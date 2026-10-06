@@ -1,0 +1,47 @@
+# Private configuration
+.env
+.env.*
+!.env.example
+
+# Private application settings
+/config/settings.py
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime state
+/data/*.json
+/data/logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+
+# Runtime / temporary files
+*.tmp
+*.temp
+*.part
+
+# Local backup files
+*.backup
+*.bak

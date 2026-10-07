@@ -54,8 +54,9 @@ Ask all Jellyfin servers
         |
         +-- Primary has the series, but
         |   another server has more
-        |   seasons ....................... "<server> has more seasons"
-        |                                   [Download missing season from <server>]
+        |   seasons or episodes ........... "<server> has more seasons"
+        |                                   or "<server> has more episodes"
+        |                                   [Download missing from <server>]
         |                                   [Search for torrent]
         |
         +-- Nobody has it ................. Jackett search results
@@ -84,10 +85,39 @@ when a library folder is configured for the category.
 - New folders and files get the owner of the library folder.
 - Progress is shown in Discord, the requester is mentioned at the end,
   and the primary library is refreshed.
-- One download runs at a time.
+- One download runs at a time. Further requests wait in a queue; their
+  message shows their place and updates when it changes.
 
-A missing season of a series that is already in the primary library
-is copied into the folder that series already uses.
+For a series already in the primary library, the episodes of both
+servers are compared by season and episode number. Whole missing
+seasons and single missing episodes are offered. They are copied into
+the folders the series already uses, including an existing season
+folder whatever it is called. A season in which your library has an
+episode without a number is never offered partly, because that file
+might be one of the "missing" ones.
+
+### Quality
+
+For movies, the availability message shows each server's copy as
+resolution, codec and size, for example `1080p · HEVC · 8.20 GiB`. When
+another server's copy scores higher under the Movies rules in
+`config/torrent_preferences.json` (resolution plus codec, the same
+scores used to rank torrents), the message says so. The bot never
+replaces library files; that is left to you.
+
+### New episodes on another server
+
+Once a day the bot compares every series in the primary library with
+the other servers and posts in the alert channel which ones have new
+seasons or episodes there. Series are matched by their TVDB, TMDB or
+IMDb id, or by title and year. Only what was not reported before is
+posted. Anyone can pick a series from the list; the bot then posts the
+usual download message for that person.
+
+```text
+JELLYFIN_NEW_CONTENT_ALERTS=true   # false turns it off
+JELLYFIN_NEW_CONTENT_HOUR=10       # hour of the day, container time
+```
 
 ### Subtitles
 
@@ -122,6 +152,7 @@ state changes.
 | Temperature | iDRAC temperature sensors | 60 s |
 | Storage | RAID controller, virtual disks and physical drives | 60 s |
 | WAN | Internet connectivity and public IP changes | 60 s |
+| Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 
@@ -202,6 +233,10 @@ JELLYFIN_SERIES_DIR=/media/Series
 
 # Preferred subtitle language: a name or code such as english, en, nl.
 SUBTITLE_LANGUAGE=english
+
+# Daily report of new seasons and episodes on the other servers.
+JELLYFIN_NEW_CONTENT_ALERTS=true
+JELLYFIN_NEW_CONTENT_HOUR=10
 
 JACKETT_INDEXERS=
 JACKETT_TIMEOUT=

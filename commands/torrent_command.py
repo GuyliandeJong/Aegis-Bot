@@ -15,6 +15,7 @@ from commands.torrent.info import TorrentInfoMixin
 from commands.torrent.list import TorrentListMixin
 from commands.torrent.search import TorrentSearchMixin
 from commands.torrent.status import TorrentStatusMixin
+from commands.torrent.watchlist import TorrentWatchlistMixin
 
 
 async def torrent_info_autocomplete(
@@ -40,6 +41,7 @@ class Torrent(
     TorrentStatusMixin,
     TorrentAddMixin,
     TorrentSearchMixin,
+    TorrentWatchlistMixin,
     commands.Cog,
 ):
     """
@@ -51,6 +53,7 @@ class Torrent(
         /torrent info
         /torrent add
         /torrent search
+        /torrent watchlist
     """
 
     ALLOWED_CATEGORIES = ALLOWED_CATEGORIES
@@ -328,6 +331,16 @@ class Torrent(
             query=query,
             category=category.value,
         )
+
+    @torrent_group.command(
+        name="watchlist",
+        description="Show or edit the titles you are waiting for.",
+    )
+    async def torrent_watchlist(
+        self,
+        interaction: discord.Interaction,
+    ):
+        await self._watchlist(interaction)
 
 
 async def setup(

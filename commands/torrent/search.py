@@ -13,6 +13,7 @@ from commands.torrent.jellyfin_download import (
     expire_view,
     find_missing_content,
 )
+from commands.torrent.watchlist import WatchlistAddView
 from services.jackett_service import JackettService
 from services.jellyfin_compare import (
     better_copy,
@@ -1575,13 +1576,20 @@ class TorrentSearchMixin:
                     )
                 )
 
-            await interaction.edit_original_response(
+            view = WatchlistAddView(
+                interaction.user.id,
+                query,
+                category,
+            )
+
+            view.message = await interaction.edit_original_response(
                 content=(
                     f"No magnet-capable results found for "
-                    f"**{query}**.{detail}"
+                    f"**{query}**.{detail}\n"
+                    "Press **Watch for it** to be told when it turns up."
                 ),
                 embed=None,
-                view=None,
+                view=view,
             )
             return
 

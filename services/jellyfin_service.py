@@ -347,6 +347,7 @@ class JellyfinService:
                 "path": str(item.get("Path") or "").strip(),
                 "media_source_id": self.media_source_id(item),
                 "subtitles": self.subtitle_info(item),
+                "quality": self.video_quality(item),
             }
 
         return None
@@ -561,6 +562,95 @@ class JellyfinService:
                 return source_id
 
         return str(item.get("Id") or "").strip()
+
+    # Jellyfin codec names, as the torrent preference keys spell them.
+    _CODEC_NAMES = {
+        "hevc": ("HEVC", ("hevc", "h.265", "x265")),
+        "h265": ("HEVC", ("hevc", "h.265", "x265")),
+        "h264": ("H.264", ("h.264", "x264")),
+        "avc": ("H.264", ("h.264", "x264")),
+        "av1": ("AV1", ("av1",)),
+        "vp9": ("VP9", ("vp9",)),
+        "mpeg2video": ("MPEG-2", ("mpeg2",)),
+    }
+
+    @staticmethod
+    def _resolution_label(width, height) -> str | None:
+        """Name a video size the way release names do (1080p, 2160p)."""
+        try:
+            width = int(width or 0)
+            height = int(height or 0)
+        except (TypeError, ValueError):
+            return None
+
+        if not width and not height:
+            return None
+
+        # Width decides for wide films: 1920x800 is still 1080p.
+        if width >= 3200 or height >= 1600:
+            return "2160p"
+
+        if width >= 1800 or height >= 1000:
+            return "1080p"
+
+        if width >= 1200 or height >= 700:
+            return "720p"
+
+        if width >= 900 or height >= 540:
+            return "576p"
+
+        return "480p"
+
+    @classmethod
+    def video_quality(cls, item: dict) -> dict | None:
+        """
+        Describe the video of an item: resolution, codec and size.
+
+        Returns None when Jellyfin sent no stream information.
+        `codec_keys` are the spellings used in torrent_preferences.json.
+        """
+        streams = item.get("MediaStreams")
+
+        if not isinstance(streams, list):
+            return None
+
+        video = next(
+            (
+                stream
+                for stream in streams
+                if isinstance(stream, dict)
+                and stream.get("Type") == "Video"
+            ),
+            None,
+        )
+
+        if video is None:
+            return None
+
+        codec = str(video.get("Codec") or "").strip().lower()
+        name, keys = cls._CODEC_NAMES.get(
+            codec,
+            (codec.upper() or None, (codec,) if codec else ()),
+        )
+
+        size = None
+        sources = item.get("MediaSources")
+
+        if isinstance(sources, list) and sources:
+            try:
+                size = int(sources[0].get("Size") or 0) or None
+            except (TypeError, ValueError, AttributeError):
+                size = None
+
+        return {
+            "resolution": cls._resolution_label(
+                video.get("Width"),
+                video.get("Height"),
+            ),
+            "codec": name,
+            "codec_keys": list(keys),
+            "size": size,
+        }
 
     @classmethod
     def subtitle_info(cls, item: dict) -> dict:

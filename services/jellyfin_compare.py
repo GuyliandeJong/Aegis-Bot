@@ -126,3 +126,78 @@ def describe_missing(entries: list[dict], limit: int = 6) -> str:
         parts = parts[:limit] + [f"{rest} more"]
 
     return ", ".join(parts)
+
+
+def quality_score(quality: dict | None, preferences: dict) -> int | None:
+    """
+    Score a copy the way torrent results are scored: resolution plus
+    codec, from the category's torrent_preferences.json section.
+    Returns None when the quality is unknown.
+    """
+    if not quality or not quality.get("resolution"):
+        return None
+
+    resolutions = preferences.get("resolution_scores") or {}
+    codecs = preferences.get("codec_scores") or {}
+
+    score = int(resolutions.get(quality["resolution"], 0) or 0)
+
+    codec_scores = [
+        int(codecs[key])
+        for key in quality.get("codec_keys") or []
+        if key in codecs
+    ]
+
+    if codec_scores:
+        score += max(codec_scores)
+
+    return score
+
+
+def describe_quality(quality: dict | None, format_size) -> str | None:
+    """"1080p · HEVC · 8.20 GiB", leaving out what is unknown."""
+    if not quality:
+        return None
+
+    parts = [
+        part
+        for part in (
+            quality.get("resolution"),
+            quality.get("codec"),
+            format_size(quality["size"]) if quality.get("size") else None,
+        )
+        if part
+    ]
+
+    return " · ".join(parts) or None
+
+
+def better_copy(matches: list[dict], preferences: dict) -> dict | None:
+    """
+    Return the other server's match that fits the preferences better
+    than the primary library's copy, or None.
+    """
+    primary = next((m for m in matches if m.get("primary")), None)
+
+    if primary is None:
+        return None
+
+    own = quality_score(primary.get("quality"), preferences)
+
+    if own is None:
+        return None
+
+    best = None
+    best_score = own
+
+    for match in matches:
+        if match is primary:
+            continue
+
+        score = quality_score(match.get("quality"), preferences)
+
+        if score is not None and score > best_score:
+            best = match
+            best_score = score
+
+    return best

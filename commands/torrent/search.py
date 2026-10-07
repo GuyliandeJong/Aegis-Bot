@@ -14,12 +14,17 @@ from commands.torrent.jellyfin_download import (
     find_missing_content,
 )
 from services.jackett_service import JackettService
-from services.jellyfin_compare import describe_missing
+from services.jellyfin_compare import (
+    better_copy,
+    describe_missing,
+    describe_quality,
+)
 from services.jellyfin_service import JellyfinService
 from services.share_link_service import (
     ShareLinkError,
     ShareLinkService,
 )
+from utils.formatting import format_bytes
 from utils.logger import logger
 from utils.open_messages import ExpiringView
 
@@ -1120,12 +1125,14 @@ class TorrentSearchMixin:
         matches,
         download_source=None,
         missing=None,
+        better=None,
     ):
         """
         Build the "already available" embed.
 
         Each Jellyfin server that has the title is listed by name, so
-        the user can see whose library it is in.
+        the user can see whose library it is in, with the quality of
+        its copy for movies.
         """
         lines = []
 
@@ -1149,6 +1156,14 @@ class TorrentSearchMixin:
 
             if server_url:
                 line += f"\n`{server_url}`"
+
+            quality = describe_quality(
+                match.get("quality"),
+                format_bytes,
+            )
+
+            if quality and match.get("type") == "Movie":
+                line += f"\n{quality}"
 
             subtitles = JellyfinService.describe_subtitles(
                 match.get("subtitles")
@@ -1192,6 +1207,14 @@ class TorrentSearchMixin:
             )
         else:
             closing = "No torrent search has been performed."
+
+        if better is not None:
+            closing = (
+                f"**{better.get('server')}** has a copy that fits your "
+                "torrent preferences better. Replacing your copy is "
+                "up to you; the bot does not touch library files.\n\n"
+                + closing
+            )
 
         return discord.Embed(
             title=title,
@@ -1321,6 +1344,19 @@ class TorrentSearchMixin:
                         JellyfinService.library_dir(category),
                     )
 
+            # Flag a better copy on another server, for movies; series
+            # episodes differ too much from file to file to compare.
+            better = None
+
+            if category == "Movies":
+                better = better_copy(
+                    jellyfin_matches,
+                    self._category_preferences(
+                        self._load_preferences(),
+                        category,
+                    ),
+                )
+
             if download_source is not None:
                 view = JellyfinSourceView(
                     owner_id=interaction.user.id,
@@ -1347,6 +1383,7 @@ class TorrentSearchMixin:
                     jellyfin_matches,
                     download_source,
                     missing,
+                    better,
                 ),
                 view=view,
             )

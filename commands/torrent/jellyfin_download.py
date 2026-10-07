@@ -186,8 +186,11 @@ async def find_missing_seasons(matches: list[dict], category: str):
     return None
 
 
-# Media files are large, so only one transfer runs at a time.
+# Media files are large, so transfers run one at a time. Requests made
+# while one runs wait here, in order.
+_queue: list["JellyfinTransfer"] = []
 _active_transfer: "JellyfinTransfer | None" = None
+_worker: asyncio.Task | None = None
 
 
 def _library_folder(match: dict) -> str:
@@ -352,7 +355,6 @@ class JellyfinTransfer:
         self.user = interaction.user
 
         self.message = None
-        self.task: asyncio.Task | None = None
 
         self.index = 0
         self.received = 0
@@ -479,14 +481,12 @@ class JellyfinTransfer:
 
     async def start(self) -> None:
         """
-        Begin the transfer.
+        Queue the transfer; it begins when the ones before it are done.
 
         The interaction must already have been answered with the
         message that will show the progress.
         """
-        global _active_transfer
-
-        _active_transfer = self
+        global _worker
 
         self.message = await _send(
             "progress message lookup",
@@ -503,9 +503,18 @@ class JellyfinTransfer:
             owner="transfer",
         )
 
-        self.task = asyncio.create_task(
-            self._run()
-        )
+        _queue.append(self)
+
+        if _active_transfer is not None or len(_queue) > 1:
+            logger.info(
+                "[JellyfinDownload] '%s' queued at position %d.",
+                self.title,
+                len(_queue),
+            )
+            await self._edit(self.queued_embed())
+
+        if _worker is None or _worker.done():
+            _worker = asyncio.create_task(_run_queue())
 
     async def _durable_message(self):
         """
@@ -546,10 +555,35 @@ class JellyfinTransfer:
             await asyncio.sleep(self.UPDATE_INTERVAL)
             await self._edit(self.progress_embed())
 
-    async def _run(self) -> None:
-        global _active_transfer
+    def queued_embed(self) -> discord.Embed:
+        """Build the embed shown while the transfer waits its turn."""
+        position = _queue.index(self) + 1 if self in _queue else 1
+        lines = [
+            f"**{self.title}**",
+            f"Waiting to copy from **{self.server_name}**.",
+            "",
+            f"Position {position} in the queue.",
+        ]
 
+        if _active_transfer is not None:
+            lines.append(
+                f"Now copying: **{_active_transfer.title}**"
+            )
+
+        subtitle_line = _subtitle_line(self.files)
+
+        if subtitle_line:
+            lines.append("")
+            lines.append(subtitle_line)
+
+        return _status_embed(
+            "Jellyfin download queued",
+            "\n".join(lines),
+        )
+
+    async def _run(self) -> None:
         service = JellyfinService()
+        self.started_at = time.monotonic()
 
         updater = asyncio.create_task(
             self._update_loop()
@@ -630,7 +664,6 @@ class JellyfinTransfer:
         finally:
             updater.cancel()
             await service.close()
-            _active_transfer = None
 
         logger.info(
             "[JellyfinDownload] Finished '%s': %d copied, %d skipped, "
@@ -668,18 +701,33 @@ class JellyfinTransfer:
             )
 
 
-async def _reject_if_busy(interaction: discord.Interaction) -> bool:
-    """Tell the user when another transfer is still running."""
-    if _active_transfer is None:
-        return False
+async def _run_queue() -> None:
+    """Run queued transfers one after another until the queue is empty."""
+    global _active_transfer
 
-    await interaction.response.send_message(
-        f"A Jellyfin download of **{_active_transfer.title}** is "
-        "already running. Please wait for it to finish.",
-        ephemeral=True,
-    )
+    while _queue:
+        transfer = _queue.pop(0)
+        _active_transfer = transfer
 
-    return True
+        # The others moved up one place.
+        for waiting in list(_queue):
+            await waiting._edit(waiting.queued_embed())
+
+        try:
+            await transfer._edit(transfer.progress_embed())
+            await transfer._run()
+        except Exception:
+            logger.exception(
+                "[JellyfinDownload] Transfer of '%s' failed.",
+                transfer.title,
+            )
+        finally:
+            _active_transfer = None
+
+
+def is_idle() -> bool:
+    """True when no transfer is running or waiting."""
+    return _active_transfer is None and not _queue
 
 
 class JellyfinSeasonView(ExpiringView):
@@ -768,9 +816,6 @@ class JellyfinSeasonView(ExpiringView):
         )
 
     async def _choose(self, interaction: discord.Interaction):
-        if await _reject_if_busy(interaction):
-            return
-
         self.stop()
 
         season = self.seasons[self.select.values[0]]
@@ -923,9 +968,6 @@ class JellyfinSourceView(ExpiringView):
         await expire_view(self)
 
     async def _download(self, interaction: discord.Interaction):
-        if await _reject_if_busy(interaction):
-            return
-
         library = JellyfinService.library_dir(self.category)
 
         if library is None:

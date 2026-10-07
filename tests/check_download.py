@@ -157,7 +157,7 @@ async def search(query, category):
 
 
 async def wait_idle():
-    while JD._active_transfer is not None: await asyncio.sleep(0.02)
+    while not JD.is_idle(): await asyncio.sleep(0.02)
     await asyncio.sleep(0.05)
 
 
@@ -173,9 +173,11 @@ async def scenario():
     print("                      " + embed.description.split(chr(10))[-1])
     BEHAVIOUR.update(delay=0.04)
     i = Inter(msg); await view._download(i)
-    busy = Inter(Message()); await JD._reject_if_busy(busy)
-    print("  second download while running ->", busy.log[-1][1]["text"][:60])
+    _, _, view2 = await search("Arrival", "Movies")
+    msg2 = Message(); await view2._download(Inter(msg2))
+    print("  second download while running ->", msg2.edits[0]["embed"].title, "|", [l for l in msg2.edits[0]["embed"].description.split(chr(10)) if l.startswith("Position")])
     await wait_idle()
+    print("  second download afterwards    ->", msg2.edits[-1]["embed"].title, "|", [l for l in msg2.edits[-1]["embed"].description.split(chr(10)) if "Skipped" in l])
     print("  progress updates:", sum(1 for e in msg.edits if e["embed"].title.startswith("Downloading")), "| final:", msg.edits[-1]["embed"].title)
     print("  " + " / ".join(l for l in msg.edits[-1]["embed"].description.split(chr(10)) if l))
     print("  mention:", msg.sent, "| library refresh requested on:", [l for l in LOG if l.startswith("POST")][-1])

@@ -108,7 +108,7 @@ async def main():
         picker.select._values = ["s1"]
         i3 = Inter(msg)
         await picker.select.callback(i3)
-        while JD._active_transfer is not None: await asyncio.sleep(0.02)
+        while not JD.is_idle(): await asyncio.sleep(0.02)
         await asyncio.sleep(0.1)
         print("result   :", msg.edits[-1]["embed"].title, "|", [l for l in msg.edits[-1]["embed"].description.splitlines() if l][1:])
         print("on disk  :", sorted(str(p.relative_to(ROOT)).replace(os.sep, "/") for p in ROOT.rglob("*") if p.is_file()))

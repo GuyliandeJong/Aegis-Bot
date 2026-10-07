@@ -121,7 +121,7 @@ async def do_search(query, category):
 
 
 async def wait_idle():
-    while JD._active_transfer is not None: await asyncio.sleep(0.02)
+    while not JD.is_idle(): await asyncio.sleep(0.02)
     await asyncio.sleep(0.1)
 
 

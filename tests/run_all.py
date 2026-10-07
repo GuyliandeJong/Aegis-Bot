@@ -48,6 +48,7 @@ EXPECTED = {
         "cut off halfway            : ERROR",
         "leftover .part files       : []",
         "Retry               : Jellyfin download complete",
+        "second download while running -> Jellyfin download queued",
     ],
     "check_series_flow.py": [
         "result   : Jellyfin download complete",

@@ -9,102 +9,45 @@ from utils.logger import logger
 
 class WOL(commands.Cog):
     """
-    Discord commands for checking and waking the configured computer
-    through GPTWOL.
+    Discord command for waking the configured computer through GPTWOL.
 
     Aegis-Bot does not send Wake-on-LAN packets itself.
     It delegates the operation to the existing GPTWOL installation.
 
-    Available commands:
-        /wol status
-        /wol wake
+    Available command:
+        /wol
     """
 
     def __init__(self, bot):
         self.bot = bot
         self.service = GPTWOLService()
 
-    @app_commands.command(
-        name="wol",
-        description="Check or wake the configured computer through GPTWOL.",
-    )
-    @app_commands.describe(action="Action to perform.")
-    @app_commands.choices(
-        action=[
-            app_commands.Choice(
-                name="Status",
-                value="status",
-            ),
-            app_commands.Choice(
-                name="Wake",
-                value="wake",
-            ),
-        ]
-    )
-    async def wol(
-        self,
-        interaction: discord.Interaction,
-        action: app_commands.Choice[str],
-    ):
-        if action.value == "status":
-            await self._status(interaction)
-            return
-
-        if action.value == "wake":
-            await self._wake(interaction)
-            return
-
-    async def _status(self, interaction: discord.Interaction):
-        """Check and display the current computer status."""
-
-        await interaction.response.defer()
-
-        try:
-            status = await self.service.check_status(
-                ip_address=settings.GPTWOL_TARGET_IP,
-                test_type=settings.GPTWOL_TARGET_TEST_TYPE,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[WOL] Failed to check GPTWOL status: %s",
-                ex,
-            )
-
-            await interaction.followup.send(
-                "Unable to retrieve the computer status from GPTWOL."
-            )
-            return
-
-        if status == "awake":
-            status_text = "Awake"
-        else:
-            status_text = "Asleep"
-
+    @staticmethod
+    def _embed(title: str, message: str) -> discord.Embed:
+        """Build the standard /wol response."""
         embed = discord.Embed(
-            title="GPTWOL Status",
+            title=title,
             description=(
                 f"**Computer**\n"
                 f"{settings.GPTWOL_TARGET_NAME}\n\n"
-                f"**IP Address**\n"
-                f"`{settings.GPTWOL_TARGET_IP}`\n\n"
-                f"**Status**\n"
-                f"{status_text}"
+                f"{message}"
             ),
             color=discord.Color.blurple(),
         )
 
         embed.timestamp = discord.utils.utcnow()
 
-        await interaction.followup.send(embed=embed)
+        return embed
 
-        logger.info(
-            "[WOL] Status requested by %s: %s",
-            interaction.user,
-            status,
-        )
-
-    async def _wake(self, interaction: discord.Interaction):
+    # Waking a computer is restricted to server administrators by
+    # default. This can be changed per user or role in Discord under
+    # Server Settings > Integrations.
+    @app_commands.command(
+        name="wol",
+        description="Wake the configured computer, or report that it is already awake.",
+    )
+    @app_commands.default_permissions(administrator=True)
+    async def wol(self, interaction: discord.Interaction):
         """
         Wake the computer if it is currently asleep.
 
@@ -135,19 +78,12 @@ class WOL(commands.Cog):
 
         # Do not call GPTWOL's toggle endpoint when the PC is already awake.
         if status == "awake":
-            embed = discord.Embed(
-                title="Computer Already Awake",
-                description=(
-                    f"**Computer**\n"
-                    f"{settings.GPTWOL_TARGET_NAME}\n\n"
-                    f"The computer is already awake."
-                ),
-                color=discord.Color.blurple(),
+            await interaction.followup.send(
+                embed=self._embed(
+                    "Computer Already Awake",
+                    "The computer is already awake.",
+                )
             )
-
-            embed.timestamp = discord.utils.utcnow()
-
-            await interaction.followup.send(embed=embed)
 
             logger.info(
                 "[WOL] Wake requested by %s, but %s is already awake.",
@@ -174,21 +110,12 @@ class WOL(commands.Cog):
             )
             return
 
-        embed = discord.Embed(
-            title="Wake-on-LAN Sent",
-            description=(
-                f"**Computer**\n"
-                f"{settings.GPTWOL_TARGET_NAME}\n\n"
-                f"**IP Address**\n"
-                f"`{settings.GPTWOL_TARGET_IP}`\n\n"
-                "Wake-on-LAN request sent through GPTWOL."
-            ),
-            color=discord.Color.blurple(),
+        await interaction.followup.send(
+            embed=self._embed(
+                "Wake-on-LAN Sent",
+                "The computer was asleep. A wake request has been sent.",
+            )
         )
-
-        embed.timestamp = discord.utils.utcnow()
-
-        await interaction.followup.send(embed=embed)
 
         logger.info(
             "[WOL] Wake requested by %s for %s.",

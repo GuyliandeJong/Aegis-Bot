@@ -12,8 +12,8 @@ class GPTWOLService:
     internet. Aegis-Bot acts as the controlled interface between
     Discord and GPTWOL.
 
-    GPTWOL base URL:
-        http://192.0.2.10:5000
+    The GPTWOL address comes from GPTWOL_HOST and GPTWOL_PORT in
+    config/settings.py.
 
     The service currently uses the two endpoints exposed by GPTWOL:
 

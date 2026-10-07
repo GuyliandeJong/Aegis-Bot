@@ -12,6 +12,33 @@ if TYPE_CHECKING:
     from commands.torrent.views.control_view import TorrentControlView
 
 
+async def _require_administrator(
+    interaction: discord.Interaction,
+) -> bool:
+    """
+    Ensure the user may permanently delete downloaded files.
+
+    Removing a torrent is open to whoever requested it, but deleting
+    the files as well is limited to server administrators.
+    """
+    permissions = getattr(
+        interaction.user,
+        "guild_permissions",
+        None,
+    )
+
+    if permissions is not None and permissions.administrator:
+        return True
+
+    await interaction.response.send_message(
+        "Only a server administrator can delete downloaded files. "
+        "You can still remove the torrent and keep its files.",
+        ephemeral=True,
+    )
+
+    return False
+
+
 class TorrentDeleteConfirmationView(discord.ui.View):
     """First-stage torrent deletion options."""
 
@@ -144,6 +171,11 @@ class TorrentDeleteConfirmationView(discord.ui.View):
         ):
             return
 
+        if not await _require_administrator(
+            interaction
+        ):
+            return
+
         confirmation = TorrentDeleteFilesConfirmationView(
             parent_view=self.parent_view,
         )
@@ -240,6 +272,11 @@ class TorrentDeleteFilesConfirmationView(discord.ui.View):
     ):
         """Remove the torrent and permanently delete its files."""
         if not await self._check_owner(
+            interaction
+        ):
+            return
+
+        if not await _require_administrator(
             interaction
         ):
             return

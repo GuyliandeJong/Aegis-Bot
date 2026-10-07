@@ -92,10 +92,10 @@ English).
   subtitle file in the preferred language is saved next to the video as
   `<video name>.<language>.srt`. Image-based subtitle files are not
   copied.
-- Torrent search results show a subtitle marker when the release name
-  mentions subtitles (for example `NLSubs`, `ESub`, `MultiSubs`). Jackett
-  only provides the name, not the file list, so a release without a
-  marker may still contain subtitles.
+
+Torrent search results say nothing about subtitles: Jackett provides
+only the release name, not the files inside. Fetching subtitles for the
+library is left to Jellyfin, for example with its Open Subtitles plugin.
 
 The other server's API key must be allowed to download media.
 

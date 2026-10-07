@@ -378,36 +378,6 @@ class TorrentSearchMixin:
             title_lower,
         ) is not None
 
-    # Subtitle markers that release names commonly use. Checked in
-    # order; the first match decides the label.
-    SUBTITLE_MARKERS = (
-        ("multi", r"\b(?:multi ?subs?|msubs?)\b"),
-        ("EN", r"\b(?:e ?subs?|eng(?:lish)? ?subs?|en ?subs?)\b"),
-        ("NL", r"\b(?:nl ?subs?|dutch ?subs?)\b"),
-        ("", r"\b(?:subs|subbed|subtitles?)\b"),
-    )
-
-    @classmethod
-    def _subtitle_hint(cls, title):
-        """
-        Return what a release name says about subtitles, or None.
-
-        Jackett only provides the release name, not the file list, so
-        this can only report subtitles the uploader mentioned. A
-        release without a marker may still contain them.
-        """
-        normalized = re.sub(
-            r"[^a-z0-9]+",
-            " ",
-            str(title).lower(),
-        )
-
-        for label, pattern in cls.SUBTITLE_MARKERS:
-            if re.search(pattern, normalized):
-                return f"{label} subs".strip()
-
-        return None
-
     @classmethod
     def _query_tokens(cls, value):
         """Return ordered normalized query tokens."""
@@ -1031,24 +1001,13 @@ class TorrentSearchMixin:
                 result["indexer"]
             )
 
-            subtitle_hint = self._subtitle_hint(
-                result["title"]
-            )
-
-            subtitle_text = (
-                f" · 💬 {subtitle_hint}"
-                if subtitle_hint
-                else ""
-            )
-
             embed.add_field(
                 name=f"{position}. {title}",
                 value=(
                     f"`Score {result['score']}` · "
                     f"{source}\n"
                     f"🌱 {result['seeders']} seeders · "
-                    f"📦 {self._format_bytes(result['size'])}"
-                    f"{subtitle_text}\n"
+                    f"📦 {self._format_bytes(result['size'])}\n"
                     f"_{result['score_reason']}_"
                 ),
                 inline=False,

@@ -29,7 +29,7 @@ class Idrac(commands.Cog):
 
         # Defer the response because the iDRAC information is
         # retrieved asynchronously.
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # Create the iDRAC service used to retrieve the information.
         service = IdracService()
@@ -74,7 +74,8 @@ class Idrac(commands.Cog):
 
             # Send the completed iDRAC information.
             await interaction.followup.send(
-                embed=embed
+                embed=embed,
+                ephemeral=True,
             )
 
             logger.info(
@@ -99,7 +100,8 @@ class Idrac(commands.Cog):
             )
 
             await interaction.followup.send(
-                embed=embed
+                embed=embed,
+                ephemeral=True,
             )
 
         finally:

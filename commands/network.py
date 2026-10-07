@@ -29,7 +29,7 @@ class Network(commands.Cog):
 
         # Defer the response because retrieving network information
         # requires an asynchronous service request.
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         try:
             # Retrieve the current network status.
@@ -92,7 +92,7 @@ class Network(commands.Cog):
             )
 
             # Send the completed network information embed.
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
             logger.info(
                 "Network status requested by %s",
@@ -115,7 +115,7 @@ class Network(commands.Cog):
                 color=theme.ERROR_COLOR,
             )
 
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

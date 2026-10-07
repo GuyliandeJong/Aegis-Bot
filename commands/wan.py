@@ -31,7 +31,7 @@ class Wan(commands.Cog):
 
         # Defer the response because retrieving the WAN IP
         # requires an external HTTP request.
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         try:
             # Retrieve the current public WAN IP.
@@ -58,7 +58,7 @@ class Wan(commands.Cog):
                 ],
             )
 
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
             logger.info(
                 "WAN IP requested by %s: %s",
@@ -83,7 +83,8 @@ class Wan(commands.Cog):
             )
 
             await interaction.followup.send(
-                embed=embed
+                embed=embed,
+                ephemeral=True,
             )
 
 

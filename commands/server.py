@@ -29,7 +29,7 @@ class Server(commands.Cog):
 
         # Defer the response because the iDRAC requests can take
         # longer than Discord's three-second interaction limit.
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         # Create the service used to retrieve server information.
         service = ServerService()
@@ -122,7 +122,8 @@ class Server(commands.Cog):
 
         # Send the completed embed to Discord.
         await interaction.followup.send(
-            embed=embed
+            embed=embed,
+            ephemeral=True,
         )
 
 

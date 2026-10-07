@@ -69,6 +69,18 @@ EXPECTED = {
         "expired; buttons disabled",
         "'disabled': [True]",
     ],
+    "check_restart.py": [
+        "after view 5 timed out: ['1']",
+        "owner after view stopped: transfer",
+        "edited at startup: (1, 'The bot restarted",
+        "edited at startup: (3, 'download note', None)",
+        "left after startup: []",
+        "qBittorrent list requests for both monitors: 1",
+        "TorrentMonitor state after two were removed: ['aaa']",
+        "5368709120 -> 5.00 GiB | completion alert 5.00 GiB",
+        "failures: [('iDRAC', 'could not connect'), "
+        "('Friend', 'the API key was refused')]",
+    ],
     "check_requesters_links.py": [
         "searched Jackett for ['Gattaca 1997']",
         "'Target category: **Series**'",

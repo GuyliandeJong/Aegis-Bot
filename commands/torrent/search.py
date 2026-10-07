@@ -1054,53 +1054,80 @@ class TorrentSearchMixin:
         from being searched.
         """
         if category not in {"Movies", "Series"}:
-            return None
+            return []
 
         service = JellyfinService()
 
         if not service.servers:
             await service.close()
-            return None
+            return []
 
         try:
-            result = await service.is_available(
+            return await service.find_matches(
                 query,
                 category,
             )
-
-            if not result:
-                return None
-
-            # JellyfinService identifies the matching server by name.
-            # Resolve the actual configured URL here so the Discord
-            # response can tell the user exactly which library contains
-            # the requested item.
-            server_name = str(
-                result.get("server")
-                or ""
-            ).strip().lower()
-
-            for server in service.servers:
-                if (
-                    str(server.name)
-                    .strip()
-                    .lower()
-                    == server_name
-                ):
-                    result["url"] = server.url
-                    break
-
-            return result
 
         except Exception as ex:
             logger.exception(
                 "[TorrentSearch] Jellyfin availability check failed: %s",
                 ex,
             )
-            return None
+            return []
 
         finally:
             await service.close()
+
+    @staticmethod
+    def _build_jellyfin_embed(matches):
+        """
+        Build the "already available" embed.
+
+        Each Jellyfin server that has the title is listed by name, so
+        the user can see whose library it is in.
+        """
+        lines = []
+
+        for match in matches:
+            title = str(
+                match.get("title")
+                or "Unknown title"
+            )
+
+            year = match.get("year")
+
+            if year:
+                title = f"{title} ({year})"
+
+            server_url = str(
+                match.get("url")
+                or ""
+            ).strip()
+
+            line = f"**{match.get('server')}** — {title}"
+
+            if server_url:
+                line += f"\n`{server_url}`"
+
+            lines.append(line)
+
+        if len(matches) == 1:
+            title = (
+                f"Already available on {matches[0].get('server')}"
+            )
+        else:
+            title = (
+                f"Already available on {len(matches)} Jellyfin servers"
+            )
+
+        return discord.Embed(
+            title=title,
+            description=(
+                "\n\n".join(lines)
+                + "\n\nNo torrent search has been performed."
+            ),
+            color=discord.Color.green(),
+        )
 
     async def _search(
         self,
@@ -1128,57 +1155,24 @@ class TorrentSearchMixin:
         #
         # Only Movies and Series are checked. Music and PC continue
         # directly to the normal Jackett search.
-        jellyfin_result = None
+        jellyfin_matches = []
         if not skip_jellyfin:
-            jellyfin_result = await self._check_jellyfin(
+            jellyfin_matches = await self._check_jellyfin(
                 query,
                 category,
             )
 
-        if jellyfin_result:
-            title = str(
-                jellyfin_result.get("title")
-                or query
-            )
-
-            year = jellyfin_result.get("year")
-
-            server_url = str(
-                jellyfin_result.get("url")
-                or ""
-            ).strip()
-
-            if year:
-                title_display = f"{title} ({year})"
-            else:
-                title_display = title
-
+        if jellyfin_matches:
             logger.info(
-                "[TorrentSearch] '%s' is already available "
-                "in Jellyfin at %s. Skipping torrent search.",
+                "[TorrentSearch] '%s' is already available on %s. "
+                "Skipping torrent search.",
                 query,
-                server_url or "unknown URL",
-            )
-
-            if server_url:
-                library_line = (
-                    f"**Library:** `{server_url}`"
-                )
-            else:
-                library_line = (
-                    "**Library:** configured Jellyfin server"
-                )
-
-            embed = discord.Embed(
-                title="Already available in Jellyfin",
-                description=(
-                    f"`{title_display}` is already available "
-                    "in the Jellyfin library.\n\n"
-                    f"{library_line}\n\n"
-                    "No torrent search has been performed."
+                ", ".join(
+                    str(match.get("server"))
+                    for match in jellyfin_matches
                 ),
-                color=discord.Color.green(),
             )
+
             view = TorrentJellyfinSearchView(
                 owner_id=interaction.user.id,
                 query=query,
@@ -1187,7 +1181,9 @@ class TorrentSearchMixin:
             )
             await interaction.edit_original_response(
                 content=None,
-                embed=embed,
+                embed=self._build_jellyfin_embed(
+                    jellyfin_matches
+                ),
                 view=view,
             )
             return

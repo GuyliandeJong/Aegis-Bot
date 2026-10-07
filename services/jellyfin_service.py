@@ -48,9 +48,13 @@ class JellyfinService:
                 index += 1
                 continue
 
+            # An optional display name, e.g. JELLYFIN_1_NAME=Home, tells
+            # users which library a title was found in.
+            name = os.getenv(f"JELLYFIN_{index}_NAME", "").strip()
+
             servers.append(
                 JellyfinServer(
-                    name=f"Jellyfin {index}",
+                    name=name or f"Jellyfin {index}",
                     url=url,
                     api_key=api_key,
                 )
@@ -230,54 +234,106 @@ class JellyfinService:
         Returns:
             A dictionary describing the matching library item, or None.
         """
+        matches = await self.find_matches(
+            query,
+            category,
+        )
+
+        return matches[0] if matches else None
+
+    async def find_matches(
+        self,
+        query: str,
+        category: str,
+    ) -> list[dict]:
+        """
+        Check every configured Jellyfin server for an existing item.
+
+        Returns:
+            One dictionary per server that has the item, in the order
+            the servers are configured. Empty when none has it.
+        """
         item_type = self._item_type_for_category(category)
 
         # Jellyfin availability checks are currently only relevant for
         # Movies and Series.
         if item_type is None:
-            return None
+            return []
 
         if not self.servers:
-            return None
+            return []
 
         await self.connect()
 
+        # The servers are independent, so ask them at the same time.
+        results = await asyncio.gather(
+            *(
+                self._match_on_server(
+                    server,
+                    query,
+                    item_type,
+                )
+                for server in self.servers
+            )
+        )
+
+        return [
+            result
+            for result in results
+            if result is not None
+        ]
+
+    async def _match_on_server(
+        self,
+        server: JellyfinServer,
+        query: str,
+        item_type: str,
+    ) -> dict | None:
+        """Return the first matching library item on one server."""
         query_year = self._extract_year(query)
 
-        for server in self.servers:
-            items = await self._search_server(
-                server,
-                query,
-                item_type,
-            )
+        # Jellyfin searches titles only, so a year typed after the
+        # title ("Dune 2021") would otherwise find nothing. The year
+        # is still compared against each result below.
+        search_term = re.sub(
+            r"\b(?:19|20)\d{2}\b",
+            " ",
+            query,
+        ).strip() or query
 
-            for item in items:
-                title = str(item.get("Name") or "").strip()
+        items = await self._search_server(
+            server,
+            search_term,
+            item_type,
+        )
 
-                if not title:
-                    continue
+        for item in items:
+            title = str(item.get("Name") or "").strip()
 
-                if not self._titles_match(query, title):
-                    continue
+            if not title:
+                continue
 
-                item_year = item.get("ProductionYear")
+            if not self._titles_match(query, title):
+                continue
 
-                if query_year is not None and item_year is not None:
-                    try:
-                        if int(item_year) != query_year:
-                            continue
-                    except (TypeError, ValueError):
-                        pass
+            item_year = item.get("ProductionYear")
 
-                return {
-                    "server": server.name,
-                    "url": server.url,
-                    "title": title,
-                    "year": item_year,
-                    "type": item.get("Type") or item_type,
-                    "item_id": str(item.get("Id") or "").strip(),
-                    "path": str(item.get("Path") or "").strip(),
-                }
+            if query_year is not None and item_year is not None:
+                try:
+                    if int(item_year) != query_year:
+                        continue
+                except (TypeError, ValueError):
+                    pass
+
+            return {
+                "server": server.name,
+                "url": server.url,
+                "title": title,
+                "year": item_year,
+                "type": item.get("Type") or item_type,
+                "item_id": str(item.get("Id") or "").strip(),
+                "path": str(item.get("Path") or "").strip(),
+            }
 
         return None
 

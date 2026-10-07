@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from dataclasses import dataclass
@@ -131,6 +132,9 @@ class JellyfinService:
 
         # Avoid matching unrelated titles simply because one contains
         # the other as a substring.
+        # TODO: decide how strict a non-exact match should be.
+        # The subset rule below still matches "The Last of Us" to "Us"
+        # and "Alien" to "Alien: Romulus".
         return query_tokens.issubset(title_tokens) or title_tokens.issubset(
             query_tokens
         )
@@ -273,7 +277,10 @@ class JellyfinService:
                     "item_id": str(item.get("Id") or "").strip(),
                     "path": str(item.get("Path") or "").strip(),
                 }
-            async def get_seasons(
+
+        return None
+
+    async def get_seasons(
         self,
         server_name: str,
         series_id: str,
@@ -432,9 +439,17 @@ class JellyfinService:
         url = f"{server.url}/Items/{item_id}/Download"
 
         try:
+            # The session's 15-second total timeout suits API calls but
+            # would abort any real media download, so only guard against
+            # a stalled connection here.
             async with self.session.get(
                 url,
                 headers=headers,
+                timeout=aiohttp.ClientTimeout(
+                    total=None,
+                    sock_connect=15,
+                    sock_read=60,
+                ),
             ) as response:
                 if response.status != 200:
                     body = await response.text()
@@ -483,18 +498,17 @@ class JellyfinService:
             return False
 
     def _get_server(
-    self,
-    server_name: str,
+        self,
+        server_name: str,
     ) -> JellyfinServer | None:
-    """Return a configured server by name."""
-    normalized = str(server_name).strip().lower()
+        """Return a configured server by name."""
+        normalized = str(server_name).strip().lower()
 
-    for server in self.servers:
-        if server.name.strip().lower() == normalized:
-            return server
+        for server in self.servers:
+            if server.name.strip().lower() == normalized:
+                return server
 
-    return None
-
+        return None
 
     async def refresh(self, server_name: str) -> bool:
         """Ask Jellyfin to refresh its library."""
@@ -548,6 +562,3 @@ class JellyfinService:
                 server.name,
             )
             return False
-
-
-        return None

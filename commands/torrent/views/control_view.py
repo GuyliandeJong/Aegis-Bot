@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
 
 import discord
 
@@ -10,9 +9,6 @@ from services.qbittorrent_service import QBittorrentService
 from utils.logger import logger
 
 from .delete_view import TorrentDeleteConfirmationView
-
-if TYPE_CHECKING:
-    from commands.torrent.torrent_cog import TorrentCog
 
 
 class TorrentControlView(discord.ui.View):
@@ -507,11 +503,22 @@ class TorrentControlView(discord.ui.View):
         finally:
             await service.close()
 
-    async def _pause(
+    async def _run_action(
         self,
         interaction: discord.Interaction,
+        method_name: str,
+        *,
+        success: str,
+        failure: str,
+        wait_for_state_change: bool = False,
     ):
-        """Pause the selected torrent."""
+        """
+        Run one qBittorrent action for a button press.
+
+        Every control button follows the same steps: check the owner,
+        call a QBittorrentService method with the torrent hash, refresh
+        the information embed, and report the outcome privately.
+        """
         if not await self._check_owner(
             interaction
         ):
@@ -531,545 +538,143 @@ class TorrentControlView(discord.ui.View):
                     "Torrent hash is missing."
                 )
 
-            await service.pause_torrent(
-                torrent_hash
-            )
+            await getattr(
+                service,
+                method_name,
+            )(torrent_hash)
 
             await self._refresh_info(
                 interaction,
-                wait_for_state_change=True,
+                wait_for_state_change=wait_for_state_change,
             )
 
             await interaction.followup.send(
-                "Torrent paused.",
+                success,
                 ephemeral=True,
+            )
+
+            logger.info(
+                "[TorrentControlView] %s completed for '%s' (hash=%s).",
+                method_name,
+                self.torrent.get(
+                    "name",
+                    "Unknown torrent",
+                ),
+                torrent_hash,
             )
 
         except Exception as ex:
             logger.exception(
-                "[TorrentControlView] Failed to pause "
-                "torrent: %s",
+                "[TorrentControlView] %s failed: %s",
+                method_name,
                 ex,
             )
 
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to pause the torrent.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to pause the torrent.",
-                    ephemeral=True,
-                )
+            await interaction.followup.send(
+                failure,
+                ephemeral=True,
+            )
 
         finally:
             await service.close()
+
+    async def _pause(
+        self,
+        interaction: discord.Interaction,
+    ):
+        """Pause the selected torrent."""
+        await self._run_action(
+            interaction,
+            "pause_torrent",
+            success="Torrent paused.",
+            failure="Unable to pause the torrent.",
+            wait_for_state_change=True,
+        )
 
     async def _resume(
         self,
         interaction: discord.Interaction,
     ):
         """Resume the selected torrent."""
-        if not await self._check_owner(
-            interaction
-        ):
-            return
-
-        await interaction.response.defer()
-
-        service = QBittorrentService()
-
-        try:
-            torrent_hash = self.torrent.get(
-                "hash"
-            )
-
-            if not torrent_hash:
-                raise RuntimeError(
-                    "Torrent hash is missing."
-                )
-
-            await service.resume_torrent(
-                torrent_hash
-            )
-
-            await self._refresh_info(
-                interaction,
-                wait_for_state_change=True,
-            )
-
-            await interaction.followup.send(
-                "Torrent resumed.",
-                ephemeral=True,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[TorrentControlView] Failed to resume "
-                "torrent: %s",
-                ex,
-            )
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to resume the torrent.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to resume the torrent.",
-                    ephemeral=True,
-                )
-
-        finally:
-            await service.close()
+        await self._run_action(
+            interaction,
+            "resume_torrent",
+            success="Torrent resumed.",
+            failure="Unable to resume the torrent.",
+            wait_for_state_change=True,
+        )
 
     async def _recheck(
         self,
         interaction: discord.Interaction,
     ):
         """Force a recheck of the selected torrent."""
-        if not await self._check_owner(
-            interaction
-        ):
-            return
-
-        await interaction.response.defer()
-
-        service = QBittorrentService()
-
-        try:
-            torrent_hash = self.torrent.get(
-                "hash"
-            )
-
-            if not torrent_hash:
-                raise RuntimeError(
-                    "Torrent hash is missing."
-                )
-
-            logger.info(
-                "[TorrentControlView] Rechecking torrent %s.",
-                torrent_hash,
-            )
-
-            await service.recheck_torrent(
-                torrent_hash
-            )
-
-            await self._refresh_info(
-                interaction
-            )
-
-            await interaction.followup.send(
-                "Torrent recheck started.",
-                ephemeral=True,
-            )
-
-            logger.info(
-                "[TorrentControlView] Recheck started "
-                "for '%s' (hash=%s).",
-                self.torrent.get(
-                    "name",
-                    "Unknown torrent",
-                ),
-                torrent_hash,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[TorrentControlView] Failed to recheck "
-                "torrent: %s",
-                ex,
-            )
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to recheck the torrent.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to recheck the torrent.",
-                    ephemeral=True,
-                )
-
-        finally:
-            await service.close()
+        await self._run_action(
+            interaction,
+            "recheck_torrent",
+            success="Torrent recheck started.",
+            failure="Unable to recheck the torrent.",
+        )
 
     async def _reannounce(
         self,
         interaction: discord.Interaction,
     ):
         """Force a tracker reannounce for the selected torrent."""
-        if not await self._check_owner(
-            interaction
-        ):
-            return
-
-        await interaction.response.defer()
-
-        service = QBittorrentService()
-
-        try:
-            torrent_hash = self.torrent.get(
-                "hash"
-            )
-
-            if not torrent_hash:
-                raise RuntimeError(
-                    "Torrent hash is missing."
-                )
-
-            logger.info(
-                "[TorrentControlView] Reannouncing torrent %s.",
-                torrent_hash,
-            )
-
-            await service.reannounce_torrent(
-                torrent_hash
-            )
-
-            await self._refresh_info(
-                interaction
-            )
-
-            await interaction.followup.send(
-                "Torrent reannounce requested.",
-                ephemeral=True,
-            )
-
-            logger.info(
-                "[TorrentControlView] Reannounce requested "
-                "for '%s' (hash=%s).",
-                self.torrent.get(
-                    "name",
-                    "Unknown torrent",
-                ),
-                torrent_hash,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[TorrentControlView] Failed to reannounce "
-                "torrent: %s",
-                ex,
-            )
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to reannounce the torrent.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to reannounce the torrent.",
-                    ephemeral=True,
-                )
-
-        finally:
-            await service.close()
+        await self._run_action(
+            interaction,
+            "reannounce_torrent",
+            success="Torrent reannounce requested.",
+            failure="Unable to reannounce the torrent.",
+        )
 
     async def _increase_priority(
         self,
         interaction: discord.Interaction,
     ):
         """Increase the selected torrent's queue priority."""
-        if not await self._check_owner(
-            interaction
-        ):
-            return
-
-        await interaction.response.defer()
-
-        service = QBittorrentService()
-
-        try:
-            torrent_hash = self.torrent.get(
-                "hash"
-            )
-
-            if not torrent_hash:
-                raise RuntimeError(
-                    "Torrent hash is missing."
-                )
-
-            logger.info(
-                "[TorrentControlView] Increasing priority "
-                "for torrent %s.",
-                torrent_hash,
-            )
-
-            await service.increase_priority(
-                torrent_hash
-            )
-
-            await self._refresh_info(
-                interaction
-            )
-
-            await interaction.followup.send(
-                "Torrent priority increased.",
-                ephemeral=True,
-            )
-
-            logger.info(
-                "[TorrentControlView] Priority increased "
-                "for '%s' (hash=%s).",
-                self.torrent.get(
-                    "name",
-                    "Unknown torrent",
-                ),
-                torrent_hash,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[TorrentControlView] Failed to increase "
-                "torrent priority: %s",
-                ex,
-            )
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to increase the torrent priority.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to increase the torrent priority.",
-                    ephemeral=True,
-                )
-
-        finally:
-            await service.close()
+        await self._run_action(
+            interaction,
+            "increase_priority",
+            success="Torrent priority increased.",
+            failure="Unable to increase the torrent priority.",
+        )
 
     async def _decrease_priority(
         self,
         interaction: discord.Interaction,
     ):
         """Decrease the selected torrent's queue priority."""
-        if not await self._check_owner(
-            interaction
-        ):
-            return
-
-        await interaction.response.defer()
-
-        service = QBittorrentService()
-
-        try:
-            torrent_hash = self.torrent.get(
-                "hash"
-            )
-
-            if not torrent_hash:
-                raise RuntimeError(
-                    "Torrent hash is missing."
-                )
-
-            logger.info(
-                "[TorrentControlView] Decreasing priority "
-                "for torrent %s.",
-                torrent_hash,
-            )
-
-            await service.decrease_priority(
-                torrent_hash
-            )
-
-            await self._refresh_info(
-                interaction
-            )
-
-            await interaction.followup.send(
-                "Torrent priority decreased.",
-                ephemeral=True,
-            )
-
-            logger.info(
-                "[TorrentControlView] Priority decreased "
-                "for '%s' (hash=%s).",
-                self.torrent.get(
-                    "name",
-                    "Unknown torrent",
-                ),
-                torrent_hash,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[TorrentControlView] Failed to decrease "
-                "torrent priority: %s",
-                ex,
-            )
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to decrease the torrent priority.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to decrease the torrent priority.",
-                    ephemeral=True,
-                )
-
-        finally:
-            await service.close()
+        await self._run_action(
+            interaction,
+            "decrease_priority",
+            success="Torrent priority decreased.",
+            failure="Unable to decrease the torrent priority.",
+        )
 
     async def _top_priority(
         self,
         interaction: discord.Interaction,
     ):
         """Move the selected torrent to the top of the queue."""
-        if not await self._check_owner(
-            interaction
-        ):
-            return
-
-        await interaction.response.defer()
-
-        service = QBittorrentService()
-
-        try:
-            torrent_hash = self.torrent.get(
-                "hash"
-            )
-
-            if not torrent_hash:
-                raise RuntimeError(
-                    "Torrent hash is missing."
-                )
-
-            logger.info(
-                "[TorrentControlView] Moving torrent %s "
-                "to top priority.",
-                torrent_hash,
-            )
-
-            await service.top_priority(
-                torrent_hash
-            )
-
-            await self._refresh_info(
-                interaction
-            )
-
-            await interaction.followup.send(
-                "Torrent moved to the top of the queue.",
-                ephemeral=True,
-            )
-
-            logger.info(
-                "[TorrentControlView] Torrent moved to top priority "
-                "for '%s' (hash=%s).",
-                self.torrent.get(
-                    "name",
-                    "Unknown torrent",
-                ),
-                torrent_hash,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[TorrentControlView] Failed to move torrent "
-                "to top priority: %s",
-                ex,
-            )
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to move the torrent to the top "
-                    "of the queue.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to move the torrent to the top "
-                    "of the queue.",
-                    ephemeral=True,
-                )
-
-        finally:
-            await service.close()
+        await self._run_action(
+            interaction,
+            "top_priority",
+            success="Torrent moved to the top of the queue.",
+            failure="Unable to move the torrent to the top of the queue.",
+        )
 
     async def _bottom_priority(
         self,
         interaction: discord.Interaction,
     ):
         """Move the selected torrent to the bottom of the queue."""
-        if not await self._check_owner(
-            interaction
-        ):
-            return
-
-        await interaction.response.defer()
-
-        service = QBittorrentService()
-
-        try:
-            torrent_hash = self.torrent.get(
-                "hash"
-            )
-
-            if not torrent_hash:
-                raise RuntimeError(
-                    "Torrent hash is missing."
-                )
-
-            logger.info(
-                "[TorrentControlView] Moving torrent %s "
-                "to bottom priority.",
-                torrent_hash,
-            )
-
-            await service.bottom_priority(
-                torrent_hash
-            )
-
-            await self._refresh_info(
-                interaction
-            )
-
-            await interaction.followup.send(
-                "Torrent moved to the bottom of the queue.",
-                ephemeral=True,
-            )
-
-            logger.info(
-                "[TorrentControlView] Torrent moved to bottom priority "
-                "for '%s' (hash=%s).",
-                self.torrent.get(
-                    "name",
-                    "Unknown torrent",
-                ),
-                torrent_hash,
-            )
-
-        except Exception as ex:
-            logger.exception(
-                "[TorrentControlView] Failed to move torrent "
-                "to bottom priority: %s",
-                ex,
-            )
-
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "Unable to move the torrent to the bottom "
-                    "of the queue.",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "Unable to move the torrent to the bottom "
-                    "of the queue.",
-                    ephemeral=True,
-                )
-
-        finally:
-            await service.close()
+        await self._run_action(
+            interaction,
+            "bottom_priority",
+            success="Torrent moved to the bottom of the queue.",
+            failure="Unable to move the torrent to the bottom of the queue.",
+        )
 
     async def _delete(
         self,

@@ -238,6 +238,34 @@ async def _send(step: str, request):
     return result
 
 
+async def expire_view(view: discord.ui.View) -> None:
+    """
+    Show that a message's buttons no longer work.
+
+    A view stops listening after its timeout, but Discord keeps
+    showing its buttons as if they still worked. Disable them and say
+    what to do next.
+    """
+    for item in view.children:
+        item.disabled = True
+
+    message = getattr(view, "message", None)
+
+    if message is None:
+        return
+
+    try:
+        await message.edit(
+            content=(
+                "This request has expired. "
+                "Run `/torrent search` again to continue."
+            ),
+            view=view,
+        )
+    except discord.HTTPException:
+        pass
+
+
 async def _report_error(
     interaction: discord.Interaction,
     error: Exception,
@@ -640,6 +668,7 @@ class JellyfinSeasonView(discord.ui.View):
         self.owner_id = owner_id
         self.match = match
         self.directory = directory
+        self.message = None
 
         # Discord allows 25 options, each needing a unique value.
         self.seasons = {}
@@ -692,6 +721,9 @@ class JellyfinSeasonView(discord.ui.View):
         item,
     ):
         await _report_error(interaction, error)
+
+    async def on_timeout(self):
+        await expire_view(self)
 
     @staticmethod
     def _season_folder(season: dict) -> str:
@@ -809,6 +841,7 @@ class JellyfinSourceView(discord.ui.View):
         self.category = category
         self.torrent_cog = torrent_cog
         self.match = match
+        self.message = None
 
         # Set when the primary library already has part of a series:
         # only these seasons are offered, and they are copied into the
@@ -856,6 +889,9 @@ class JellyfinSourceView(discord.ui.View):
         item,
     ):
         await _report_error(interaction, error)
+
+    async def on_timeout(self):
+        await expire_view(self)
 
     async def _download(self, interaction: discord.Interaction):
         if await _reject_if_busy(interaction):
@@ -978,7 +1014,7 @@ class JellyfinSourceView(discord.ui.View):
             )
             return
 
-        await _send(
+        view.message = await _send(
             "season picker",
             interaction.edit_original_response(
                 content=None,

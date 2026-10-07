@@ -10,6 +10,7 @@ import discord
 from commands.torrent.jellyfin_download import (
     JellyfinSourceView,
     existing_series_folder,
+    expire_view,
     find_missing_seasons,
 )
 from services.jackett_service import JackettService
@@ -139,9 +140,13 @@ class TorrentJellyfinSearchView(discord.ui.View):
         self.query = query
         self.category = category
         self.torrent_cog = torrent_cog
+        self.message = None
         self.add_item(
             TorrentJellyfinSearchButton(self)
         )
+
+    async def on_timeout(self):
+        await expire_view(self)
 
     async def interaction_check(
         self,
@@ -1327,7 +1332,8 @@ class TorrentSearchMixin:
                     torrent_cog=self,
                 )
 
-            await interaction.edit_original_response(
+            # Kept so the view can grey out its buttons when it expires.
+            view.message = await interaction.edit_original_response(
                 content=None,
                 embed=self._build_jellyfin_embed(
                     jellyfin_matches,

@@ -21,6 +21,7 @@ class Server(commands.Cog):
         name="server",
         description="Displays the current server status.",
     )
+    @app_commands.default_permissions(administrator=True)
     async def server(self, interaction: discord.Interaction):
         """
         Retrieve and display live server information from iDRAC.

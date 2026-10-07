@@ -5,6 +5,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from config.settings import settings
 from monitors.filesystem_monitor import FilesystemMonitor
 from monitors.monitor_manager import MonitorManager
 from monitors.wan_monitor import WanMonitor
@@ -133,6 +134,16 @@ async def on_ready():
 
 async def main():
     """Start Aegis-Bot."""
+    # Older copies of config/settings.py do not track missing values.
+    missing = getattr(settings, "MISSING", None)
+
+    if missing:
+        logger.warning(
+            "Missing required .env values: %s. "
+            "Features that depend on them will not work.",
+            ", ".join(missing),
+        )
+
     try:
         async with bot:
             await load_extensions()

@@ -23,6 +23,7 @@ class Wan(commands.Cog):
         name="wan",
         description="Show the server's current public WAN IP.",
     )
+    @app_commands.default_permissions(administrator=True)
     async def wan(self, interaction: discord.Interaction):
         """
         Retrieve and display the current public WAN IP.

@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from config.settings import settings
 from monitors.base_monitor import BaseMonitor
 from services.qbittorrent_service import QBittorrentService
+from services.torrent_requesters import mention_for
 from utils.formatting import format_compact_duration
 from utils.logger import logger
 
@@ -386,19 +386,9 @@ class TorrentMonitor(BaseMonitor):
             ),
         ]
 
-        user_id = str(
-            getattr(
-                settings,
-                "DISCORD_USER_ID",
-                "",
-            )
-            or ""
-        ).strip()
-
-        content = (
-            f"<@{user_id}>"
-            if user_id.isdigit()
-            else None
+        # Mention the person who added the torrent through the bot.
+        content = mention_for(
+            torrent.get("hash")
         )
 
         description = (

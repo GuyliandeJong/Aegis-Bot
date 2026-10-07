@@ -6,6 +6,7 @@ import discord
 
 from commands.torrent.views import TorrentControlView
 from services.qbittorrent_service import QBittorrentService
+from services.torrent_requesters import remember
 from utils.logger import logger
 
 
@@ -76,6 +77,12 @@ class TorrentAddMixin:
             logger.info(
                 "[Torrent] qBittorrent returned torrent hash %s.",
                 torrent_hash,
+            )
+
+            # Notifications about this torrent go to whoever added it.
+            remember(
+                torrent_hash,
+                interaction.user.id,
             )
 
             torrent = None

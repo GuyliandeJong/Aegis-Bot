@@ -2,9 +2,9 @@ import json
 import time
 from pathlib import Path
 
-from config.settings import settings
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_action_tracker import consume_expected_action
+from services.torrent_requesters import mention_for
 from utils.formatting import format_compact_duration
 from utils.logger import logger
 
@@ -112,12 +112,9 @@ class TorrentHealthMonitor:
         return format_compact_duration(seconds)
 
     @staticmethod
-    def mention_content():
-        user_id = str(
-            getattr(settings, "DISCORD_USER_ID", "") or ""
-        ).strip()
-
-        return f"<@{user_id}>" if user_id.isdigit() else None
+    def mention_content(torrent):
+        """Mention the person who added the torrent through the bot."""
+        return mention_for(torrent.get("hash"))
 
     async def notify_status(
         self,
@@ -148,7 +145,7 @@ class TorrentHealthMonitor:
                     True,
                 ),
             ],
-            content=self.mention_content(),
+            content=self.mention_content(torrent),
         )
 
     async def notify_stalled(self, torrent, stalled_for):
@@ -172,7 +169,7 @@ class TorrentHealthMonitor:
                     True,
                 ),
             ],
-            content=self.mention_content(),
+            content=self.mention_content(torrent),
         )
 
         logger.warning(
@@ -198,7 +195,7 @@ class TorrentHealthMonitor:
                     True,
                 ),
             ],
-            content=self.mention_content(),
+            content=self.mention_content(torrent),
         )
 
         logger.warning(

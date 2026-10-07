@@ -58,6 +58,14 @@ Ask all Jellyfin servers
         +-- Nobody has it ................. Jackett search results
 ```
 
+Instead of a title, a Google share link (`https://share.google/…`) can
+be pasted as the search. The bot reads the title from the link and asks
+Wikidata for the year and whether it is a film or a series. For a film
+the year is added to the search; if the chosen category does not match
+(a series searched under Movies, or the reverse), the right one is used.
+Only share links are accepted, and the Google results page itself is
+never downloaded.
+
 The primary server is `JELLYFIN_1`. The download button only appears
 when a library folder is configured for the category.
 
@@ -119,6 +127,10 @@ Filesystem and temperature alerts for the same component are at least
 not alert on every crossing. A component becoming critical is always
 reported immediately.
 
+Torrent notifications (completed, stalled, error) mention the person
+who added the torrent through the bot. Torrents added some other way,
+for example in qBittorrent itself, mention `DISCORD_USER_ID`.
+
 Monitor state is kept in `data/` so a restart does not repeat alerts.
 
 ## Configuration
@@ -161,7 +173,7 @@ GPTWOL_TARGET_MAC=
 Optional:
 
 ```text
-# Mentioned in torrent notifications.
+# Mentioned for torrents that were not added through the bot.
 DISCORD_USER_ID=
 
 # Jellyfin servers, numbered from 1. Server 1 is the primary library.

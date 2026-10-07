@@ -15,6 +15,10 @@ from commands.torrent.jellyfin_download import (
 )
 from services.jackett_service import JackettService
 from services.jellyfin_service import JellyfinService
+from services.share_link_service import (
+    ShareLinkError,
+    ShareLinkService,
+)
 from utils.logger import logger
 
 
@@ -1219,6 +1223,47 @@ class TorrentSearchMixin:
 
         if not interaction.response.is_done():
             await interaction.response.defer()
+
+        # A Google share link can be pasted instead of a title. It is
+        # turned into "Title Year", and tells movies from series.
+        if ShareLinkService.is_link(query):
+            try:
+                resolved = await ShareLinkService().resolve(query)
+
+            except ShareLinkError as ex:
+                await interaction.edit_original_response(
+                    content=str(ex),
+                    embed=None,
+                    view=None,
+                )
+                return
+
+            query = resolved["title"]
+
+            if (
+                resolved["kind"]
+                and category in {"Movies", "Series"}
+                and resolved["kind"] != category
+            ):
+                logger.info(
+                    "[TorrentSearch] '%s' is in %s, not %s; "
+                    "searching that category instead.",
+                    query,
+                    resolved["kind"],
+                    category,
+                )
+
+                category = resolved["kind"]
+
+            # Movie releases carry their year, so adding it narrows
+            # the search. Series releases are named by season instead,
+            # and a year would hide most of them.
+            if (
+                category == "Movies"
+                and resolved["year"]
+                and str(resolved["year"]) not in query
+            ):
+                query = f"{query} {resolved['year']}"
 
         # Check Jellyfin before creating or querying Jackett.
         #

@@ -189,9 +189,12 @@ state changes.
 | Filesystem | Usage of the host's mounted filesystems | 60 s |
 | Temperature | iDRAC temperature sensors | 60 s |
 | Storage | RAID controller, virtual disks and physical drives | 60 s |
+| Hardware | Power supply and fan health through iDRAC | 60 s |
 | WAN | Internet connectivity and public IP changes | 60 s |
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Watchlist | Titles people are waiting for | Twice a day |
+| Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
+| Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 
@@ -205,6 +208,49 @@ who added the torrent through the bot. Torrents added some other way,
 for example in qBittorrent itself, mention `DISCORD_USER_ID`.
 
 Monitor state is kept in `data/` so a restart does not repeat alerts.
+
+The hardware monitor reports a power supply or fan whose health
+changes (Critical, Warning, back to OK), and one that iDRAC stops
+listing. `/server` also shows how many power supplies and fans are OK
+and how many watts the server draws.
+
+The weekly summary is posted in the alert channel:
+
+```text
+WEEKLY_SUMMARY=true          # false turns it off
+WEEKLY_SUMMARY_DAY=sunday
+WEEKLY_SUMMARY_HOUR=10       # container time
+```
+
+Disk growth is measured from one summary to the next, so the first
+summary only shows current usage.
+
+### When the bot itself is down
+
+No monitor can report that the bot has stopped. `scripts/watchdog.sh`
+runs on the server from cron instead. It posts to a Discord webhook
+when the container is not running or the bot has not written
+`data/heartbeat` for ten minutes (hung, or disconnected from Discord),
+and once more when the bot is back.
+
+1. In Discord: the alert channel's settings > Integrations > Webhooks
+   > New Webhook > Copy Webhook URL.
+2. Add it to `.env`:
+
+   ```text
+   WATCHDOG_WEBHOOK_URL=https://discord.com/api/webhooks/...
+   ```
+
+3. Add a cron entry for a user that may run `docker` (for example with
+   `sudo crontab -e`):
+
+   ```text
+   */5 * * * * bash /path/to/Aegis-Bot/scripts/watchdog.sh
+   ```
+
+The webhook URL lets anyone who has it post in that channel; keep it in
+`.env` only. The script cannot report a server that is off or has no
+internet, because nothing runs then to send the message.
 
 At startup the bot checks that qBittorrent, Jackett, iDRAC and every
 Jellyfin server answer, and posts one alert naming any that do not.
@@ -281,6 +327,14 @@ JELLYFIN_NEW_CONTENT_HOUR=10
 SEED_RATIO_TARGET=2
 SEED_DAYS_TARGET=14
 
+# Weekly summary in the alert channel.
+WEEKLY_SUMMARY=true
+WEEKLY_SUMMARY_DAY=sunday
+WEEKLY_SUMMARY_HOUR=10
+
+# Used only by scripts/watchdog.sh on the server.
+WATCHDOG_WEBHOOK_URL=
+
 JACKETT_INDEXERS=
 JACKETT_TIMEOUT=
 GPTWOL_TARGET_NAME=
@@ -347,6 +401,7 @@ redfish/               HTTP client for the iDRAC Redfish API
 utils/                 Logging, embeds, formatting, theme
 config/                Settings template and torrent ranking preferences
 scripts/rebuild.sh     Restart the container and show its startup log
+scripts/watchdog.sh    Cron job: alert through a webhook when the bot is down
 tests/                 Checks that run the bot's code against local stand-ins
 ```
 

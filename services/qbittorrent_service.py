@@ -1,5 +1,7 @@
 """qBittorrent Web API service."""
 
+import asyncio
+
 import aiohttp
 
 from config.settings import settings
@@ -7,7 +9,17 @@ from utils.logger import logger
 
 
 class QBittorrentService:
-    """Asynchronous qBittorrent Web API client."""
+    """
+    Asynchronous qBittorrent Web API client.
+
+    Every instance shares one authenticated HTTP session. Commands,
+    buttons and refresh loops create a new QBittorrentService for each
+    action, and logging in to qBittorrent for every one of them was
+    the slowest part of each request.
+    """
+
+    _shared_session: aiohttp.ClientSession | None = None
+    _connect_lock: asyncio.Lock | None = None
 
     def __init__(self):
         self.base_url = (
@@ -20,57 +32,87 @@ class QBittorrentService:
             total=settings.QBITTORRENT_TIMEOUT
         )
 
-        self.session: aiohttp.ClientSession | None = None
+    @property
+    def session(self) -> aiohttp.ClientSession | None:
+        """The session shared by all QBittorrentService instances."""
+        return QBittorrentService._shared_session
 
     async def connect(self) -> None:
-        """Create the HTTP session and authenticate with qBittorrent."""
+        """Create the shared HTTP session and authenticate, if needed."""
 
-        if self.session is not None and not self.session.closed:
-            return
+        cls = QBittorrentService
 
-        logger.info(
-            "[QBittorrentService] Connecting to qBittorrent at %s",
-            self.base_url,
-        )
+        if cls._connect_lock is None:
+            cls._connect_lock = asyncio.Lock()
 
-        self.session = aiohttp.ClientSession(
-            timeout=self.timeout,
-            cookie_jar=aiohttp.CookieJar(
-                unsafe=True,
-            ),
-            headers={
-                "Origin": self.base_url,
-                "Referer": f"{self.base_url}/",
-            },
-        )
+        # The lock stops two simultaneous requests from both logging in.
+        async with cls._connect_lock:
+            if self.session is not None and not self.session.closed:
+                return
 
-        try:
-            async with self.session.post(
-                f"{self.api_url}/auth/login",
-                data={
-                    "username": settings.QBITTORRENT_USERNAME,
-                    "password": settings.QBITTORRENT_PASSWORD,
+            logger.info(
+                "[QBittorrentService] Connecting to qBittorrent at %s",
+                self.base_url,
+            )
+
+            session = aiohttp.ClientSession(
+                timeout=self.timeout,
+                cookie_jar=aiohttp.CookieJar(
+                    unsafe=True,
+                ),
+                headers={
+                    "Origin": self.base_url,
+                    "Referer": f"{self.base_url}/",
                 },
-            ) as response:
+            )
 
-                if response.status not in {
-                    200,
-                    204,
-                }:
-                    text = await response.text()
+            try:
+                async with session.post(
+                    f"{self.api_url}/auth/login",
+                    data={
+                        "username": settings.QBITTORRENT_USERNAME,
+                        "password": settings.QBITTORRENT_PASSWORD,
+                    },
+                ) as response:
 
-                    raise RuntimeError(
-                        "qBittorrent authentication failed: "
-                        f"{response.status} {text}"
+                    if response.status not in {
+                        200,
+                        204,
+                    }:
+                        text = await response.text()
+
+                        raise RuntimeError(
+                            "qBittorrent authentication failed: "
+                            f"{response.status} {text}"
+                        )
+
+                    logger.info(
+                        "[QBittorrentService] Successfully authenticated."
                     )
 
-                logger.info(
-                    "[QBittorrentService] Successfully authenticated."
-                )
+            except Exception:
+                await session.close()
+                raise
 
-        except Exception:
-            await self.close()
-            raise
+            cls._shared_session = session
+
+    @classmethod
+    async def _discard_session(
+        cls,
+        session: aiohttp.ClientSession | None,
+    ) -> None:
+        """
+        Drop a session that qBittorrent no longer accepts.
+
+        Nothing happens if another request has already replaced it.
+        """
+        if session is None or cls._shared_session is not session:
+            return
+
+        cls._shared_session = None
+
+        if not session.closed:
+            await session.close()
 
     async def _request(
         self,
@@ -95,12 +137,14 @@ class QBittorrentService:
         for attempt in range(2):
             await self.connect()
 
-            if self.session is None:
+            session = self.session
+
+            if session is None:
                 raise RuntimeError(
                     "qBittorrent session was not initialized."
                 )
 
-            async with self.session.request(
+            async with session.request(
                 method,
                 url,
                 params=params,
@@ -132,7 +176,7 @@ class QBittorrentService:
                     )
 
             if retry:
-                await self.close()
+                await self._discard_session(session)
 
     @staticmethod
     async def _parse_response(
@@ -516,12 +560,13 @@ class QBittorrentService:
         )
 
     async def close(self):
-        """Close the HTTP session."""
+        """
+        Kept so existing callers can still pair every use with close().
 
-        if (
-            self.session is not None
-            and not self.session.closed
-        ):
-            await self.session.close()
+        The session is shared and stays open; see shutdown().
+        """
 
-        self.session = None
+    @classmethod
+    async def shutdown(cls) -> None:
+        """Close the shared HTTP session when the bot stops."""
+        await cls._discard_session(cls._shared_session)

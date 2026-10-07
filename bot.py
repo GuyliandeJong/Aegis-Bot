@@ -14,6 +14,7 @@ from monitors.memory_monitor import MemoryMonitor
 from monitors.storage_monitor import StorageMonitor
 from monitors.torrent_monitor import TorrentMonitor
 from monitors.torrent_health_monitor import TorrentHealthMonitor
+from services.qbittorrent_service import QBittorrentService
 from services.torrent_action_tracker import (
     install_qbittorrent_action_tracking,
 )
@@ -132,9 +133,12 @@ async def on_ready():
 
 async def main():
     """Start Aegis-Bot."""
-    async with bot:
-        await load_extensions()
-        await bot.start(TOKEN)
+    try:
+        async with bot:
+            await load_extensions()
+            await bot.start(TOKEN)
+    finally:
+        await QBittorrentService.shutdown()
 
 
 if __name__ == "__main__":

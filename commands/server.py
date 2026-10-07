@@ -66,7 +66,7 @@ class Server(commands.Cog):
                     ),
                     EmbedField(
                         f"{theme.STORAGE_EMOJI} Memory",
-                        f"{status.total_memory_gb} GB",
+                        f"{status.total_memory_gb} GiB",
                         inline=False,
                     ),
                     EmbedField(

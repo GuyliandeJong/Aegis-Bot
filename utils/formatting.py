@@ -79,7 +79,7 @@ def format_uptime(boot_time: float) -> str:
 
 def format_bytes(value: int | float | None) -> str:
     """
-    Format a byte value into a readable size, e.g. "1.50 GB".
+    Format a byte value into a readable binary size, e.g. "1.50 GiB".
     """
 
     try:
@@ -90,13 +90,13 @@ def format_bytes(value: int | float | None) -> str:
     if value < 1024:
         return f"{value:.0f} B"
 
-    for unit in ("KB", "MB", "GB", "TB", "PB"):
+    for unit in ("KiB", "MiB", "GiB", "TiB", "PiB"):
         value /= 1024
 
         if value < 1024:
             return f"{value:.2f} {unit}"
 
-    return f"{value:.2f} EB"
+    return f"{value:.2f} EiB"
 
 
 def format_compact_duration(seconds: int | float | None) -> str:

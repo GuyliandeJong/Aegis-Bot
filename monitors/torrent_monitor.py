@@ -4,7 +4,7 @@ from pathlib import Path
 from monitors.base_monitor import BaseMonitor
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_requesters import mention_for
-from utils.formatting import format_compact_duration
+from utils.formatting import format_bytes, format_compact_duration
 from utils.logger import logger
 
 
@@ -159,46 +159,13 @@ class TorrentMonitor(BaseMonitor):
             or progress >= 1.0
         )
 
-    @classmethod
+    @staticmethod
     def format_bytes(
-        cls,
         value,
     ):
         """Format bytes as a human-readable binary size."""
 
-        value = max(
-            0.0,
-            cls.number(value),
-        )
-
-        units = (
-            "B",
-            "KiB",
-            "MiB",
-            "GiB",
-            "TiB",
-            "PiB",
-        )
-
-        for unit in units:
-            if (
-                value < 1024
-                or unit == units[-1]
-            ):
-                if unit == "B":
-                    return f"{value:.0f} {unit}"
-
-                if value >= 100:
-                    return f"{value:.0f} {unit}"
-
-                if value >= 10:
-                    return f"{value:.1f} {unit}"
-
-                return f"{value:.2f} {unit}"
-
-            value /= 1024
-
-        return "0 B"
+        return format_bytes(value)
 
     @classmethod
     def format_speed(

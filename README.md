@@ -1,290 +1,227 @@
 # Aegis-Bot
 
-Aegis-Bot is a self-hosted Python Discord bot designed for server management, infrastructure monitoring, torrent automation, and Jellyfin integration.
+Aegis-Bot is a self-hosted Discord bot for one home server. It reports
+on the server's hardware and health, sends alerts when something needs
+attention, and manages media: searching and adding torrents, and copying
+movies and series from another Jellyfin server.
 
-The project is primarily intended to run in Docker on a self-hosted server.
+It runs in Docker and serves a single Discord server (guild).
 
-## Features
+## Commands
 
-- Discord-based server management
-- System and infrastructure monitoring
-- Network and connectivity monitoring
-- Storage and filesystem monitoring
-- Hardware monitoring
-- iDRAC / Redfish integration
-- Wake-on-LAN
-- Torrent searching and management
-- Jackett integration
-- qBittorrent integration
-- Jellyfin library checking
-- Jellyfin-based media downloading
-- Docker-based deployment
+| Command | What it does | Who can use it |
+|---|---|---|
+| `/torrent search` | Checks Jellyfin first, then searches Jackett and adds the chosen result to qBittorrent | Everyone |
+| `/torrent add` | Adds a magnet link to qBittorrent | Everyone |
+| `/torrent list` | Lists torrents, with filter, sort and live refresh | Everyone |
+| `/torrent info` | Details and controls for one torrent | Everyone |
+| `/torrent status` | qBittorrent version and transfer totals | Everyone |
+| `/cpu`, `/memory`, `/filesystems`, `/network` | Live readings from the host | Everyone |
+| `/storage`, `/temperature`, `/idrac` | RAID, sensors and iDRAC details through Redfish | Everyone |
+| `/server` | Server model, service tag, BIOS and OS through Redfish | Administrators |
+| `/wan` | Public IP address | Administrators |
+| `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
+| `/ping`, `/hello` | Checks that the bot responds | Everyone |
 
-## Project Structure
+"Administrators" is Discord's administrator permission, set as the
+command default. It can be changed per user or role in Discord under
+Server Settings > Integrations.
+
+Inside `/torrent info`, removing a torrent is open to whoever requested
+it. Removing a torrent together with its files requires administrator
+permission.
+
+## Torrent search and Jellyfin
+
+For the Movies and Series categories, `/torrent search` asks every
+configured Jellyfin server before searching for torrents.
 
 ```text
-Aegis-Bot/
-├── bot.py
-├── Dockerfile
-├── requirements.txt
-│
-├── commands/
-│   ├── ...
-│   └── torrent/
-│
-├── config/
-│   ├── __init__.py
-│   └── torrent_preferences.json
-│
-├── models/
-│   └── ...
-│
-├── monitors/
-│   └── ...
-│
-├── redfish/
-│   └── ...
-│
-├── services/
-│   └── ...
-│
-├── utils/
-│   └── ...
-│
-├── scripts/
-│   └── rebuild.sh
-│
-├── README.md
-├── HANDOVER.md
-└── PROJECT_STATE.md
+/torrent search <title>
+        |
+        v
+Ask all Jellyfin servers
+        |
+        +-- Primary server has it ......... "Already available on <server>"
+        |                                   [Search for torrent]
+        |
+        +-- Only another server has it .... "Available on <server>"
+        |                                   [Download from <server>]
+        |                                   [Search for torrent]
+        |
+        +-- Nobody has it ................. Jackett search results
 ```
 
-### Main Components
+The primary server is `JELLYFIN_1`. The download button only appears
+when a library folder is configured for the category.
 
-- `commands/` — Discord commands and user-facing bot functionality.
-- `services/` — Integrations with external services and APIs.
-- `monitors/` — System and infrastructure monitoring functionality.
-- `models/` — Data models used throughout the application.
-- `redfish/` — Redfish / iDRAC-related functionality.
-- `utils/` — Shared utility functions.
-- `config/` — Non-sensitive configuration and application defaults.
-- `scripts/` — Deployment and maintenance scripts.
+### Downloading from another Jellyfin server
+
+- Movies are copied to `JELLYFIN_MOVIES_DIR/<Title (Year)>/`.
+- Series ask for a season and copy only that season to
+  `JELLYFIN_SERIES_DIR/<Title (Year)>/Season NN/`.
+- Original file names are kept.
+- A file is written as `<name>.part` and renamed once complete.
+- Files that already exist are skipped, never overwritten, so a season
+  that stopped halfway can simply be requested again.
+- New folders and files get the owner of the library folder.
+- Progress is shown in Discord, the requester is mentioned at the end,
+  and the primary library is refreshed.
+- One download runs at a time.
+
+Only the video file is copied. Separate subtitle files are not.
+
+The other server's API key must be allowed to download media.
+
+## Monitoring
+
+Monitors run in the background and post to the alert channel when a
+state changes.
+
+| Monitor | Watches | Interval |
+|---|---|---|
+| CPU, Memory | Sustained high usage, with separate recovery thresholds | 60 s |
+| Filesystem | Usage of the host's mounted filesystems | 60 s |
+| Temperature | iDRAC temperature sensors | 60 s |
+| Storage | RAID controller, virtual disks and physical drives | 60 s |
+| WAN | Internet connectivity and public IP changes | 60 s |
+| Torrent | Completed downloads | 10 s |
+| Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
+
+Filesystem and temperature alerts for the same component are at least
+`ALERT_COOLDOWN` seconds apart, so a value hovering on a threshold does
+not alert on every crossing. A component becoming critical is always
+reported immediately.
+
+Monitor state is kept in `data/` so a restart does not repeat alerts.
 
 ## Configuration
 
-Private configuration is intentionally not included in this repository.
+Configuration lives in two untracked files.
 
-The following files are excluded from Git:
+### `config/settings.py`
+
+Copy `config/settings.example.py` to `config/settings.py`. It reads
+everything from `.env` and contains no addresses or credentials itself.
+The comments in that file describe every value. Missing required values
+are listed in the log at startup.
+
+### `.env`
+
+Required:
 
 ```text
-.env
-config/settings.py
-.venv/
-data/*.json
+DISCORD_TOKEN=
+GUILD_ID=
+ALERT_CHANNEL_ID=
+
+IDRAC_HOST=
+IDRAC_USERNAME=
+IDRAC_PASSWORD=
+
+QBITTORRENT_HOST=
+QBITTORRENT_PORT=
+QBITTORRENT_USERNAME=
+QBITTORRENT_PASSWORD=
+
+JACKETT_URL=
+JACKETT_API_KEY=
+
+GPTWOL_HOST=
+GPTWOL_TARGET_IP=
+GPTWOL_TARGET_MAC=
 ```
 
-These files contain environment-specific configuration, credentials, runtime state, or other private information.
+Optional:
 
-When setting up a development environment, the required configuration must be recreated locally.
+```text
+# Mentioned in torrent notifications.
+DISCORD_USER_ID=
+
+# Jellyfin servers, numbered from 1. Server 1 is the primary library.
+JELLYFIN_1_URL=
+JELLYFIN_1_API_KEY=
+JELLYFIN_1_NAME=
+JELLYFIN_2_URL=
+JELLYFIN_2_API_KEY=
+JELLYFIN_2_NAME=
+
+# Library folders as seen inside the container. Setting these enables
+# downloading from another Jellyfin server.
+JELLYFIN_MOVIES_DIR=/media/Movies
+JELLYFIN_SERIES_DIR=/media/Series
+
+JACKETT_INDEXERS=
+JACKETT_TIMEOUT=
+GPTWOL_TARGET_NAME=
+ALERT_COOLDOWN=1800
+```
+
+Thresholds and durations for the monitors can also be set in `.env`;
+see `config/settings.example.py` for their names and defaults.
+
+`config/torrent_preferences.json` controls how search results are
+ranked per category: preferred resolutions, codec scores and terms to
+avoid.
 
 ## Docker
 
-Aegis-Bot is designed to run in Docker.
+The container is named `aegis-bot`. The project folder is mounted at
+`/app`, so source changes only need a restart, not an image rebuild.
 
-The production container is currently named:
+Required mounts:
 
-```text
-aegis-bot
+```yaml
+volumes:
+  # Read-only view of the host for monitoring.
+  - /:/host:ro
+
+  # The project itself.
+  - /path/to/Aegis-Bot:/app
+
+  # Read-write access to the media library, for Jellyfin downloads.
+  - /path/to/media:/media
 ```
 
-The project is mounted into the container as:
+The media mount must be read-write. A read-only mount makes every
+download fail with a "mounted read-write" message.
 
-```text
-/app
-```
-
-The host storage is also available to the container for integrations that require access to files on the server.
-
-The normal rebuild process is:
+Restart after a change:
 
 ```bash
 bash scripts/rebuild.sh
 ```
 
-## Development Guidelines
+The script restarts the container, waits until the bot reports that it
+has started, and prints the startup log. Check that every command file
+is listed as loaded.
 
-Aegis-Bot is an existing production application. Changes should therefore be incremental and targeted.
+Logs:
 
-### General Rules
-
-- Preserve existing functionality.
-- Avoid unnecessary rewrites.
-- Do not replace working integrations without a clear reason.
-- Keep changes limited to the feature being developed.
-- Maintain compatibility with the existing Docker deployment.
-- Keep Discord/UI logic inside the appropriate command modules.
-- Keep external service/API logic inside `services/` where practical.
-- Do not commit credentials, API keys, tokens, or private configuration.
-- Test changes before deploying them to the production container.
-
-### External Integrations
-
-Existing integrations should be treated as dependencies of the application.
-
-In particular, changes to torrent functionality should preserve the existing:
-
-- Jackett integration
-- qBittorrent integration
-- Torrent search flow
-- Existing Discord UI
-
-## Torrent Search
-
-Torrent searching is handled through the torrent command system.
-
-The current workflow integrates with Jellyfin before performing a normal torrent search.
-
-For supported media categories:
-
-1. Search Jellyfin for the requested title.
-2. If the media already exists in Jellyfin, inform the user.
-3. Allow the user to explicitly continue with a torrent search.
-4. Otherwise continue with the existing Jackett torrent search workflow.
-
-The Jellyfin check must not remove or bypass the existing torrent-search functionality.
-
-## Jellyfin Integration
-
-The project currently has a Jellyfin service used to search configured Jellyfin servers.
-
-The first Jellyfin integration is already functional.
-
-The intended architecture supports multiple Jellyfin servers, allowing the bot to determine where requested media is available before starting a torrent search.
-
-### Jellyfin 1
-
-Jellyfin 1 is the primary media library.
-
-When media is already available there, the bot reports that it is available and provides an option to continue with a torrent search if desired.
-
-### Jellyfin 2
-
-The next development stage is to use Jellyfin 2 as an additional source for media.
-
-The intended workflow is:
-
-```text
-User searches for media
-        │
-        ▼
-Check Jellyfin 1
-        │
-   ┌────┴────┐
-   │         │
- Found    Not found
-   │         │
-   ▼         ▼
- Show     Check Jellyfin 2
-available       │
-           ┌────┴────┐
-           │         │
-        Found     Not found
-           │         │
-           ▼         ▼
-   Download from   Torrent
-   Jellyfin 2      search
+```bash
+docker logs --since 10m aegis-bot
 ```
 
-If media exists in Jellyfin 2, the user should be given the option to download it from Jellyfin 2 into the primary Jellyfin 1 library.
+The same output is kept in `data/logs/aegis.log`.
 
-### Movies
-
-Movies downloaded from Jellyfin 2 should be placed in the Jellyfin 1 Movies library while preserving the original media filename.
-
-Target structure:
+## Project structure
 
 ```text
-/media/Movies/<Movie Name>/<original media filename>
+bot.py                 Entry point: loads commands, starts monitors
+commands/              One file per slash command
+commands/torrent/      The /torrent group, its views and the Jellyfin download
+services/              Clients for qBittorrent, Jackett, Jellyfin, GPTWOL, Redfish data
+monitors/              Background checks and their persisted state
+models/                Small data classes returned by services
+redfish/               HTTP client for the iDRAC Redfish API
+utils/                 Logging, embeds, formatting, theme
+config/                Settings template and torrent ranking preferences
+scripts/rebuild.sh     Restart the container and show its startup log
 ```
 
-After the download completes, Jellyfin 1 should be refreshed so the media becomes available in the primary library.
-
-### Series
-
-For series, the user should be able to select a season.
-
-Only the selected season should be downloaded.
-
-Episodes should be placed in the Jellyfin 1 Series library while preserving their original filenames.
-
-Target structure:
-
-```text
-/media/Series/<Series Name>/Season XX/<original episode filename>
-```
-
-After the download completes, Jellyfin 1 should be refreshed.
-
-### Music
-
-Music is currently outside the scope of the Jellyfin download workflow.
-
-Do not implement Jellyfin 2 music downloading unless explicitly requested.
-
-## API Design
-
-External service communication should remain separated from Discord command handling.
-
-For example:
-
-```text
-Discord command
-      │
-      ▼
-Command logic
-      │
-      ▼
-Service layer
-      │
-      ▼
-External API
-```
-
-This keeps the bot commands easier to maintain and allows the service integrations to be tested independently.
-
-## Testing
-
-Before deploying changes:
-
-1. Verify the Python code starts correctly.
-2. Verify the Docker container starts correctly.
-3. Test the affected Discord command.
-4. Verify existing functionality still works.
-5. Check container logs for errors.
-6. Test both successful and failure paths for external API operations.
-
-For Jellyfin-related changes, test at minimum:
-
-- Media found in Jellyfin 1.
-- Media not found in Jellyfin 1.
-- Media found in Jellyfin 2.
-- Media not found in either server.
-- Movie download.
-- Series season selection.
-- Series season download.
-- Jellyfin library refresh.
-- API/network failure.
-- Invalid or missing media data.
-
-## Development Documentation
-
-Additional development information is maintained in:
-
-- `HANDOVER.md` — development handover and implementation guidance.
-- `PROJECT_STATE.md` — current implementation state and outstanding work.
-
-These files are intended to give another developer or AI coding assistant enough context to continue development without having to reconstruct the project history.
+Development notes, working method and known limitations are in
+`HANDOVER.md`.
 
 ## License
 
-No open-source license has currently been selected for this project.
+No open-source license has been selected for this project.

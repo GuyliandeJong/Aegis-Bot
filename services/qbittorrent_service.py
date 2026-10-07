@@ -295,6 +295,26 @@ class QBittorrentService:
 
             return cls._snapshot
 
+    async def get_free_space(self) -> int | None:
+        """
+        Return the free space qBittorrent reports, in bytes.
+
+        This is the free space of the disk holding qBittorrent's
+        default save path. Returns None when it is not reported.
+        """
+
+        data = await self._request(
+            "GET",
+            "/sync/maindata",
+            params={"rid": 0},
+        )
+
+        try:
+            value = data["server_state"]["free_space_on_disk"]
+            return int(value) if value is not None else None
+        except (KeyError, TypeError, ValueError):
+            return None
+
     async def get_torrent_info(
         self,
         torrent_hash: str,

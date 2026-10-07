@@ -7,6 +7,7 @@ import discord
 from commands.torrent.views import TorrentControlView
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_requesters import remember
+from utils.formatting import format_bytes
 from utils.logger import logger
 
 
@@ -186,6 +187,16 @@ class TorrentAddMixin:
         view.message = await interaction.original_response()
         view.start_refresh()
 
+        # A magnet often has no size until qBittorrent has fetched its
+        # metadata, so the space check runs in the background.
+        asyncio.create_task(
+            self._warn_if_no_space(
+                interaction,
+                torrent_hash,
+                category,
+            )
+        )
+
         logger.info(
             "[Torrent] Successfully added torrent '%s' "
             "(hash=%s, category=%s) for %s.",
@@ -200,3 +211,82 @@ class TorrentAddMixin:
             ),
             interaction.user,
         )
+
+    # How long to wait for a magnet's size, and how often to look.
+    SPACE_CHECK_TRIES = 12
+    SPACE_CHECK_INTERVAL = 10
+
+    async def _warn_if_no_space(
+        self,
+        interaction: discord.Interaction,
+        torrent_hash: str,
+        category: str,
+    ) -> None:
+        """
+        Tell the requester when a new torrent may not fit on the disk.
+
+        Compares what is left to download with the free space
+        qBittorrent reports for its default save path. Only warns;
+        the torrent is left as it is.
+        """
+        service = QBittorrentService()
+
+        try:
+            for attempt in range(self.SPACE_CHECK_TRIES):
+                if attempt:
+                    await asyncio.sleep(self.SPACE_CHECK_INTERVAL)
+
+                torrents = await service.get_torrents(category=category)
+
+                torrent = next(
+                    (
+                        candidate
+                        for candidate in torrents
+                        if str(candidate.get("hash", "")).lower()
+                        == torrent_hash.lower()
+                    ),
+                    None,
+                )
+
+                if torrent is None:
+                    return
+
+                size = int(torrent.get("size") or 0)
+
+                if size <= 0:
+                    continue
+
+                left = int(torrent.get("amount_left") or size)
+                free = await service.get_free_space()
+
+                if free is None or left <= free:
+                    return
+
+                logger.warning(
+                    "[Torrent] '%s' needs %d bytes; %d are free.",
+                    torrent.get("name"),
+                    left,
+                    free,
+                )
+
+                await interaction.followup.send(
+                    f"**Not enough free space.** "
+                    f"**{torrent.get('name')}** still needs "
+                    f"{format_bytes(left)}, but only "
+                    f"{format_bytes(free)} is free on qBittorrent's "
+                    "download disk. The torrent was added anyway; "
+                    "free up space or remove it.",
+                    ephemeral=True,
+                )
+                return
+
+        except Exception as ex:
+            logger.warning(
+                "[Torrent] Free space check for %s failed: %s",
+                torrent_hash,
+                ex,
+            )
+
+        finally:
+            await service.close()
+

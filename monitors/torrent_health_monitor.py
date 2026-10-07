@@ -205,7 +205,7 @@ class TorrentHealthMonitor:
 
     async def check(self):
         """Check current torrents and report meaningful changes."""
-        torrents = await self.service.get_torrents()
+        torrents = await self.service.get_torrents_snapshot()
 
         if not isinstance(torrents, list):
             raise RuntimeError(

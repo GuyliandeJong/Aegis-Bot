@@ -377,7 +377,7 @@ class TorrentMonitor(BaseMonitor):
     async def check(self):
         """Run one torrent monitoring cycle."""
 
-        torrents = await self.service.get_torrents()
+        torrents = await self.service.get_torrents_snapshot()
 
         if not isinstance(
             torrents,

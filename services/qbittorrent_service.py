@@ -21,6 +21,16 @@ class QBittorrentService:
     _shared_session: aiohttp.ClientSession | None = None
     _connect_lock: asyncio.Lock | None = None
 
+    # The torrent list as last fetched for the monitors, with the
+    # event-loop time it was fetched at.
+    _snapshot: list[dict] | None = None
+    _snapshot_at = 0.0
+    _snapshot_lock: asyncio.Lock | None = None
+
+    # Both torrent monitors run every ten seconds. A list younger than
+    # this is handed to the second one instead of asking again.
+    SNAPSHOT_MAX_AGE = 5.0
+
     def __init__(self):
         self.base_url = (
             f"http://{settings.QBITTORRENT_HOST}:{settings.QBITTORRENT_PORT}"
@@ -255,6 +265,35 @@ class QBittorrentService:
             )
 
         return result
+
+    async def get_torrents_snapshot(self) -> list[dict]:
+        """
+        Return the full torrent list, shared between the monitors.
+
+        The two torrent monitors each need the whole list every ten
+        seconds. The first to ask fetches it; the other receives the
+        same list if it is at most SNAPSHOT_MAX_AGE seconds old.
+        Commands keep using get_torrents(), which is always fresh.
+        """
+
+        cls = QBittorrentService
+
+        if cls._snapshot_lock is None:
+            cls._snapshot_lock = asyncio.Lock()
+
+        async with cls._snapshot_lock:
+            now = asyncio.get_running_loop().time()
+
+            if (
+                cls._snapshot is not None
+                and now - cls._snapshot_at <= cls.SNAPSHOT_MAX_AGE
+            ):
+                return cls._snapshot
+
+            cls._snapshot = await self.get_torrents()
+            cls._snapshot_at = asyncio.get_running_loop().time()
+
+            return cls._snapshot
 
     async def get_torrent_info(
         self,

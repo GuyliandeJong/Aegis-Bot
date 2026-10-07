@@ -26,6 +26,7 @@ import services.torrent_requesters as R
 import services.share_link_service as SL
 from commands.torrent.formatting import TorrentFormattingMixin
 from commands.torrent.constants import ALLOWED_CATEGORIES
+import isolate  # state files go to a temporary folder
 
 R.STATE_FILE = Path(tempfile.mkdtemp()) / "requesters.json"
 PORT = 18100

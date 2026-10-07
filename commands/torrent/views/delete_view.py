@@ -7,6 +7,7 @@ import discord
 
 from services.qbittorrent_service import QBittorrentService
 from utils.logger import logger
+from utils.open_messages import ExpiringView
 
 if TYPE_CHECKING:
     from commands.torrent.views.control_view import TorrentControlView
@@ -39,7 +40,7 @@ async def _require_administrator(
     return False
 
 
-class TorrentDeleteConfirmationView(discord.ui.View):
+class TorrentDeleteConfirmationView(ExpiringView):
     """First-stage torrent deletion options."""
 
     def __init__(
@@ -217,7 +218,7 @@ class TorrentDeleteConfirmationView(discord.ui.View):
         self._disable_all_buttons()
 
 
-class TorrentDeleteFilesConfirmationView(discord.ui.View):
+class TorrentDeleteFilesConfirmationView(ExpiringView):
     """Second-stage confirmation for permanently deleting torrent files."""
 
     def __init__(

@@ -8,9 +8,10 @@ from utils import theme
 from utils.embed_models import EmbedField
 from utils.embeds import create_embed
 from utils.logger import logger
+from utils.open_messages import ExpiringView
 
 
-class TorrentMatchView(discord.ui.View):
+class TorrentMatchView(ExpiringView):
     """
     Dropdown used to select one torrent from multiple search results.
     """

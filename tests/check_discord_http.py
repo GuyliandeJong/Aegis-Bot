@@ -23,6 +23,7 @@ import discord
 from discord.webhook import async_ as webhook_async
 import discord.http
 import commands.torrent.jellyfin_download as JD
+import isolate  # state files go to a temporary folder
 
 webhook_async.Route.BASE = f"http://127.0.0.1:{PORT}/api"
 DISCORD_CALLS = []

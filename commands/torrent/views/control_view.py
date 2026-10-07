@@ -7,11 +7,12 @@ import discord
 
 from services.qbittorrent_service import QBittorrentService
 from utils.logger import logger
+from utils.open_messages import ExpiringView
 
 from .delete_view import TorrentDeleteConfirmationView
 
 
-class TorrentControlView(discord.ui.View):
+class TorrentControlView(ExpiringView):
     """Controls for an individual torrent."""
 
     REFRESH_INTERVAL = 10

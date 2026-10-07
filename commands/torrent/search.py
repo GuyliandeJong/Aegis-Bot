@@ -20,6 +20,7 @@ from services.share_link_service import (
     ShareLinkService,
 )
 from utils.logger import logger
+from utils.open_messages import ExpiringView
 
 
 class TorrentSearchSelect(discord.ui.Select):
@@ -130,7 +131,7 @@ class TorrentJellyfinSearchButton(discord.ui.Button):
         )
 
 
-class TorrentJellyfinSearchView(discord.ui.View):
+class TorrentJellyfinSearchView(ExpiringView):
     """Owner-restricted view shown when Jellyfin already has the title."""
     def __init__(
         self,
@@ -166,7 +167,7 @@ class TorrentJellyfinSearchView(discord.ui.View):
         return False
 
 
-class TorrentSearchView(discord.ui.View):
+class TorrentSearchView(ExpiringView):
     """Owner-restricted torrent-search result picker."""
 
     def __init__(

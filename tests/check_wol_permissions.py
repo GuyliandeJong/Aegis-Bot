@@ -77,6 +77,7 @@ async def fake_delete(self, torrent_hash, delete_files=False): deleted.append((t
 
 QS.QBittorrentService.delete_torrent = fake_delete
 from commands.torrent.views.delete_view import TorrentDeleteConfirmationView as V1, TorrentDeleteFilesConfirmationView as V2
+import isolate  # state files go to a temporary folder
 parent = types.SimpleNamespace(owner_id=1, torrent={"hash": "abc", "name": "T"}, message=None, stop=lambda: None)
 print("\ndelete buttons (user is the requester in every case)")
 for admin in (True, False):

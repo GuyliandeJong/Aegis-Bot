@@ -9,6 +9,7 @@ PORT = 18099
 import discord
 from discord.webhook import async_ as webhook_async
 import commands.torrent.search as SM
+import isolate  # state files go to a temporary folder
 webhook_async.Route.BASE = f"http://127.0.0.1:{PORT}/api"
 CALLS = []
 USER = {"id": "7", "username": "tester", "discriminator": "0", "avatar": None, "global_name": "Tester"}

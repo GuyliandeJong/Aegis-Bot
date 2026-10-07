@@ -17,6 +17,8 @@ from services.jellyfin_service import (
 )
 from utils.formatting import format_bytes
 from utils.logger import logger
+from utils import open_messages
+from utils.open_messages import ExpiringView
 
 
 @dataclass
@@ -491,6 +493,16 @@ class JellyfinTransfer:
             self._durable_message(),
         )
 
+        open_messages.remember(
+            self.message,
+            note=(
+                "The bot restarted during this download, so it "
+                "stopped. Request it again: files that were already "
+                "copied are skipped."
+            ),
+            owner="transfer",
+        )
+
         self.task = asyncio.create_task(
             self._run()
         )
@@ -630,6 +642,7 @@ class JellyfinTransfer:
         )
 
         await self._edit(self.result_embed())
+        open_messages.forget(self.message, "transfer")
         await self._notify()
 
     async def _notify(self) -> None:
@@ -669,7 +682,7 @@ async def _reject_if_busy(interaction: discord.Interaction) -> bool:
     return True
 
 
-class JellyfinSeasonView(discord.ui.View):
+class JellyfinSeasonView(ExpiringView):
     """Owner-restricted season picker for a series download."""
 
     def __init__(
@@ -834,7 +847,7 @@ class JellyfinSeasonView(discord.ui.View):
         ).start()
 
 
-class JellyfinSourceView(discord.ui.View):
+class JellyfinSourceView(ExpiringView):
     """
     Owner-restricted view shown when a title is missing from the
     primary library but another Jellyfin server has it.

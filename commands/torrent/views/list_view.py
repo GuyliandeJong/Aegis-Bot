@@ -3,12 +3,13 @@ import asyncio
 import discord
 from services.qbittorrent_service import QBittorrentService
 from utils.logger import logger
+from utils.open_messages import ExpiringView
 from commands.torrent.list_processing import (
     _build_pages,
     _filter_torrents,
     _sort_torrents,
 )
-class TorrentListView(discord.ui.View):
+class TorrentListView(ExpiringView):
     """Paginated Discord view for displaying torrent lists."""
     TORRENTS_PER_PAGE = 10
     REFRESH_INTERVAL = 10

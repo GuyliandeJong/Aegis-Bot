@@ -19,6 +19,7 @@ from services.qbittorrent_service import QBittorrentService
 from services.torrent_action_tracker import (
     install_qbittorrent_action_tracking,
 )
+from utils import open_messages
 from utils.logger import logger
 
 
@@ -53,6 +54,14 @@ async def load_extensions():
                 logger.info("Loaded %s", filename)
             except Exception:
                 logger.exception("Failed to load %s", filename)
+
+
+async def startup_tasks():
+    """Mark buttons from before the restart as expired, once."""
+    try:
+        await open_messages.expire_all(bot)
+    except Exception:
+        logger.exception("Expiring old messages failed")
 
 
 @bot.event
@@ -103,6 +112,11 @@ async def on_ready():
     # Start the monitoring framework only once. Discord may call on_ready
     # again after a reconnect.
     if monitor_task is None:
+        # Mark buttons from before the restart as expired. Runs
+        # alongside the monitors: editing many old messages can take
+        # a while because of Discord's rate limits.
+        asyncio.create_task(startup_tasks())
+
         monitor_manager.register(
             FilesystemMonitor(monitor_manager.notification_service)
         )

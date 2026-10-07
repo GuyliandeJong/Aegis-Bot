@@ -60,6 +60,9 @@ EXPECTED = {
     "check_seasons_subtitles.py": [
         "[Friend has more seasons]",
         "picker offers: ['Season 2']",
+        "[Friend has more episodes]",
+        "picker offers: ['Season 2 — 2 missing episodes']",
+        "Series/Gravity Falls (2012)/S2/GF.S02E03.mkv",
         "English subtitles: in 2 of 3 files",
         "Amelie: Subtitles: no English (has Dutch, French)",
         "Movies/Parasite (2019)/Parasite.2019.en.srt",

@@ -188,20 +188,20 @@ async def scenario():
     i = Inter(msg); await view._download(i)
     season_view = i.log[-1][1]["view"]
     print(f"Show (series)       : picker options={[o.label for o in season_view.select.options]}")
-    season_view.select.values = ["s2"]
+    season_view.select.values = ["1"]
     i2 = Inter(msg); await season_view._choose(i2); await wait_idle()
     print("  final:", msg.edits[-1]["embed"].title, "|", [l for l in msg.edits[-1]["embed"].description.split(chr(10)) if "Copied" in l])
 
     # 4. one episode fails mid-season, then retry skips what is already there
     shutil.rmtree(SERIES, ignore_errors=True)
     msg, embed, view = await search("Show", "Series")
-    i = Inter(msg); await view._download(i); sv = i.log[-1][1]["view"]; sv.select.values = ["s2"]
+    i = Inter(msg); await view._download(i); sv = i.log[-1][1]["view"]; sv.select.values = ["1"]
     BEHAVIOUR.update(fail_item="e2")
     await sv._choose(Inter(msg)); await wait_idle()
     print("Episode 2 fails     :", msg.edits[-1]["embed"].title, "|", " / ".join(l for l in msg.edits[-1]["embed"].description.split(chr(10))[2:] if l))
     BEHAVIOUR.update(fail_item=None)
     msg, embed, view = await search("Show", "Series")
-    i = Inter(msg); await view._download(i); sv = i.log[-1][1]["view"]; sv.select.values = ["s2"]
+    i = Inter(msg); await view._download(i); sv = i.log[-1][1]["view"]; sv.select.values = ["1"]
     await sv._choose(Inter(msg)); await wait_idle()
     print("Retry               :", msg.edits[-1]["embed"].title, "|", " / ".join(l for l in msg.edits[-1]["embed"].description.split(chr(10))[2:4] if l))
 

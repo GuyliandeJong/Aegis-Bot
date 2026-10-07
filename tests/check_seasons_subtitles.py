@@ -38,9 +38,17 @@ FRIEND_ITEMS = [
 HOME_ITEMS = [{"Name": "Gravity Falls", "ProductionYear": 2012, "Id": "hgf", "Type": "Series", "Path": "/data/tv/Gravity Falls (2012)"}]
 SEASONS = {"gf": [{"Id": "s1", "Name": "Season 1", "IndexNumber": 1}, {"Id": "s2", "Name": "Season 2", "IndexNumber": 2}],
            "hgf": [{"Id": "h1", "Name": "Season 1", "IndexNumber": 1}]}
-EPISODES = [{"Id": "e1", "Path": "/tv/GF/Season 02/GF.S02E01.mkv", "MediaStreams": [VIDEO, sub("eng")]},
-            {"Id": "e2", "Path": "/tv/GF/Season 02/GF.S02E02.mkv", "MediaStreams": [VIDEO, sub("dut")]},
-            {"Id": "e3", "Path": "/tv/GF/Season 02/GF.S02E03.mkv", "MediaStreams": [VIDEO, sub("eng", external=True, index=4)]}]
+def ep(i, season, number, path, streams=None, season_id=None):
+    return {"Id": i, "Path": path, "ParentIndexNumber": season, "IndexNumber": number, "SeasonId": season_id or f"s{season}",
+            "SeasonName": f"Season {season}", "MediaStreams": streams or [VIDEO]}
+
+
+EPISODES = [ep("e1", 2, 1, "/tv/GF/Season 02/GF.S02E01.mkv", [VIDEO, sub("eng")]),
+            ep("e2", 2, 2, "/tv/GF/Season 02/GF.S02E02.mkv", [VIDEO, sub("dut")]),
+            ep("e3", 2, 3, "/tv/GF/Season 02/GF.S02E03.mkv", [VIDEO, sub("eng", external=True, index=4)])]
+SERIES_EPISODES = {"gf": [ep("f1", 1, 1, "/tv/GF/Season 01/GF.S01E01.mkv"), ep("f2", 1, 2, "/tv/GF/Season 01/GF.S01E02.mkv")] + EPISODES,
+                   "hgf": [ep("h1", 1, 1, "/data/tv/Gravity Falls (2012)/Season 01/a.mkv", season_id="h1"),
+                           ep("h2", 1, 2, "/data/tv/Gravity Falls (2012)/Season 01/b.mkv", season_id="h1")]}
 REQUESTS = []
 
 
@@ -57,6 +65,9 @@ async def seasons(request):
 
 
 async def episodes(request):
+    if "SeasonId" not in request.query:
+        REQUESTS.append(("all episodes", request.match_info["id"]))
+        return web.json_response({"Items": SERIES_EPISODES[request.match_info["id"]]})
     assert request.query["SeasonId"] == "s2", request.query
     return web.json_response({"Items": EPISODES})
 
@@ -135,7 +146,7 @@ async def main():
     app = web.Application()
     app.add_routes([web.get("/home/Items", search(HOME_ITEMS)), web.get("/friend/Items", search(FRIEND_ITEMS)),
                     web.get("/home/Shows/{id}/Seasons", seasons), web.get("/friend/Shows/{id}/Seasons", seasons),
-                    web.get("/friend/Shows/{id}/Episodes", episodes), web.get("/friend/Items/{id}/Download", download),
+                    web.get("/friend/Shows/{id}/Episodes", episodes), web.get("/home/Shows/{id}/Episodes", episodes), web.get("/friend/Items/{id}/Download", download),
                     web.get("/friend/Videos/{id}/{src}/Subtitles/{index}/Stream.srt", subtitle),
                     web.post("/home/Library/Refresh", refresh)])
     runner = web.AppRunner(app); await runner.setup(); await web.TCPSite(runner, "127.0.0.1", PORT).start()
@@ -143,11 +154,11 @@ async def main():
         print("1. Series: Home has season 1, Friend has seasons 1 and 2")
         msg, embed, view = await do_search("Gravity Falls", "Series")
         show(embed)
-        print("  buttons:", [c.label for c in view.children], "| IsMissing sent:", {r[2] for r in REQUESTS if r[0] == "seasons"})
+        print("  buttons:", [c.label for c in view.children], "| episode lists asked:", [r[1] for r in REQUESTS if r[0] == "all episodes"])
         i = Inter(msg); await view.download_button.callback(i)
         picker = i.log[-1][1]["view"]
         print("  picker offers:", [o.label for o in picker.select.options])
-        picker.select._values = ["s2"]
+        picker.select._values = ["0"]
         await picker.select.callback(Inter(msg)); await wait_idle()
         show(msg.edits[-1]["embed"])
 
@@ -161,8 +172,21 @@ async def main():
         show(msg.edits[-1]["embed"])
         print("  subtitle requests:", [r[1] for r in REQUESTS if r[0] == "subtitle"])
 
-        print("\n4. Searching Gravity Falls again: nothing missing any more")
-        SEASONS["hgf"].append({"Id": "h2", "Name": "Season 2", "IndexNumber": 2})
+        print("\n4. Home has only episode 1 of season 2, in a folder called 'S2'")
+        shutil.rmtree(SERIES / "Gravity Falls (2012)" / "Season 02")
+        (SERIES / "Gravity Falls (2012)" / "S2").mkdir()
+        SERIES_EPISODES["hgf"].append(ep("h3", 2, 1, "/data/tv/Gravity Falls (2012)/S2/own.S02E01.mkv", season_id="h2"))
+        msg, embed, view = await do_search("Gravity Falls", "Series")
+        show(embed)
+        i = Inter(msg); await view.download_button.callback(i)
+        picker = i.log[-1][1]["view"]
+        print("  picker offers:", [o.label for o in picker.select.options])
+        picker.select._values = ["0"]
+        await picker.select.callback(Inter(msg)); await wait_idle()
+        show(msg.edits[-1]["embed"])
+
+        print("\n5. Searching Gravity Falls again: nothing missing any more")
+        SERIES_EPISODES["hgf"] += [ep("h4", 2, 2, "/data/tv/Gravity Falls (2012)/S2/x.mkv"), ep("h5", 2, 3, "/data/tv/Gravity Falls (2012)/S2/y.mkv")]
         msg, embed, view = await do_search("Gravity Falls", "Series")
         print(f"  [{embed.title}] view={type(view).__name__}")
 

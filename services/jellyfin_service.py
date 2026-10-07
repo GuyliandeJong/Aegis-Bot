@@ -746,8 +746,14 @@ class JellyfinService:
         server_name: str,
         path: str,
         params: dict,
+        timeout: float | None = None,
     ) -> list[dict]:
-        """Return the Items list of one Jellyfin API response."""
+        """
+        Return the Items list of one Jellyfin API response.
+
+        `timeout` overrides the session's 15 seconds, for requests that
+        list a whole library.
+        """
         server = self._get_server(server_name)
 
         if server is None:
@@ -766,6 +772,11 @@ class JellyfinService:
                     "Accept": "application/json",
                 },
                 params=params,
+                **(
+                    {"timeout": aiohttp.ClientTimeout(total=timeout)}
+                    if timeout
+                    else {}
+                ),
             ) as response:
                 if response.status != 200:
                     body = await response.text()
@@ -830,6 +841,30 @@ class JellyfinService:
                 "SortBy": "IndexNumber",
                 "SortOrder": "Ascending",
             },
+        )
+
+    async def get_series_episodes(
+        self,
+        server_name: str,
+        series_id: str,
+    ) -> list[dict]:
+        """
+        Return every episode of a series, all seasons in one request.
+
+        Each episode carries ParentIndexNumber (its season number),
+        IndexNumber, SeasonId and SeasonName, which is enough to tell
+        which episodes one library lacks compared to another.
+        """
+        return await self._get_items(
+            server_name,
+            f"/Shows/{series_id}/Episodes",
+            {
+                "IsMissing": "false",
+                "Fields": "Path,MediaStreams,MediaSources",
+                "SortBy": "ParentIndexNumber,IndexNumber",
+                "SortOrder": "Ascending",
+            },
+            timeout=60,
         )
 
     async def download_item(

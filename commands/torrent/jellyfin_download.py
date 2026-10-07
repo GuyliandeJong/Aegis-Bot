@@ -11,6 +11,7 @@ from pathlib import Path
 import discord
 
 from commands.torrent.formatting import TorrentFormattingMixin
+from services.jellyfin_compare import missing_content
 from services.jellyfin_service import (
     JellyfinDownloadError,
     JellyfinService,
@@ -118,12 +119,52 @@ def existing_series_folder(primary_match: dict, library: Path) -> str | None:
     return None
 
 
-async def find_missing_seasons(matches: list[dict], category: str):
+def season_folder_name(
+    number: int,
+    own_episodes: list[dict],
+    series_dir: Path | None,
+) -> str:
     """
-    Find seasons another server has that the primary library lacks.
+    Return the folder a season's episodes belong in.
 
-    Returns (source match, missing seasons, primary match), or None
-    when there is nothing to offer or the comparison cannot be made.
+    When the library already has episodes of that season, their folder
+    is reused, whatever it is called ("Season 3", "Season 03", "S03").
+    Otherwise the folder is "Season NN".
+    """
+    if series_dir is not None:
+        for episode in own_episodes:
+            if episode.get("ParentIndexNumber") != number:
+                continue
+
+            parts = re.split(
+                r"[\\/]",
+                str(episode.get("Path") or ""),
+            )
+
+            if len(parts) < 2:
+                continue
+
+            name = parts[-2].strip()
+
+            if name and name not in {".", ".."} and (
+                series_dir / name
+            ).is_dir():
+                return name
+
+    return f"Season {number:02d}"
+
+
+async def find_missing_content(matches: list[dict], category: str):
+    """
+    Find episodes another server has that the primary library lacks.
+
+    Whole seasons and single episodes are both found: each server is
+    asked once for every episode of the series, and the episode
+    numbers are compared.
+
+    Returns a dict with source, primary, missing (see
+    jellyfin_compare.missing_content) and own_episodes, or None when
+    there is nothing to offer or the comparison cannot be made.
     """
     if category != "Series":
         return None
@@ -146,39 +187,34 @@ async def find_missing_seasons(matches: list[dict], category: str):
     service = JellyfinService()
 
     try:
-        own = await service.get_seasons(
+        own = await service.get_series_episodes(
             primary["server"],
             primary["item_id"],
         )
 
-        # Without the primary library's own seasons there is nothing
-        # to compare against, and every season would look missing.
+        # Without the primary library's own episodes there is nothing
+        # to compare against, and everything would look missing.
         if not own:
             return None
-
-        own_numbers = {
-            season.get("IndexNumber")
-            for season in own
-        }
 
         for match in matches:
             if match.get("primary") or not match.get("item_id"):
                 continue
 
-            theirs = await service.get_seasons(
+            theirs = await service.get_series_episodes(
                 match["server"],
                 match["item_id"],
             )
 
-            missing = [
-                season
-                for season in theirs
-                if isinstance(season.get("IndexNumber"), int)
-                and season["IndexNumber"] not in own_numbers
-            ]
+            missing = missing_content(own, theirs)
 
             if missing:
-                return match, missing, primary
+                return {
+                    "source": match,
+                    "primary": primary,
+                    "missing": missing,
+                    "own_episodes": own,
+                }
 
     finally:
         await service.close()
@@ -730,34 +766,56 @@ def is_idle() -> bool:
     return _active_transfer is None and not _queue
 
 
+def _season_choice_label(season: dict) -> str:
+    return (
+        str(season.get("Name") or "").strip()
+        or f"Season {season.get('IndexNumber')}"
+    )
+
+
+def _default_season_folder(season: dict) -> str:
+    """Return the "Season 01" folder name for a season."""
+    number = season.get("IndexNumber")
+
+    if isinstance(number, int):
+        return f"Season {number:02d}"
+
+    return (
+        JellyfinService.safe_name(season.get("Name"))
+        or "Season Unknown"
+    )
+
+
 class JellyfinSeasonView(ExpiringView):
-    """Owner-restricted season picker for a series download."""
+    """
+    Owner-restricted season picker for a series download.
+
+    Each choice is a dict with:
+        season:    the season ({"Id", "Name", "IndexNumber"})
+        episodes:  the episodes to copy, or None to copy the whole
+                   season (looked up when chosen)
+        directory: the folder the files go into
+        label:     the text shown in the picker
+    """
 
     def __init__(
         self,
         owner_id: int,
         match: dict,
-        seasons: list[dict],
-        directory: Path,
+        choices: list[dict],
     ):
         super().__init__(timeout=180)
 
         self.owner_id = owner_id
         self.match = match
-        self.directory = directory
         self.message = None
 
-        # Discord allows 25 options, each needing a unique value.
-        self.seasons = {}
-
-        for season in seasons:
-            if not isinstance(season, dict) or not season.get("Id"):
-                continue
-
-            self.seasons[str(season["Id"])] = season
-
-            if len(self.seasons) == 25:
-                break
+        # Discord allows 25 options.
+        self.choices = [
+            choice
+            for choice in choices
+            if isinstance(choice.get("season"), dict)
+        ][:25]
 
         self.select = discord.ui.Select(
             placeholder="Choose a season to download…",
@@ -765,13 +823,10 @@ class JellyfinSeasonView(ExpiringView):
             max_values=1,
             options=[
                 discord.SelectOption(
-                    label=(
-                        str(season.get("Name") or "").strip()
-                        or f"Season {season.get('IndexNumber')}"
-                    )[:100],
-                    value=season_id[:100],
+                    label=choice["label"][:100],
+                    value=str(index),
                 )
-                for season_id, season in self.seasons.items()
+                for index, choice in enumerate(self.choices)
             ],
         )
 
@@ -802,71 +857,81 @@ class JellyfinSeasonView(ExpiringView):
     async def on_timeout(self):
         await expire_view(self)
 
-    @staticmethod
-    def _season_folder(season: dict) -> str:
-        """Return the "Season 01" folder name for a season."""
-        number = season.get("IndexNumber")
-
-        if isinstance(number, int):
-            return f"Season {number:02d}"
-
-        return (
-            JellyfinService.safe_name(season.get("Name"))
-            or "Season Unknown"
-        )
-
     async def _choose(self, interaction: discord.Interaction):
         self.stop()
 
-        season = self.seasons[self.select.values[0]]
-        season_name = str(season.get("Name") or "the season")
+        choice = self.choices[int(self.select.values[0])]
+        season = choice["season"]
+        season_name = _season_choice_label(season)
         server_name = self.match["server"]
+        episodes = choice.get("episodes")
 
         logger.info(
             "[JellyfinDownload] %s chose %s of '%s'.",
             interaction.user,
-            season_name,
+            choice["label"],
             self.match.get("title"),
         )
 
-        await _send(
-            "episode lookup notice",
-            interaction.response.edit_message(
-                content=None,
-                embed=_status_embed(
-                    "Downloading from Jellyfin…",
-                    f"Looking up the episodes of **{season_name}**.",
+        if episodes is None:
+            await _send(
+                "episode lookup notice",
+                interaction.response.edit_message(
+                    content=None,
+                    embed=_status_embed(
+                        "Downloading from Jellyfin…",
+                        f"Looking up the episodes of **{season_name}**.",
+                    ),
+                    view=None,
                 ),
-                view=None,
-            ),
-        )
-
-        service = JellyfinService()
-
-        try:
-            episodes = await service.get_episodes(
-                server_name,
-                self.match["item_id"],
-                str(season.get("Id")),
             )
-        finally:
-            await service.close()
 
-        directory = self.directory / self._season_folder(season)
+            service = JellyfinService()
 
-        logger.info(
-            "[JellyfinDownload] %s returned %d episode(s) for '%s' %s.",
-            server_name,
-            len(episodes),
-            self.match.get("title"),
-            season_name,
-        )
+            try:
+                episodes = await service.get_episodes(
+                    server_name,
+                    self.match["item_id"],
+                    str(season.get("Id")),
+                )
+            finally:
+                await service.close()
+
+            logger.info(
+                "[JellyfinDownload] %s returned %d episode(s) for "
+                "'%s' %s.",
+                server_name,
+                len(episodes),
+                self.match.get("title"),
+                season_name,
+            )
+            title = f"{self.match.get('title')} — {season_name}"
+
+        else:
+            await _send(
+                "missing episodes notice",
+                interaction.response.edit_message(
+                    content=None,
+                    embed=_status_embed(
+                        "Downloading from Jellyfin…",
+                        f"Preparing **{choice['label']}**.",
+                    ),
+                    view=None,
+                ),
+            )
+            count = len(episodes)
+            title = (
+                f"{self.match.get('title')} — {season_name}"
+                if choice.get("complete")
+                else f"{self.match.get('title')} — {season_name} "
+                f"({count} episode{'s' if count != 1 else ''})"
+            )
 
         files = [
             _transfer_file(
                 str(episode.get("Id")),
                 JellyfinService.media_filename(episode),
-                directory,
+                choice["directory"],
                 JellyfinService.subtitle_info(episode),
                 JellyfinService.media_source_id(episode),
             )
@@ -887,15 +952,53 @@ class JellyfinSeasonView(ExpiringView):
         await JellyfinTransfer(
             interaction,
             server_name,
-            f"{self.match.get('title')} — {season_name}",
+            title,
             files,
         ).start()
 
 
+def missing_choices(
+    missing: list[dict],
+    own_episodes: list[dict],
+    series_dir: Path,
+) -> list[dict]:
+    """Turn missing content into season picker choices."""
+    choices = []
+
+    for entry in missing:
+        season = entry["season"]
+        name = _season_choice_label(season)
+
+        if entry["complete"]:
+            label = name
+        else:
+            count = len(entry["episodes"])
+            label = (
+                f"{name} — {count} missing "
+                f"episode{'s' if count != 1 else ''}"
+            )
+
+        choices.append(
+            {
+                "season": season,
+                "episodes": entry["episodes"],
+                "directory": series_dir / season_folder_name(
+                    entry["number"],
+                    own_episodes,
+                    series_dir,
+                ),
+                "label": label,
+                "complete": entry["complete"],
+            }
+        )
+
+    return choices
+
+
 class JellyfinSourceView(ExpiringView):
     """
-    Owner-restricted view shown when a title is missing from the
-    primary library but another Jellyfin server has it.
+    Owner-restricted view shown when another Jellyfin server has a
+    title, or episodes of it, that the primary library lacks.
     """
 
     def __init__(
@@ -905,10 +1008,12 @@ class JellyfinSourceView(ExpiringView):
         category: str,
         torrent_cog,
         match: dict,
-        only_seasons: list[dict] | None = None,
+        missing: list[dict] | None = None,
+        own_episodes: list[dict] | None = None,
         folder_name: str | None = None,
+        timeout: float = 180,
     ):
-        super().__init__(timeout=180)
+        super().__init__(timeout=timeout)
 
         self.owner_id = owner_id
         self.query = query
@@ -918,13 +1023,14 @@ class JellyfinSourceView(ExpiringView):
         self.message = None
 
         # Set when the primary library already has part of a series:
-        # only these seasons are offered, and they are copied into the
-        # folder the series already uses.
-        self.only_seasons = only_seasons
+        # only the missing seasons and episodes are offered, and they
+        # are copied into the folders the series already uses.
+        self.missing = missing
+        self.own_episodes = own_episodes or []
         self.folder_name = folder_name
 
-        if only_seasons is not None:
-            label = f"Download missing season from {match['server']}"
+        if missing is not None:
+            label = f"Download missing from {match['server']}"
         else:
             label = f"Download from {match['server']}"
 
@@ -939,15 +1045,16 @@ class JellyfinSourceView(ExpiringView):
         # Imported here because the search module imports this one.
         from commands.torrent.search import TorrentJellyfinSearchButton
 
-        self.add_item(
-            TorrentJellyfinSearchButton(self)
-        )
+        if torrent_cog is not None:
+            self.add_item(
+                TorrentJellyfinSearchButton(self)
+            )
 
     async def interaction_check(
         self,
         interaction: discord.Interaction,
     ):
-        if interaction.user.id == self.owner_id:
+        if self.owner_id is None or interaction.user.id == self.owner_id:
             return True
 
         await interaction.response.send_message(
@@ -1043,10 +1150,15 @@ class JellyfinSourceView(ExpiringView):
             ),
         )
 
-        if self.only_seasons is not None:
-            # The missing seasons were already looked up for the
+        if self.missing is not None:
+            # The missing episodes were already looked up for the
             # availability message.
-            seasons = self.only_seasons
+            choices = missing_choices(
+                self.missing,
+                self.own_episodes,
+                directory,
+            )
+            found = len(self.missing)
 
         else:
             service = JellyfinService()
@@ -1059,23 +1171,34 @@ class JellyfinSourceView(ExpiringView):
             finally:
                 await service.close()
 
+            choices = [
+                {
+                    "season": season,
+                    "episodes": None,
+                    "directory": directory / _default_season_folder(season),
+                    "label": _season_choice_label(season),
+                }
+                for season in seasons
+                if isinstance(season, dict) and season.get("Id")
+            ]
+            found = len(seasons)
+
         view = JellyfinSeasonView(
             owner_id=self.owner_id,
             match=self.match,
-            seasons=seasons,
-            directory=directory,
+            choices=choices,
         )
 
         logger.info(
             "[JellyfinDownload] %s returned %d season(s) for '%s'; "
             "%d can be offered.",
             server_name,
-            len(seasons),
+            found,
             self.match.get("title"),
-            len(view.seasons),
+            len(view.choices),
         )
 
-        if not view.seasons:
+        if not view.choices:
             await interaction.edit_original_response(
                 embed=_status_embed(
                     "Nothing to download",
@@ -1093,7 +1216,7 @@ class JellyfinSourceView(ExpiringView):
                     "Download from Jellyfin",
                     f"**{self.match.get('title')}** on **{server_name}**\n\n"
                     "Choose the season to copy into your library. "
-                    "Only that season is downloaded.",
+                    "Only what you choose is downloaded.",
                 ),
                 view=view,
             ),

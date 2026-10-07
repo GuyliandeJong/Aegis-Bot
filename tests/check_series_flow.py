@@ -105,7 +105,7 @@ async def main():
         await button.callback(i2)
         for kind, k in i2.log: print("  step   :", kind, "|", k["embed"].title, "-", k["embed"].description.splitlines()[0], "| view:", type(k.get("view")).__name__)
         picker = i2.log[-1][1].get("view")
-        picker.select._values = ["s1"]
+        picker.select._values = ["1"]
         i3 = Inter(msg)
         await picker.select.callback(i3)
         while not JD.is_idle(): await asyncio.sleep(0.02)

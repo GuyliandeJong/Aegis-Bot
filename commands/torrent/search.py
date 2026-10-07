@@ -11,9 +11,10 @@ from commands.torrent.jellyfin_download import (
     JellyfinSourceView,
     existing_series_folder,
     expire_view,
-    find_missing_seasons,
+    find_missing_content,
 )
 from services.jackett_service import JackettService
+from services.jellyfin_compare import describe_missing
 from services.jellyfin_service import JellyfinService
 from services.share_link_service import (
     ShareLinkError,
@@ -1118,7 +1119,7 @@ class TorrentSearchMixin:
     def _build_jellyfin_embed(
         matches,
         download_source=None,
-        missing_seasons=None,
+        missing=None,
     ):
         """
         Build the "already available" embed.
@@ -1167,20 +1168,18 @@ class TorrentSearchMixin:
                 f"Already available on {len(matches)} Jellyfin servers"
             )
 
-        if missing_seasons:
+        if missing:
             server = download_source.get("server")
-            names = ", ".join(
-                str(
-                    season.get("Name")
-                    or f"Season {season.get('IndexNumber')}"
-                )
-                for season in missing_seasons
-            )
 
-            title = f"{server} has more seasons"
+            if all(entry["complete"] for entry in missing):
+                title = f"{server} has more seasons"
+            else:
+                title = f"{server} has more episodes"
+
             closing = (
-                f"Your library is missing: **{names}**.\n"
-                f"You can copy a season from {server} or search for "
+                f"Your library is missing: "
+                f"**{describe_missing(missing)}**.\n"
+                f"You can copy them from {server} or search for "
                 "a torrent instead."
             )
 
@@ -1294,28 +1293,31 @@ class TorrentSearchMixin:
             )
 
             # The primary library may have the series but lack seasons
-            # that another server has.
-            missing_seasons = None
+            # or episodes that another server has.
+            missing = None
+            own_episodes = None
             folder_name = None
 
             if download_source is None:
                 try:
-                    found = await find_missing_seasons(
+                    found = await find_missing_content(
                         jellyfin_matches,
                         category,
                     )
                 except Exception as ex:
                     logger.exception(
-                        "[TorrentSearch] Season comparison failed: %s",
+                        "[TorrentSearch] Episode comparison failed: %s",
                         ex,
                     )
                     found = None
 
                 if found is not None:
-                    download_source, missing_seasons, primary = found
+                    download_source = found["source"]
+                    missing = found["missing"]
+                    own_episodes = found["own_episodes"]
 
                     folder_name = existing_series_folder(
-                        primary,
+                        found["primary"],
                         JellyfinService.library_dir(category),
                     )
 
@@ -1326,7 +1328,8 @@ class TorrentSearchMixin:
                     category=category,
                     torrent_cog=self,
                     match=download_source,
-                    only_seasons=missing_seasons,
+                    missing=missing,
+                    own_episodes=own_episodes,
                     folder_name=folder_name,
                 )
             else:
@@ -1343,7 +1346,7 @@ class TorrentSearchMixin:
                 embed=self._build_jellyfin_embed(
                     jellyfin_matches,
                     download_source,
-                    missing_seasons,
+                    missing,
                 ),
                 view=view,
             )

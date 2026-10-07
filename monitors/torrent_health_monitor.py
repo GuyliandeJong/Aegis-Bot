@@ -5,6 +5,7 @@ from pathlib import Path
 from config.settings import settings
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_action_tracker import consume_expected_action
+from utils.formatting import format_compact_duration
 from utils.logger import logger
 
 
@@ -108,19 +109,7 @@ class TorrentHealthMonitor:
 
     @staticmethod
     def format_duration(seconds):
-        seconds = max(0, int(seconds))
-        minutes, seconds = divmod(seconds, 60)
-        hours, minutes = divmod(minutes, 60)
-
-        parts = []
-        if hours:
-            parts.append(f"{hours}h")
-        if minutes:
-            parts.append(f"{minutes}m")
-        if seconds or not parts:
-            parts.append(f"{seconds}s")
-
-        return " ".join(parts)
+        return format_compact_duration(seconds)
 
     @staticmethod
     def mention_content():

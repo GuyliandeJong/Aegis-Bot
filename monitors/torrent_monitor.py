@@ -4,6 +4,7 @@ from pathlib import Path
 from config.settings import settings
 from monitors.base_monitor import BaseMonitor
 from services.qbittorrent_service import QBittorrentService
+from utils.formatting import format_compact_duration
 from utils.logger import logger
 
 
@@ -210,61 +211,13 @@ class TorrentMonitor(BaseMonitor):
             f"{cls.format_bytes(value)}/s"
         )
 
-    @classmethod
+    @staticmethod
     def format_duration(
-        cls,
         value,
     ):
         """Format seconds as a compact human-readable duration."""
 
-        seconds = max(
-            0,
-            int(
-                cls.number(value)
-            ),
-        )
-
-        days, seconds = divmod(
-            seconds,
-            86400,
-        )
-
-        hours, seconds = divmod(
-            seconds,
-            3600,
-        )
-
-        minutes, seconds = divmod(
-            seconds,
-            60,
-        )
-
-        parts = []
-
-        if days:
-            parts.append(
-                f"{days}d"
-            )
-
-        if hours:
-            parts.append(
-                f"{hours}h"
-            )
-
-        if minutes:
-            parts.append(
-                f"{minutes}m"
-            )
-
-        if (
-            seconds
-            or not parts
-        ):
-            parts.append(
-                f"{seconds}s"
-            )
-
-        return " ".join(parts)
+        return format_compact_duration(value)
 
     @classmethod
     def format_ratio(

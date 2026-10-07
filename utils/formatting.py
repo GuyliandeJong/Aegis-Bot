@@ -75,3 +75,56 @@ def format_uptime(boot_time: float) -> str:
         parts.append(f"{minutes}m")
 
     return " ".join(parts)
+
+
+def format_bytes(value: int | float | None) -> str:
+    """
+    Format a byte value into a readable size, e.g. "1.50 GB".
+    """
+
+    try:
+        value = float(value or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+
+    if value < 1024:
+        return f"{value:.0f} B"
+
+    for unit in ("KB", "MB", "GB", "TB", "PB"):
+        value /= 1024
+
+        if value < 1024:
+            return f"{value:.2f} {unit}"
+
+    return f"{value:.2f} EB"
+
+
+def format_compact_duration(seconds: int | float | None) -> str:
+    """
+    Format seconds as a compact duration, e.g. "1d 2h 5m 30s".
+    """
+
+    try:
+        seconds = max(0, int(float(seconds or 0)))
+    except (TypeError, ValueError):
+        seconds = 0
+
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+
+    parts = []
+
+    if days:
+        parts.append(f"{days}d")
+
+    if hours:
+        parts.append(f"{hours}h")
+
+    if minutes:
+        parts.append(f"{minutes}m")
+
+    if seconds or not parts:
+        parts.append(f"{seconds}s")
+
+    return " ".join(parts)

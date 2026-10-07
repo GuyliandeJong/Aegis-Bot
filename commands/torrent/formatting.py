@@ -2,6 +2,7 @@
 from datetime import timedelta
 
 from commands.torrent.constants import STATE_LABELS
+from utils.formatting import format_bytes
 
 
 class TorrentFormattingMixin:
@@ -9,26 +10,7 @@ class TorrentFormattingMixin:
     @staticmethod
     def _format_bytes(value: int | float | None) -> str:
         """Format a byte value into a readable size."""
-        if value is None:
-            value = 0
-        try:
-            value = float(value)
-        except (TypeError, ValueError):
-            value = 0
-        if value < 1024:
-            return f"{value:.0f} B"
-        units = (
-            "KB",
-            "MB",
-            "GB",
-            "TB",
-            "PB",
-        )
-        for unit in units:
-            value /= 1024
-            if value < 1024:
-                return f"{value:.2f} {unit}"
-        return f"{value:.2f} EB"
+        return format_bytes(value)
     @staticmethod
     def _format_speed(value: int | float | None) -> str:
         """Format a transfer speed."""

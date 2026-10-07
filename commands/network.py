@@ -6,28 +6,8 @@ from services.network_service import NetworkService
 from utils import theme
 from utils.embed_models import EmbedField
 from utils.embeds import create_embed
+from utils.formatting import format_bytes
 from utils.logger import logger
-
-
-def format_bytes(value: int) -> str:
-    """
-    Convert a byte value into a human-readable size.
-    """
-
-    # Units are checked from smallest to largest until the
-    # value fits within a readable range.
-    units = ["B", "KB", "MB", "GB", "TB"]
-
-    size = float(value)
-
-    for unit in units:
-        if size < 1024:
-            return f"{size:.2f} {unit}"
-
-        size /= 1024
-
-    # Values beyond terabytes are represented as petabytes.
-    return f"{size:.2f} PB"
 
 
 class Network(commands.Cog):

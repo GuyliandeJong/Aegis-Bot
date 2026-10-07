@@ -422,6 +422,52 @@ class JellyfinService:
 
         return value.strip(" .")
 
+    @staticmethod
+    def _match_owner(path: Path, reference: Path) -> None:
+        """
+        Give a new file or folder the same owner as an existing one.
+
+        The bot usually runs as root inside its container. Without
+        this, downloads would be owned by root and could not be renamed
+        or deleted by the library's normal user.
+        """
+        if not hasattr(os, "chown"):
+            return
+
+        try:
+            owner = reference.stat()
+            os.chown(path, owner.st_uid, owner.st_gid)
+
+        except OSError as ex:
+            logger.warning(
+                "[Jellyfin] Could not set the owner of %s: %s",
+                path,
+                ex,
+            )
+
+    @classmethod
+    def _create_directory(cls, directory: Path) -> None:
+        """
+        Create a library folder, including missing parent folders.
+
+        Every folder that had to be created gets the owner of the
+        closest folder that already existed.
+        """
+        created = []
+        existing = directory
+
+        while not existing.exists():
+            created.append(existing)
+            existing = existing.parent
+
+        directory.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        for path in reversed(created):
+            cls._match_owner(path, existing)
+
     @classmethod
     def media_filename(cls, item: dict) -> str:
         """
@@ -635,9 +681,8 @@ class JellyfinService:
 
                 try:
                     await asyncio.to_thread(
-                        directory.mkdir,
-                        parents=True,
-                        exist_ok=True,
+                        self._create_directory,
+                        directory,
                     )
                 except OSError as ex:
                     raise JellyfinDownloadError(
@@ -704,6 +749,12 @@ class JellyfinService:
             )
 
             completed = True
+
+            await asyncio.to_thread(
+                self._match_owner,
+                destination,
+                directory,
+            )
 
             logger.info(
                 "[Jellyfin] Downloaded item %s from %s to %s.",

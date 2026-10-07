@@ -133,6 +133,14 @@ for example in qBittorrent itself, mention `DISCORD_USER_ID`.
 
 Monitor state is kept in `data/` so a restart does not repeat alerts.
 
+At startup the bot checks that qBittorrent, Jackett, iDRAC and every
+Jellyfin server answer, and posts one alert naming any that do not.
+
+Buttons stop working when the bot restarts. At startup the bot edits
+the messages whose buttons were still active to say so, and marks a
+Jellyfin download that was cut off as stopped. Requesting the download
+again skips the files that were already copied.
+
 ## Configuration
 
 Configuration lives in two untracked files.

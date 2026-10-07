@@ -395,6 +395,7 @@ class TorrentMonitor(BaseMonitor):
         tracked = 0
         completed_count = 0
         active_count = 0
+        seen = set()
 
         for torrent in torrents:
             torrent_hash = torrent.get(
@@ -411,6 +412,8 @@ class TorrentMonitor(BaseMonitor):
             torrent_hash = str(
                 torrent_hash
             ).lower()
+
+            seen.add(torrent_hash)
 
             name = torrent.get(
                 "name",
@@ -559,6 +562,26 @@ class TorrentMonitor(BaseMonitor):
                 ] = False
 
                 state_changed = True
+
+        # Forget torrents that are no longer in qBittorrent, so the
+        # state file does not grow forever. A torrent that comes back
+        # is treated as new, which never produces a false alert.
+        removed = [
+            torrent_hash
+            for torrent_hash in self.state
+            if torrent_hash not in seen
+        ]
+
+        for torrent_hash in removed:
+            del self.state[torrent_hash]
+
+        if removed:
+            logger.info(
+                "[TorrentMonitor] Forgot %d torrent(s) no longer "
+                "in qBittorrent.",
+                len(removed),
+            )
+            state_changed = True
 
         if state_changed:
             self.save_state()

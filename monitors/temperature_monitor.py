@@ -101,6 +101,11 @@ class TemperatureMonitor(BaseMonitor):
                 sensor.reading
             ).lower()
 
+            # temperature_status() reports a normal reading as "OK",
+            # while this monitor's states are healthy/warning/critical.
+            if current == "ok":
+                current = "healthy"
+
             # Use the sensor name as the persistent state key.
             sensor_key = sensor.name
 
@@ -108,8 +113,38 @@ class TemperatureMonitor(BaseMonitor):
                 sensor_key
             )
 
+            # Older versions persisted "ok". Convert it silently so the
+            # rename does not look like a recovery.
+            if previous == "ok":
+                previous = "healthy"
+                state.temperatures[sensor_key] = previous
+
             # No state transition means there is nothing to report.
             if previous == current:
+                continue
+
+            alert_key = f"temperature:{sensor_key}"
+
+            # A reading hovering around a threshold would otherwise
+            # send a notification on every crossing. Stay quiet until
+            # the cooldown has passed; the reported state is left
+            # unchanged, so a change that persists is still reported
+            # afterwards. A sensor becoming critical is always reported.
+            if (
+                previous is not None
+                and current != "critical"
+                and not state.alert_allowed(
+                    alert_key,
+                    self.alert_cooldown(),
+                )
+            ):
+                logger.debug(
+                    "[TemperatureMonitor] %s: %s -> %s suppressed "
+                    "by alert cooldown.",
+                    sensor.name,
+                    previous,
+                    current,
+                )
                 continue
 
             logger.info(
@@ -184,6 +219,7 @@ class TemperatureMonitor(BaseMonitor):
 
             # Persist the new state after handling the transition.
             state.temperatures[sensor_key] = current
+            state.mark_alert(alert_key)
             state.save()
 
     async def _check_stale(self):

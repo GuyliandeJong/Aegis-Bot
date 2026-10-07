@@ -47,6 +47,12 @@ class MonitorState:
         # stale notification every monitoring cycle.
         self.stale = {}
 
+        # Track when each component last generated a notification.
+        #
+        # Monitors without built-in hysteresis use this to avoid
+        # re-alerting while a value hovers around a threshold.
+        self.alerts = {}
+
         # Restore previously saved state when the bot starts.
         self.load()
 
@@ -82,6 +88,12 @@ class MonitorState:
             # Restore stale states.
             self.stale = data.get(
                 "stale",
+                {},
+            )
+
+            # Restore notification timestamps.
+            self.alerts = data.get(
+                "alerts",
                 {},
             )
 
@@ -178,6 +190,42 @@ class MonitorState:
 
         self.stale[monitor_name] = True
 
+    def alert_allowed(self, key: str, cooldown: int) -> bool:
+        """
+        Return whether a component may generate another notification.
+
+        A component that has never alerted, or whose last notification
+        is older than the cooldown, is allowed to alert.
+        """
+
+        last_alert = self.alerts.get(key)
+
+        if last_alert is None:
+            return True
+
+        try:
+            last_alert_time = datetime.fromisoformat(
+                last_alert
+            )
+
+        except (TypeError, ValueError):
+            return True
+
+        age = (
+            datetime.now(timezone.utc) - last_alert_time
+        ).total_seconds()
+
+        return age >= cooldown
+
+    def mark_alert(self, key: str):
+        """
+        Record that a component has just generated a notification.
+        """
+
+        self.alerts[key] = (
+            datetime.now(timezone.utc).isoformat()
+        )
+
     def save(self):
         """
         Persist the current monitoring state to disk atomically.
@@ -194,6 +242,7 @@ class MonitorState:
             "memory": self.memory,
             "last_success": self.last_success,
             "stale": self.stale,
+            "alerts": self.alerts,
         }
 
         # Use a temporary file in the same directory as STATE_FILE.

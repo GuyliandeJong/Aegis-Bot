@@ -48,11 +48,35 @@ class FilesystemMonitor(BaseMonitor):
         for filesystem in status.filesystems:
             current = self.get_status(filesystem.percent_used)
 
-            # Retrieve the state recorded during the previous check.
+            # Retrieve the state that was last reported.
             previous = state.filesystems.get(filesystem.mountpoint)
 
             # Nothing changed, so no notification or log entry is needed.
             if previous == current:
+                continue
+
+            alert_key = f"filesystem:{filesystem.mountpoint}"
+
+            # Usage hovering around a threshold would otherwise send a
+            # notification on every crossing. Stay quiet until the
+            # cooldown has passed; the reported state is left unchanged,
+            # so a change that persists is still reported afterwards.
+            # A filesystem becoming critical is always reported.
+            if (
+                previous is not None
+                and current != "critical"
+                and not state.alert_allowed(
+                    alert_key,
+                    self.alert_cooldown(),
+                )
+            ):
+                logger.debug(
+                    "[FilesystemMonitor] %s: %s -> %s suppressed "
+                    "by alert cooldown.",
+                    filesystem.mountpoint,
+                    previous,
+                    current,
+                )
                 continue
 
             # Record the state transition in the application log.
@@ -150,4 +174,5 @@ class FilesystemMonitor(BaseMonitor):
             # Save the new state so the same alert is not repeatedly
             # sent during subsequent monitoring cycles.
             state.filesystems[filesystem.mountpoint] = current
+            state.mark_alert(alert_key)
             state.save()

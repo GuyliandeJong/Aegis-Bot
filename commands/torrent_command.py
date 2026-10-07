@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from commands.torrent.add import TorrentAddMixin
+from commands.torrent.cleanup import TorrentCleanupMixin
 from commands.torrent.constants import (
     ACTIVE_STATES,
     ALLOWED_CATEGORIES,
@@ -42,6 +43,7 @@ class Torrent(
     TorrentAddMixin,
     TorrentSearchMixin,
     TorrentWatchlistMixin,
+    TorrentCleanupMixin,
     commands.Cog,
 ):
     """
@@ -54,6 +56,7 @@ class Torrent(
         /torrent add
         /torrent search
         /torrent watchlist
+        /torrent cleanup (administrators)
     """
 
     ALLOWED_CATEGORIES = ALLOWED_CATEGORIES
@@ -341,6 +344,16 @@ class Torrent(
         interaction: discord.Interaction,
     ):
         await self._watchlist(interaction)
+
+    @torrent_group.command(
+        name="cleanup",
+        description="Finished torrents by seeding; remove them (admins).",
+    )
+    async def torrent_cleanup(
+        self,
+        interaction: discord.Interaction,
+    ):
+        await self._cleanup(interaction)
 
 
 async def setup(

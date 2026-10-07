@@ -50,6 +50,37 @@ def _status_embed(title: str, description: str) -> discord.Embed:
     )
 
 
+# A Discord request that has not finished after this long is treated
+# as failed, so a stalled request shows an error instead of leaving
+# the message untouched.
+DISCORD_TIMEOUT = 30
+
+
+async def _send(step: str, request):
+    """
+    Await one Discord request, logging when it starts and finishes.
+
+    The log lines make it possible to tell which step a stuck
+    download stopped at.
+    """
+    logger.info("[JellyfinDownload] %s: sending.", step)
+
+    try:
+        result = await asyncio.wait_for(
+            request,
+            timeout=DISCORD_TIMEOUT,
+        )
+    except asyncio.TimeoutError as ex:
+        raise RuntimeError(
+            f"Discord did not answer within {DISCORD_TIMEOUT} seconds "
+            f"({step})."
+        ) from ex
+
+    logger.info("[JellyfinDownload] %s: done.", step)
+
+    return result
+
+
 async def _report_error(
     interaction: discord.Interaction,
     error: Exception,
@@ -236,7 +267,10 @@ class JellyfinTransfer:
 
         _active_transfer = self
 
-        self.message = await self._durable_message()
+        self.message = await _send(
+            "progress message lookup",
+            self._durable_message(),
+        )
 
         self.task = asyncio.create_task(
             self._run()
@@ -485,13 +519,23 @@ class JellyfinSeasonView(discord.ui.View):
         season_name = str(season.get("Name") or "the season")
         server_name = self.match["server"]
 
-        await interaction.response.edit_message(
-            content=None,
-            embed=_status_embed(
-                "Downloading from Jellyfin…",
-                f"Looking up the episodes of **{season_name}**.",
+        logger.info(
+            "[JellyfinDownload] %s chose %s of '%s'.",
+            interaction.user,
+            season_name,
+            self.match.get("title"),
+        )
+
+        await _send(
+            "episode lookup notice",
+            interaction.response.edit_message(
+                content=None,
+                embed=_status_embed(
+                    "Downloading from Jellyfin…",
+                    f"Looking up the episodes of **{season_name}**.",
+                ),
+                view=None,
             ),
-            view=None,
         )
 
         service = JellyfinService()
@@ -619,6 +663,14 @@ class JellyfinSourceView(discord.ui.View):
         directory = library / _library_folder(self.match)
         server_name = self.match["server"]
 
+        logger.info(
+            "[JellyfinDownload] %s pressed download for '%s' (%s) on %s.",
+            interaction.user,
+            self.match.get("title"),
+            self.category,
+            server_name,
+        )
+
         if self.category == "Series":
             await self._choose_season(
                 interaction,
@@ -654,14 +706,17 @@ class JellyfinSourceView(discord.ui.View):
         server_name: str,
         directory: Path,
     ):
-        await interaction.response.edit_message(
-            content=None,
-            embed=_status_embed(
-                "Download from Jellyfin",
-                f"Looking up the seasons of "
-                f"**{self.match.get('title')}**.",
+        await _send(
+            "season lookup notice",
+            interaction.response.edit_message(
+                content=None,
+                embed=_status_embed(
+                    "Download from Jellyfin",
+                    f"Looking up the seasons of "
+                    f"**{self.match.get('title')}**.",
+                ),
+                view=None,
             ),
-            view=None,
         )
 
         service = JellyfinService()
@@ -700,12 +755,16 @@ class JellyfinSourceView(discord.ui.View):
             )
             return
 
-        await interaction.edit_original_response(
-            embed=_status_embed(
-                "Download from Jellyfin",
-                f"**{self.match.get('title')}** on **{server_name}**\n\n"
-                "Choose the season to copy into your library. "
-                "Only that season is downloaded.",
+        await _send(
+            "season picker",
+            interaction.edit_original_response(
+                content=None,
+                embed=_status_embed(
+                    "Download from Jellyfin",
+                    f"**{self.match.get('title')}** on **{server_name}**\n\n"
+                    "Choose the season to copy into your library. "
+                    "Only that season is downloaded.",
+                ),
+                view=view,
             ),
-            view=view,
         )

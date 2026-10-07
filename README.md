@@ -258,6 +258,7 @@ redfish/               HTTP client for the iDRAC Redfish API
 utils/                 Logging, embeds, formatting, theme
 config/                Settings template and torrent ranking preferences
 scripts/rebuild.sh     Restart the container and show its startup log
+tests/                 Checks that run the bot's code against local stand-ins
 ```
 
 Development notes, working method and known limitations are in

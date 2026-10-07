@@ -34,7 +34,9 @@ class TorrentAddMixin:
         magnet: str | None = None,
     ):
         """Add a torrent source to qBittorrent."""
-        await interaction.response.defer()
+        # The search picker has already deferred by the time it gets here.
+        if not interaction.response.is_done():
+            await interaction.response.defer()
 
         if not category:
             await interaction.followup.send(

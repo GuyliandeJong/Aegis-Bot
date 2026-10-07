@@ -94,7 +94,24 @@ class TorrentJellyfinSearchButton(discord.ui.Button):
         interaction: discord.Interaction,
     ):
         self.search_view.stop()
-        await interaction.response.defer()
+
+        # Deferring a button press shows nothing in Discord, and a
+        # Jackett search can take a long time. Replace the Jellyfin
+        # message straight away so the user can see the search started.
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                title="Searching for torrents…",
+                description=(
+                    f"Searching Jackett for "
+                    f"**{self.search_view.query}**.\n"
+                    "This can take a little while."
+                ),
+                color=discord.Color.blurple(),
+            ),
+            view=None,
+        )
+
         await self.search_view.torrent_cog._search(
             interaction,
             query=self.search_view.query,
@@ -191,6 +208,10 @@ class TorrentSearchView(discord.ui.View):
             result["indexer"],
         )
 
+        # Resolving a Jackett download URL can take far longer than the
+        # three seconds Discord allows before an interaction expires.
+        await interaction.response.defer()
+
         service = JackettService()
 
         try:
@@ -219,7 +240,7 @@ class TorrentSearchView(discord.ui.View):
                 ex,
             )
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Unable to resolve the selected torrent. "
                 "Please try another result.",
                 ephemeral=True,
@@ -230,7 +251,7 @@ class TorrentSearchView(discord.ui.View):
             await service.close()
 
         if not magnet.lower().startswith("magnet:?"):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "The selected release could not be resolved "
                 "to a usable magnet link. Please try another result.",
                 ephemeral=True,
@@ -327,6 +348,25 @@ class TorrentSearchMixin:
             )
             if len(token) >= 2
         }
+
+    @staticmethod
+    def _title_has_term(title_lower, term):
+        """
+        Check whether a preference term appears in a title as a whole
+        word or phrase.
+
+        A plain substring test is not enough: "iso" is also found
+        inside "episode".
+        """
+        term = str(term).strip().lower()
+
+        if not term:
+            return False
+
+        return re.search(
+            rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])",
+            title_lower,
+        ) is not None
 
     @classmethod
     def _query_tokens(cls, value):
@@ -832,8 +872,10 @@ class TorrentSearchMixin:
             int(codec_score)
             for codec, codec_score
             in codec_scores.items()
-            if str(codec).lower()
-            in title_lower
+            if cls._title_has_term(
+                title_lower,
+                codec,
+            )
         ]
 
         if matched_codec_scores:
@@ -859,8 +901,10 @@ class TorrentSearchMixin:
             int(term_score)
             for term, term_score
             in avoid_term_scores.items()
-            if str(term).lower()
-            in title_lower
+            if cls._title_has_term(
+                title_lower,
+                term,
+            )
         ]
 
         if matched_avoid_scores:
@@ -1238,7 +1282,9 @@ class TorrentSearchMixin:
                 content=(
                     "Unable to search Jackett. Check the bot logs "
                     "and the Jackett connection settings."
-                )
+                ),
+                embed=None,
+                view=None,
             )
             return
 
@@ -1305,7 +1351,9 @@ class TorrentSearchMixin:
                 content=(
                     f"No magnet-capable results found for "
                     f"**{query}**.{detail}"
-                )
+                ),
+                embed=None,
+                view=None,
             )
             return
 

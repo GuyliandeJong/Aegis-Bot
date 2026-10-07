@@ -130,14 +130,15 @@ class JellyfinService:
         if not query_tokens or not title_tokens:
             return False
 
-        # Avoid matching unrelated titles simply because one contains
-        # the other as a substring.
-        # TODO: decide how strict a non-exact match should be.
-        # The subset rule below still matches "The Last of Us" to "Us"
-        # and "Alien" to "Alien: Romulus".
-        return query_tokens.issubset(title_tokens) or title_tokens.issubset(
-            query_tokens
-        )
+        # A shortened query may match a longer library title, but never
+        # the other way round: "The Last of Us" must not match "Us".
+        if not query_tokens.issubset(title_tokens):
+            return False
+
+        # The query must also cover most of the title, so "Alien" does
+        # not claim "Alien: Romulus" while "The Office" still finds
+        # "The Office (US)". A miss only costs a normal torrent search.
+        return len(query_tokens) / len(title_tokens) >= 0.6
 
     @staticmethod
     def _item_type_for_category(category: str) -> str | None:

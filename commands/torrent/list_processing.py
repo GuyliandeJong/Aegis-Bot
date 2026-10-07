@@ -277,7 +277,7 @@ def _torrent_sort_key(
     elif state == "stalleddl":
         priority = 1
 
-    elif state == "queuedl":
+    elif state == "queueddl":
         priority = 2
 
     elif state in {
@@ -289,6 +289,7 @@ def _torrent_sort_key(
 
     elif state in {
         "pauseddl",
+        "stoppeddl",
         "error",
         "missingfiles",
     }:
@@ -302,12 +303,13 @@ def _torrent_sort_key(
 
     elif state in {
         "stalledup",
-        "queueup",
+        "queuedup",
     }:
         priority = 6
 
     elif state in {
         "pausedup",
+        "stoppedup",
         "completed",
         "checkingup",
     }:

@@ -80,13 +80,6 @@ class QBittorrentService:
         params: dict | None = None,
         data: dict | None = None,
     ):
-        await self.connect()
-
-        if self.session is None:
-            raise RuntimeError(
-                "qBittorrent session was not initialized."
-            )
-
         url = f"{self.api_url}{endpoint}"
 
         logger.debug(
@@ -95,26 +88,51 @@ class QBittorrentService:
             url,
         )
 
-        async with self.session.request(
-            method,
-            url,
-            params=params,
-            data=data,
-        ) as response:
+        # qBittorrent answers 403 once its login cookie is no longer
+        # valid, for example after qBittorrent restarts. Long-lived
+        # users of this service (the monitors) would otherwise fail
+        # forever, so log in again and retry the request once.
+        for attempt in range(2):
+            await self.connect()
 
-            if response.status >= 400:
-                text = await response.text()
-
+            if self.session is None:
                 raise RuntimeError(
-                    "qBittorrent API request failed: "
-                    f"{response.status}, "
-                    f"message='{text}', "
-                    f"url='{url}'"
+                    "qBittorrent session was not initialized."
                 )
 
-            return await self._parse_response(
-                response
-            )
+            async with self.session.request(
+                method,
+                url,
+                params=params,
+                data=data,
+            ) as response:
+
+                if response.status == 403 and attempt == 0:
+                    logger.info(
+                        "[QBittorrentService] Session rejected; "
+                        "logging in again."
+                    )
+                    retry = True
+
+                else:
+                    retry = False
+
+                    if response.status >= 400:
+                        text = await response.text()
+
+                        raise RuntimeError(
+                            "qBittorrent API request failed: "
+                            f"{response.status}, "
+                            f"message='{text}', "
+                            f"url='{url}'"
+                        )
+
+                    return await self._parse_response(
+                        response
+                    )
+
+            if retry:
+                await self.close()
 
     @staticmethod
     async def _parse_response(

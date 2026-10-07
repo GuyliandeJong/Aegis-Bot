@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import discord
@@ -25,6 +26,162 @@ class TransferFile:
     item_id: str
     filename: str
     directory: Path
+
+    # Whether the file has subtitles in the preferred language.
+    # None when the other server did not report its streams.
+    has_subtitles: bool | None = None
+
+    # Separate subtitle files to save next to the video.
+    media_source_id: str = ""
+    subtitle_streams: list[int] = field(default_factory=list)
+
+
+def _transfer_file(
+    item_id: str,
+    filename: str,
+    directory: Path,
+    subtitles: dict | None,
+    media_source_id: str = "",
+) -> TransferFile:
+    """Build a TransferFile, including its subtitle information."""
+    known = bool(subtitles and subtitles.get("known"))
+
+    return TransferFile(
+        item_id=item_id,
+        filename=filename,
+        directory=directory,
+        has_subtitles=(
+            subtitles["preferred"] is not None
+            if known
+            else None
+        ),
+        media_source_id=media_source_id,
+        subtitle_streams=(
+            list(subtitles["external"])
+            if known
+            else []
+        ),
+    )
+
+
+def _subtitle_line(files: list[TransferFile]) -> str | None:
+    """Summarize preferred-language subtitles across a transfer."""
+    known = [
+        file
+        for file in files
+        if file.has_subtitles is not None
+    ]
+
+    if not known:
+        return None
+
+    name = JellyfinService.language_name(
+        JellyfinService.preferred_subtitle_language()
+    )
+
+    count = sum(1 for file in known if file.has_subtitles)
+
+    if count == 0:
+        return f"{name} subtitles: none"
+
+    if len(known) == 1:
+        return f"{name} subtitles: yes"
+
+    if count == len(known):
+        return f"{name} subtitles: in all {count} files"
+
+    return f"{name} subtitles: in {count} of {len(known)} files"
+
+
+def existing_series_folder(primary_match: dict, library: Path) -> str | None:
+    """
+    Return the folder a series already uses in the primary library.
+
+    Missing seasons must land next to the seasons that are already
+    there. The primary server reports the folder with its own path, so
+    only the folder name is used, and only if it exists in the library
+    as this container sees it.
+    """
+    name = re.split(
+        r"[\\/]",
+        str(primary_match.get("path") or "").rstrip("\\/"),
+    )[-1].strip()
+
+    if not name or name in {".", ".."}:
+        return None
+
+    if (library / name).is_dir():
+        return name
+
+    return None
+
+
+async def find_missing_seasons(matches: list[dict], category: str):
+    """
+    Find seasons another server has that the primary library lacks.
+
+    Returns (source match, missing seasons, primary match), or None
+    when there is nothing to offer or the comparison cannot be made.
+    """
+    if category != "Series":
+        return None
+
+    if JellyfinService.library_dir(category) is None:
+        return None
+
+    primary = next(
+        (
+            match
+            for match in matches
+            if match.get("primary") and match.get("item_id")
+        ),
+        None,
+    )
+
+    if primary is None:
+        return None
+
+    service = JellyfinService()
+
+    try:
+        own = await service.get_seasons(
+            primary["server"],
+            primary["item_id"],
+        )
+
+        # Without the primary library's own seasons there is nothing
+        # to compare against, and every season would look missing.
+        if not own:
+            return None
+
+        own_numbers = {
+            season.get("IndexNumber")
+            for season in own
+        }
+
+        for match in matches:
+            if match.get("primary") or not match.get("item_id"):
+                continue
+
+            theirs = await service.get_seasons(
+                match["server"],
+                match["item_id"],
+            )
+
+            missing = [
+                season
+                for season in theirs
+                if isinstance(season.get("IndexNumber"), int)
+                and season["IndexNumber"] not in own_numbers
+            ]
+
+            if missing:
+                return match, missing, primary
+
+    finally:
+        await service.close()
+
+    return None
 
 
 # Media files are large, so only one transfer runs at a time.
@@ -160,6 +317,7 @@ class JellyfinTransfer:
         self.skipped: list[str] = []
         self.error: str | None = None
         self.refreshed = False
+        self.subtitle_files = 0
 
     def _on_progress(self, received: int, total: int) -> None:
         self.received = received
@@ -195,6 +353,12 @@ class JellyfinTransfer:
                 f"{format_bytes(self.received)} received"
             )
 
+        subtitle_line = _subtitle_line(self.files)
+
+        if subtitle_line:
+            lines.append("")
+            lines.append(subtitle_line)
+
         return _status_embed(
             "Downloading from Jellyfin…",
             "\n".join(lines),
@@ -215,6 +379,17 @@ class JellyfinTransfer:
                 f"Skipped {len(self.skipped)} file(s) that were "
                 "already in your library."
             )
+
+        subtitle_line = _subtitle_line(self.files)
+
+        if subtitle_line and (self.downloaded or self.skipped):
+            lines.append(subtitle_line)
+
+            if self.subtitle_files:
+                lines.append(
+                    f"Saved {self.subtitle_files} separate "
+                    "subtitle file(s)."
+                )
 
         if self.error:
             remaining = (
@@ -356,6 +531,28 @@ class JellyfinTransfer:
                     self.downloaded.append(path.name)
                 else:
                     self.skipped.append(path.name)
+
+                # Subtitles inside the video file come along by
+                # themselves; separate subtitle files are fetched here.
+                for number, stream_index in enumerate(
+                    file.subtitle_streams
+                ):
+                    name = JellyfinService.subtitle_filename(path.name)
+
+                    if number:
+                        name = name.replace(
+                            ".srt",
+                            f".{number + 1}.srt",
+                        )
+
+                    if await service.download_subtitle(
+                        self.server_name,
+                        file.item_id,
+                        file.media_source_id,
+                        stream_index,
+                        path.with_name(name),
+                    ):
+                        self.subtitle_files += 1
 
             primary = service.primary_server()
 
@@ -560,10 +757,12 @@ class JellyfinSeasonView(discord.ui.View):
         )
 
         files = [
-            TransferFile(
-                item_id=str(episode.get("Id")),
-                filename=JellyfinService.media_filename(episode),
-                directory=directory,
+            _transfer_file(
+                str(episode.get("Id")),
+                JellyfinService.media_filename(episode),
+                directory,
+                JellyfinService.subtitle_info(episode),
+                JellyfinService.media_source_id(episode),
             )
             for episode in episodes
             if episode.get("Id")
@@ -600,6 +799,8 @@ class JellyfinSourceView(discord.ui.View):
         category: str,
         torrent_cog,
         match: dict,
+        only_seasons: list[dict] | None = None,
+        folder_name: str | None = None,
     ):
         super().__init__(timeout=180)
 
@@ -609,8 +810,19 @@ class JellyfinSourceView(discord.ui.View):
         self.torrent_cog = torrent_cog
         self.match = match
 
+        # Set when the primary library already has part of a series:
+        # only these seasons are offered, and they are copied into the
+        # folder the series already uses.
+        self.only_seasons = only_seasons
+        self.folder_name = folder_name
+
+        if only_seasons is not None:
+            label = f"Download missing season from {match['server']}"
+        else:
+            label = f"Download from {match['server']}"
+
         self.download_button = discord.ui.Button(
-            label=f"Download from {match['server']}"[:80],
+            label=label[:80],
             style=discord.ButtonStyle.success,
         )
 
@@ -660,7 +872,10 @@ class JellyfinSourceView(discord.ui.View):
 
         self.stop()
 
-        directory = library / _library_folder(self.match)
+        directory = library / (
+            self.folder_name
+            or _library_folder(self.match)
+        )
         server_name = self.match["server"]
 
         logger.info(
@@ -684,10 +899,12 @@ class JellyfinSourceView(discord.ui.View):
             server_name,
             _library_folder(self.match),
             [
-                TransferFile(
-                    item_id=self.match["item_id"],
-                    filename=JellyfinService.media_filename(self.match),
-                    directory=directory,
+                _transfer_file(
+                    self.match["item_id"],
+                    JellyfinService.media_filename(self.match),
+                    directory,
+                    self.match.get("subtitles"),
+                    self.match.get("media_source_id") or "",
                 )
             ],
         )
@@ -719,15 +936,21 @@ class JellyfinSourceView(discord.ui.View):
             ),
         )
 
-        service = JellyfinService()
+        if self.only_seasons is not None:
+            # The missing seasons were already looked up for the
+            # availability message.
+            seasons = self.only_seasons
 
-        try:
-            seasons = await service.get_seasons(
-                server_name,
-                self.match["item_id"],
-            )
-        finally:
-            await service.close()
+        else:
+            service = JellyfinService()
+
+            try:
+                seasons = await service.get_seasons(
+                    server_name,
+                    self.match["item_id"],
+                )
+            finally:
+                await service.close()
 
         view = JellyfinSeasonView(
             owner_id=self.owner_id,

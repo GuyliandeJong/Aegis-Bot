@@ -7,7 +7,11 @@ from pathlib import Path
 
 import discord
 
-from commands.torrent.jellyfin_download import JellyfinSourceView
+from commands.torrent.jellyfin_download import (
+    JellyfinSourceView,
+    existing_series_folder,
+    find_missing_seasons,
+)
 from services.jackett_service import JackettService
 from services.jellyfin_service import JellyfinService
 from utils.logger import logger
@@ -368,6 +372,36 @@ class TorrentSearchMixin:
             rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])",
             title_lower,
         ) is not None
+
+    # Subtitle markers that release names commonly use. Checked in
+    # order; the first match decides the label.
+    SUBTITLE_MARKERS = (
+        ("multi", r"\b(?:multi ?subs?|msubs?)\b"),
+        ("EN", r"\b(?:e ?subs?|eng(?:lish)? ?subs?|en ?subs?)\b"),
+        ("NL", r"\b(?:nl ?subs?|dutch ?subs?)\b"),
+        ("", r"\b(?:subs|subbed|subtitles?)\b"),
+    )
+
+    @classmethod
+    def _subtitle_hint(cls, title):
+        """
+        Return what a release name says about subtitles, or None.
+
+        Jackett only provides the release name, not the file list, so
+        this can only report subtitles the uploader mentioned. A
+        release without a marker may still contain them.
+        """
+        normalized = re.sub(
+            r"[^a-z0-9]+",
+            " ",
+            str(title).lower(),
+        )
+
+        for label, pattern in cls.SUBTITLE_MARKERS:
+            if re.search(pattern, normalized):
+                return f"{label} subs".strip()
+
+        return None
 
     @classmethod
     def _query_tokens(cls, value):
@@ -992,13 +1026,24 @@ class TorrentSearchMixin:
                 result["indexer"]
             )
 
+            subtitle_hint = self._subtitle_hint(
+                result["title"]
+            )
+
+            subtitle_text = (
+                f" · 💬 {subtitle_hint}"
+                if subtitle_hint
+                else ""
+            )
+
             embed.add_field(
                 name=f"{position}. {title}",
                 value=(
                     f"`Score {result['score']}` · "
                     f"{source}\n"
                     f"🌱 {result['seeders']} seeders · "
-                    f"📦 {self._format_bytes(result['size'])}\n"
+                    f"📦 {self._format_bytes(result['size'])}"
+                    f"{subtitle_text}\n"
                     f"_{result['score_reason']}_"
                 ),
                 inline=False,
@@ -1101,7 +1146,11 @@ class TorrentSearchMixin:
         return None
 
     @staticmethod
-    def _build_jellyfin_embed(matches, download_source=None):
+    def _build_jellyfin_embed(
+        matches,
+        download_source=None,
+        missing_seasons=None,
+    ):
         """
         Build the "already available" embed.
 
@@ -1131,6 +1180,13 @@ class TorrentSearchMixin:
             if server_url:
                 line += f"\n`{server_url}`"
 
+            subtitles = JellyfinService.describe_subtitles(
+                match.get("subtitles")
+            )
+
+            if subtitles:
+                line += f"\n{subtitles}"
+
             lines.append(line)
 
         if len(matches) == 1:
@@ -1142,7 +1198,24 @@ class TorrentSearchMixin:
                 f"Already available on {len(matches)} Jellyfin servers"
             )
 
-        if download_source is not None:
+        if missing_seasons:
+            server = download_source.get("server")
+            names = ", ".join(
+                str(
+                    season.get("Name")
+                    or f"Season {season.get('IndexNumber')}"
+                )
+                for season in missing_seasons
+            )
+
+            title = f"{server} has more seasons"
+            closing = (
+                f"Your library is missing: **{names}**.\n"
+                f"You can copy a season from {server} or search for "
+                "a torrent instead."
+            )
+
+        elif download_source is not None:
             title = f"Available on {download_source.get('server')}"
             closing = (
                 "It is not in your own library yet. You can copy it "
@@ -1210,6 +1283,32 @@ class TorrentSearchMixin:
                 category,
             )
 
+            # The primary library may have the series but lack seasons
+            # that another server has.
+            missing_seasons = None
+            folder_name = None
+
+            if download_source is None:
+                try:
+                    found = await find_missing_seasons(
+                        jellyfin_matches,
+                        category,
+                    )
+                except Exception as ex:
+                    logger.exception(
+                        "[TorrentSearch] Season comparison failed: %s",
+                        ex,
+                    )
+                    found = None
+
+                if found is not None:
+                    download_source, missing_seasons, primary = found
+
+                    folder_name = existing_series_folder(
+                        primary,
+                        JellyfinService.library_dir(category),
+                    )
+
             if download_source is not None:
                 view = JellyfinSourceView(
                     owner_id=interaction.user.id,
@@ -1217,6 +1316,8 @@ class TorrentSearchMixin:
                     category=category,
                     torrent_cog=self,
                     match=download_source,
+                    only_seasons=missing_seasons,
+                    folder_name=folder_name,
                 )
             else:
                 view = TorrentJellyfinSearchView(
@@ -1231,6 +1332,7 @@ class TorrentSearchMixin:
                 embed=self._build_jellyfin_embed(
                     jellyfin_matches,
                     download_source,
+                    missing_seasons,
                 ),
                 view=view,
             )

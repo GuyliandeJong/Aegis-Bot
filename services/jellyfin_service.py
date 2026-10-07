@@ -190,7 +190,7 @@ class JellyfinService:
             "SearchTerm": query,
             "Recursive": "true",
             "IncludeItemTypes": item_type,
-            "Fields": "ProductionYear,Path",
+            "Fields": "ProductionYear,Path,MediaStreams,MediaSources",
             "Limit": "25",
         }
 
@@ -345,6 +345,8 @@ class JellyfinService:
                 "type": item.get("Type") or item_type,
                 "item_id": str(item.get("Id") or "").strip(),
                 "path": str(item.get("Path") or "").strip(),
+                "media_source_id": self.media_source_id(item),
+                "subtitles": self.subtitle_info(item),
             }
 
         return None
@@ -507,6 +509,238 @@ class JellyfinService:
 
         return cls.safe_name(re.split(r"[\\/]", name)[-1])
 
+    # ------------------------------------------------------------
+    # Subtitles
+    # ------------------------------------------------------------
+
+    # Jellyfin reports three-letter language codes. Users and file
+    # names commonly use two-letter codes or full names.
+    _LANGUAGES = {
+        "eng": ("English", "en", {"en", "eng", "english"}),
+        "dut": ("Dutch", "nl", {"nl", "dut", "nld", "dutch"}),
+        "ger": ("German", "de", {"de", "ger", "deu", "german"}),
+        "fre": ("French", "fr", {"fr", "fre", "fra", "french"}),
+        "spa": ("Spanish", "es", {"es", "spa", "spanish"}),
+    }
+
+    @classmethod
+    def language_code(cls, value) -> str:
+        """Normalize a language name or code to Jellyfin's form."""
+        value = str(value or "").strip().lower()
+
+        for code, (_, _, aliases) in cls._LANGUAGES.items():
+            if value in aliases:
+                return code
+
+        return value
+
+    @classmethod
+    def language_name(cls, code: str) -> str:
+        """Return a readable name for a language code."""
+        if code in cls._LANGUAGES:
+            return cls._LANGUAGES[code][0]
+
+        return code.upper() if code else "Unknown"
+
+    @classmethod
+    def preferred_subtitle_language(cls) -> str:
+        """Return the preferred subtitle language (SUBTITLE_LANGUAGE)."""
+        return cls.language_code(
+            os.getenv("SUBTITLE_LANGUAGE", "eng")
+        ) or "eng"
+
+    @staticmethod
+    def media_source_id(item: dict) -> str:
+        """Return the id Jellyfin uses for an item's media file."""
+        sources = item.get("MediaSources")
+
+        if isinstance(sources, list) and sources:
+            source_id = str(sources[0].get("Id") or "").strip()
+
+            if source_id:
+                return source_id
+
+        return str(item.get("Id") or "").strip()
+
+    @classmethod
+    def subtitle_info(cls, item: dict) -> dict:
+        """
+        Summarize the subtitles Jellyfin reports for an item.
+
+        Returns a dictionary with:
+            known:     False when Jellyfin sent no stream information
+            preferred: "embedded", "external" or None for the
+                       preferred language
+            external:  stream indexes of separate text subtitle files
+                       in the preferred language
+            others:    names of the other subtitle languages present
+        """
+        streams = item.get("MediaStreams")
+
+        info = {
+            "known": isinstance(streams, list),
+            "preferred": None,
+            "external": [],
+            "others": [],
+        }
+
+        if not info["known"]:
+            return info
+
+        wanted = cls.preferred_subtitle_language()
+        others = set()
+
+        for stream in streams:
+            if not isinstance(stream, dict):
+                continue
+
+            if stream.get("Type") != "Subtitle":
+                continue
+
+            language = cls.language_code(stream.get("Language"))
+
+            if language != wanted:
+                if language:
+                    others.add(cls.language_name(language))
+                continue
+
+            if not stream.get("IsExternal"):
+                info["preferred"] = "embedded"
+                continue
+
+            if info["preferred"] is None:
+                info["preferred"] = "external"
+
+            # Only text subtitles can be saved as an .srt file.
+            if (
+                stream.get("IsTextSubtitleStream")
+                and isinstance(stream.get("Index"), int)
+            ):
+                info["external"].append(stream["Index"])
+
+        info["others"] = sorted(others)
+
+        return info
+
+    @classmethod
+    def describe_subtitles(cls, info: dict | None) -> str | None:
+        """Describe subtitle availability for one item, for Discord."""
+        if not info or not info.get("known"):
+            return None
+
+        name = cls.language_name(cls.preferred_subtitle_language())
+
+        if info["preferred"] == "embedded":
+            return f"Subtitles: {name} (in the file)"
+
+        if info["preferred"] == "external":
+            return f"Subtitles: {name} (separate file)"
+
+        if info["others"]:
+            return (
+                f"Subtitles: no {name} "
+                f"(has {', '.join(info['others'])})"
+            )
+
+        return "Subtitles: none"
+
+    @classmethod
+    def subtitle_filename(cls, video_filename: str) -> str:
+        """Return the name for a subtitle file next to a video file."""
+        language = cls.preferred_subtitle_language()
+
+        suffix = (
+            cls._LANGUAGES[language][1]
+            if language in cls._LANGUAGES
+            else language
+        )
+
+        return f"{Path(video_filename).stem}.{suffix}.srt"
+
+    async def download_subtitle(
+        self,
+        server_name: str,
+        item_id: str,
+        media_source_id: str,
+        stream_index: int,
+        destination: Path,
+    ) -> bool:
+        """
+        Save one subtitle stream as an .srt file.
+
+        Subtitles are a bonus: any failure is logged and reported as
+        False, and never interrupts the media download.
+        """
+        server = self._get_server(server_name)
+
+        if server is None:
+            return False
+
+        try:
+            if destination.exists():
+                return True
+
+            await self.connect()
+
+            async with self.session.get(
+                f"{server.url}/Videos/{item_id}/"
+                f"{media_source_id or item_id}/Subtitles/"
+                f"{stream_index}/Stream.srt",
+                headers=self._auth_headers(server),
+            ) as response:
+                if response.status != 200:
+                    logger.warning(
+                        "%s returned HTTP %d for subtitle %s of item %s.",
+                        server.name,
+                        response.status,
+                        stream_index,
+                        item_id,
+                    )
+                    return False
+
+                content = await response.read()
+
+            if not content.strip():
+                return False
+
+            temporary = destination.with_name(
+                f"{destination.name}.part"
+            )
+
+            await asyncio.to_thread(
+                temporary.write_bytes,
+                content,
+            )
+
+            await asyncio.to_thread(
+                temporary.replace,
+                destination,
+            )
+
+            await asyncio.to_thread(
+                self._match_owner,
+                destination,
+                destination.parent,
+            )
+
+            logger.info(
+                "[Jellyfin] Saved subtitle %s.",
+                destination,
+            )
+
+            return True
+
+        except asyncio.CancelledError:
+            raise
+
+        except Exception:
+            logger.exception(
+                "[Jellyfin] Failed to save subtitle %s of item %s.",
+                stream_index,
+                item_id,
+            )
+            return False
+
     async def _get_items(
         self,
         server_name: str,
@@ -572,6 +806,8 @@ class JellyfinService:
             server_name,
             f"/Shows/{series_id}/Seasons",
             {
+                # Leave out seasons Jellyfin only lists as "missing".
+                "IsMissing": "false",
                 "SortBy": "IndexNumber",
                 "SortOrder": "Ascending",
             },
@@ -589,7 +825,8 @@ class JellyfinService:
             f"/Shows/{series_id}/Episodes",
             {
                 "SeasonId": season_id,
-                "Fields": "Path",
+                "IsMissing": "false",
+                "Fields": "Path,MediaStreams,MediaSources",
                 "SortBy": "IndexNumber",
                 "SortOrder": "Ascending",
             },

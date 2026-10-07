@@ -49,6 +49,12 @@ Ask all Jellyfin servers
         |                                   [Download from <server>]
         |                                   [Search for torrent]
         |
+        +-- Primary has the series, but
+        |   another server has more
+        |   seasons ....................... "<server> has more seasons"
+        |                                   [Download missing season from <server>]
+        |                                   [Search for torrent]
+        |
         +-- Nobody has it ................. Jackett search results
 ```
 
@@ -69,7 +75,27 @@ when a library folder is configured for the category.
   and the primary library is refreshed.
 - One download runs at a time.
 
-Only the video file is copied. Separate subtitle files are not.
+A missing season of a series that is already in the primary library
+is copied into the folder that series already uses.
+
+### Subtitles
+
+The preferred subtitle language is `SUBTITLE_LANGUAGE` (default
+English).
+
+- For a movie, the availability message says whether the other server
+  has subtitles in that language, and whether they are inside the video
+  file or a separate file.
+- For a season, the progress and result messages say how many episodes
+  have them.
+- Subtitles inside the video file come along with it. A separate text
+  subtitle file in the preferred language is saved next to the video as
+  `<video name>.<language>.srt`. Image-based subtitle files are not
+  copied.
+- Torrent search results show a subtitle marker when the release name
+  mentions subtitles (for example `NLSubs`, `ESub`, `MultiSubs`). Jackett
+  only provides the name, not the file list, so a release without a
+  marker may still contain subtitles.
 
 The other server's API key must be allowed to download media.
 
@@ -150,6 +176,9 @@ JELLYFIN_2_NAME=
 # downloading from another Jellyfin server.
 JELLYFIN_MOVIES_DIR=/media/Movies
 JELLYFIN_SERIES_DIR=/media/Series
+
+# Preferred subtitle language: a name or code such as english, en, nl.
+SUBTITLE_LANGUAGE=english
 
 JACKETT_INDEXERS=
 JACKETT_TIMEOUT=

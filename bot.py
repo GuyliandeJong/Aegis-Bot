@@ -15,6 +15,7 @@ from monitors.memory_monitor import MemoryMonitor
 from monitors.storage_monitor import StorageMonitor
 from monitors.torrent_monitor import TorrentMonitor
 from monitors.torrent_health_monitor import TorrentHealthMonitor
+from services import startup_check
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_action_tracker import (
     install_qbittorrent_action_tracking,
@@ -57,7 +58,12 @@ async def load_extensions():
 
 
 async def startup_tasks():
-    """Mark buttons from before the restart as expired, once."""
+    """Expire leftover buttons and check the services, once."""
+    try:
+        await startup_check.run(monitor_manager.notification_service)
+    except Exception:
+        logger.exception("Startup service check failed")
+
     try:
         await open_messages.expire_all(bot)
     except Exception:
@@ -112,9 +118,9 @@ async def on_ready():
     # Start the monitoring framework only once. Discord may call on_ready
     # again after a reconnect.
     if monitor_task is None:
-        # Mark buttons from before the restart as expired. Runs
-        # alongside the monitors: editing many old messages can take
-        # a while because of Discord's rate limits.
+        # Check the services and mark buttons from before the restart
+        # as expired. Runs alongside the monitors: editing many old
+        # messages can take a while because of Discord's rate limits.
         asyncio.create_task(startup_tasks())
 
         monitor_manager.register(

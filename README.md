@@ -23,6 +23,9 @@ It runs in Docker and serves a single Discord server (guild).
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone |
 
+`/wan`, `/server`, `/idrac` and `/network` reply privately: only the
+person who ran the command sees the answer.
+
 "Administrators" is Discord's administrator permission, set as the
 command default. It can be changed per user or role in Discord under
 Server Settings > Integrations.

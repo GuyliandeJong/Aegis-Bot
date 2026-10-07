@@ -28,6 +28,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_discord_http.py` | The download button through discord.py's request code | Local fake Discord API |
 | `check_seasons_subtitles.py` | Missing seasons, subtitle reporting, separate subtitle files | Two local fake Jellyfin servers |
 | `check_expiry.py` | Messages disabling their buttons after the timeout | Local fake Discord API |
+| `check_private_replies.py` | `/wan`, `/server`, `/idrac` and `/network` reply only to the person who ran them | Reads the source; runs nothing |
 | `check_restart.py` | Buttons marked expired after a restart, the shared torrent list, pruning removed torrents, GiB sizes, the startup service check | Fake channel, local fake qBittorrent, Jackett and Jellyfin |
 | `check_requesters_links.py` | Who is mentioned per torrent, and Google share links | Local fake Google and Wikidata |
 

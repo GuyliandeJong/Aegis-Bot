@@ -81,6 +81,12 @@ EXPECTED = {
         "failures: [('iDRAC', 'could not connect'), "
         "('Friend', 'the API key was refused')]",
     ],
+    "check_private_replies.py": [
+        "/wan      all private",
+        "/server   all private",
+        "/idrac    all private",
+        "/network  all private",
+    ],
     "check_requesters_links.py": [
         "searched Jackett for ['Gattaca 1997']",
         "'Target category: **Series**'",

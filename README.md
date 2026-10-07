@@ -16,6 +16,8 @@ It runs in Docker and serves a single Discord server (guild).
 | `/torrent list` | Lists torrents, with filter, sort and live refresh | Everyone |
 | `/torrent info` | Details and controls for one torrent | Everyone |
 | `/torrent status` | qBittorrent version and transfer totals | Everyone |
+| `/torrent watchlist` | Titles you are waiting for; remove them | Everyone (own list) |
+| `/torrent cleanup` | Finished torrents by ratio and seeding time; remove them | Administrators |
 | `/cpu`, `/memory`, `/filesystems`, `/network` | Live readings from the host | Everyone |
 | `/storage`, `/temperature`, `/idrac` | RAID, sensors and iDRAC details through Redfish | Everyone |
 | `/server` | Server model, service tag, BIOS and OS through Redfish | Administrators |
@@ -140,6 +142,42 @@ library is left to Jellyfin, for example with its Open Subtitles plugin.
 
 The other server's API key must be allowed to download media.
 
+### Watchlist
+
+When `/torrent search` finds nothing, the message offers **Watch for
+it**. Twice a day the bot looks again: first on every Jellyfin server,
+then on Jackett with the same search and relevance filter as
+`/torrent search`. When the title turns up, the person who asked is
+mentioned in the channel they searched in, with a **Show results**
+button that runs the normal search. The title is then removed from the
+watchlist. Each person can watch up to 25 titles.
+
+### Seeding and cleanup
+
+`/torrent cleanup` lists finished torrents, those that reached a
+seeding target first, with ratio, seeding time and size. Choose
+torrents in the list and remove them with or without their files;
+removing files asks for confirmation. Only administrators can use it,
+and the reply is visible to them only.
+
+```text
+SEED_RATIO_TARGET=2     # a ratio counted as seeded enough
+SEED_DAYS_TARGET=14     # or this many days of seeding
+```
+
+qBittorrent's own share limits (Options > BitTorrent) can stop or
+remove torrents automatically; the bot only shows and removes on
+request.
+
+### Free space
+
+After a torrent is added, the bot compares what is left to download
+with the free space qBittorrent reports, and privately warns the
+requester when it does not fit. A magnet's size is only known once
+qBittorrent has its metadata, so the check waits up to two minutes for
+it. qBittorrent reports the free space of its default save path; a
+category saved on another disk is compared against that same number.
+
 ## Monitoring
 
 Monitors run in the background and post to the alert channel when a
@@ -153,6 +191,7 @@ state changes.
 | Storage | RAID controller, virtual disks and physical drives | 60 s |
 | WAN | Internet connectivity and public IP changes | 60 s |
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
+| Watchlist | Titles people are waiting for | Twice a day |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 
@@ -237,6 +276,10 @@ SUBTITLE_LANGUAGE=english
 # Daily report of new seasons and episodes on the other servers.
 JELLYFIN_NEW_CONTENT_ALERTS=true
 JELLYFIN_NEW_CONTENT_HOUR=10
+
+# What /torrent cleanup counts as seeded enough.
+SEED_RATIO_TARGET=2
+SEED_DAYS_TARGET=14
 
 JACKETT_INDEXERS=
 JACKETT_TIMEOUT=

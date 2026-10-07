@@ -1,12 +1,14 @@
-"""Jellyfin availability service for torrent searches."""
+"""Jellyfin availability and download service for torrent searches."""
 
 from __future__ import annotations
 
 import asyncio
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import unquote
 
 import aiohttp
 
@@ -19,9 +21,17 @@ class JellyfinServer:
     url: str
     api_key: str
 
+    # The first configured server is the library that downloads from
+    # the other servers are copied into.
+    primary: bool = False
+
+
+class JellyfinDownloadError(Exception):
+    """A download failed; the message is suitable for showing in Discord."""
+
 
 class JellyfinService:
-    """Check whether a requested movie or series already exists in Jellyfin."""
+    """Find movies and series on Jellyfin servers and copy them between them."""
 
     def __init__(self) -> None:
         self.servers = self._load_servers()
@@ -57,6 +67,7 @@ class JellyfinService:
                     name=name or f"Jellyfin {index}",
                     url=url,
                     api_key=api_key,
+                    primary=index == 1,
                 )
             )
 
@@ -327,6 +338,7 @@ class JellyfinService:
 
             return {
                 "server": server.name,
+                "primary": server.primary,
                 "url": server.url,
                 "title": title,
                 "year": item_year,
@@ -337,222 +349,45 @@ class JellyfinService:
 
         return None
 
-    async def get_seasons(
-        self,
-        server_name: str,
-        series_id: str,
-    ) -> list[dict]:
-        """Return the seasons belonging to a Jellyfin series."""
-        server = self._get_server(server_name)
+    # ------------------------------------------------------------
+    # Downloading from another Jellyfin server
+    #
+    # The first configured server (JELLYFIN_1_*) is the primary
+    # library. Titles found only on another server can be copied
+    # into the primary library's folders.
+    # ------------------------------------------------------------
 
-        if server is None:
-            return []
+    DOWNLOAD_CHUNK_SIZE = 4 * 1024 * 1024
 
-        await self.connect()
+    @staticmethod
+    def library_dir(category: str) -> Path | None:
+        """
+        Return the primary library folder for a category.
 
-        if self.session is None:
-            return []
+        The folders come from JELLYFIN_MOVIES_DIR and
+        JELLYFIN_SERIES_DIR, as seen from inside the container.
+        Returns None when the folder is not configured, which
+        disables downloading for that category.
+        """
+        variable = {
+            "movies": "JELLYFIN_MOVIES_DIR",
+            "series": "JELLYFIN_SERIES_DIR",
+        }.get(category.strip().lower())
 
-        headers = {
-            "Authorization": f'MediaBrowser Token="{server.api_key}"',
-            "Accept": "application/json",
-            "User-Agent": "Aegis-Bot/1.0",
-        }
+        if variable is None:
+            return None
 
-        url = f"{server.url}/Shows/{series_id}/Seasons"
+        value = os.getenv(variable, "").strip()
 
-        try:
-            async with self.session.get(
-                url,
-                headers=headers,
-                params={
-                    "Fields": "Path,ProductionYear",
-                    "SortBy": "IndexNumber",
-                    "SortOrder": "Ascending",
-                },
-            ) as response:
-                if response.status != 200:
-                    body = await response.text()
+        return Path(value) if value else None
 
-                    logger.warning(
-                        "%s Jellyfin seasons request returned HTTP %d: %s",
-                        server.name,
-                        response.status,
-                        body[:500],
-                    )
+    def primary_server(self) -> JellyfinServer | None:
+        """Return the primary Jellyfin server, when configured."""
+        for server in self.servers:
+            if server.primary:
+                return server
 
-                    return []
-
-                data = await response.json()
-                items = data.get("Items", [])
-
-                return items if isinstance(items, list) else []
-
-        except asyncio.CancelledError:
-            raise
-
-        except Exception:
-            logger.exception(
-                "Failed to retrieve seasons for Jellyfin item %s",
-                series_id,
-            )
-            return []
-
-    async def get_episodes(
-        self,
-        server_name: str,
-        series_id: str,
-        season_number: int,
-    ) -> list[dict]:
-        """Return all episodes for one Jellyfin season."""
-        server = self._get_server(server_name)
-
-        if server is None:
-            return []
-
-        await self.connect()
-
-        if self.session is None:
-            return []
-
-        headers = {
-            "Authorization": f'MediaBrowser Token="{server.api_key}"',
-            "Accept": "application/json",
-            "User-Agent": "Aegis-Bot/1.0",
-        }
-
-        url = f"{server.url}/Shows/{series_id}/Episodes"
-
-        try:
-            async with self.session.get(
-                url,
-                headers=headers,
-                params={
-                    "Season": season_number,
-                    "Fields": "Path,ProductionYear",
-                    "SortBy": "ParentIndexNumber,IndexNumber",
-                    "SortOrder": "Ascending",
-                },
-            ) as response:
-                if response.status != 200:
-                    body = await response.text()
-
-                    logger.warning(
-                        "%s Jellyfin episodes request returned HTTP %d: %s",
-                        server.name,
-                        response.status,
-                        body[:500],
-                    )
-
-                    return []
-
-                data = await response.json()
-                items = data.get("Items", [])
-
-                return items if isinstance(items, list) else []
-
-        except asyncio.CancelledError:
-            raise
-
-        except Exception:
-            logger.exception(
-                "Failed to retrieve episodes for Jellyfin series %s season %d",
-                series_id,
-                season_number,
-            )
-            return []
-
-    async def download_item(
-        self,
-        server_name: str,
-        item_id: str,
-        destination: Path,
-    ) -> bool:
-        """Download one Jellyfin item to the local filesystem."""
-        server = self._get_server(server_name)
-
-        if server is None:
-            return False
-
-        await self.connect()
-
-        if self.session is None:
-            return False
-
-        destination.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        temporary = destination.with_name(
-            f"{destination.name}.part"
-        )
-
-        headers = {
-            "Authorization": f'MediaBrowser Token="{server.api_key}"',
-            "User-Agent": "Aegis-Bot/1.0",
-        }
-
-        url = f"{server.url}/Items/{item_id}/Download"
-
-        try:
-            # The session's 15-second total timeout suits API calls but
-            # would abort any real media download, so only guard against
-            # a stalled connection here.
-            async with self.session.get(
-                url,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(
-                    total=None,
-                    sock_connect=15,
-                    sock_read=60,
-                ),
-            ) as response:
-                if response.status != 200:
-                    body = await response.text()
-
-                    logger.warning(
-                        "%s Jellyfin download returned HTTP %d: %s",
-                        server.name,
-                        response.status,
-                        body[:500],
-                    )
-
-                    return False
-
-                with temporary.open("wb") as file:
-                    async for chunk in response.content.iter_chunked(
-                        1024 * 1024
-                    ):
-                        file.write(chunk)
-
-            temporary.replace(destination)
-
-            logger.info(
-                "[Jellyfin] Downloaded '%s' from %s to %s.",
-                item_id,
-                server.name,
-                destination,
-            )
-
-            return True
-
-        except asyncio.CancelledError:
-            raise
-
-        except Exception:
-            logger.exception(
-                "[Jellyfin] Failed to download item %s from %s.",
-                item_id,
-                server.name,
-            )
-
-            try:
-                temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
-
-            return False
+        return None
 
     def _get_server(
         self,
@@ -567,6 +402,357 @@ class JellyfinService:
 
         return None
 
+    @staticmethod
+    def _auth_headers(server: JellyfinServer) -> dict:
+        return {
+            "Authorization": f'MediaBrowser Token="{server.api_key}"',
+            "User-Agent": "Aegis-Bot/1.0",
+        }
+
+    @staticmethod
+    def safe_name(value) -> str:
+        """
+        Make a title or file name safe to use as one path component.
+
+        Names come from another person's server, so anything that
+        could change the destination folder is removed.
+        """
+        value = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", str(value or ""))
+        value = re.sub(r"\s+", " ", value)
+
+        return value.strip(" .")
+
+    @classmethod
+    def media_filename(cls, item: dict) -> str:
+        """
+        Return the original media file name of a Jellyfin item.
+
+        Only the final component of the reported path is used; the
+        other server may run on Windows or Linux.
+        """
+        path = str(item.get("Path") or item.get("path") or "")
+        name = re.split(r"[\\/]", path)[-1]
+
+        return cls.safe_name(name)
+
+    @classmethod
+    def _filename_from_response(
+        cls,
+        response: aiohttp.ClientResponse,
+    ) -> str:
+        """Return the file name offered by a download response."""
+        disposition = response.headers.get("Content-Disposition", "")
+
+        match = re.search(
+            r"filename\*=(?:UTF-8'')?([^;]+)",
+            disposition,
+            re.IGNORECASE,
+        )
+
+        if match:
+            name = unquote(match.group(1).strip().strip('"'))
+        else:
+            match = re.search(
+                r'filename="?([^";]+)"?',
+                disposition,
+                re.IGNORECASE,
+            )
+            name = match.group(1) if match else ""
+
+        return cls.safe_name(re.split(r"[\\/]", name)[-1])
+
+    async def _get_items(
+        self,
+        server_name: str,
+        path: str,
+        params: dict,
+    ) -> list[dict]:
+        """Return the Items list of one Jellyfin API response."""
+        server = self._get_server(server_name)
+
+        if server is None:
+            return []
+
+        await self.connect()
+
+        if self.session is None:
+            return []
+
+        try:
+            async with self.session.get(
+                f"{server.url}{path}",
+                headers={
+                    **self._auth_headers(server),
+                    "Accept": "application/json",
+                },
+                params=params,
+            ) as response:
+                if response.status != 200:
+                    body = await response.text()
+
+                    logger.warning(
+                        "%s Jellyfin request %s returned HTTP %d: %s",
+                        server.name,
+                        path,
+                        response.status,
+                        body[:500],
+                    )
+
+                    return []
+
+                data = await response.json()
+                items = data.get("Items", [])
+
+                return items if isinstance(items, list) else []
+
+        except asyncio.CancelledError:
+            raise
+
+        except Exception:
+            logger.exception(
+                "Jellyfin request %s failed on %s",
+                path,
+                server.name,
+            )
+            return []
+
+    async def get_seasons(
+        self,
+        server_name: str,
+        series_id: str,
+    ) -> list[dict]:
+        """Return the seasons belonging to a Jellyfin series."""
+        return await self._get_items(
+            server_name,
+            f"/Shows/{series_id}/Seasons",
+            {
+                "SortBy": "IndexNumber",
+                "SortOrder": "Ascending",
+            },
+        )
+
+    async def get_episodes(
+        self,
+        server_name: str,
+        series_id: str,
+        season_id: str,
+    ) -> list[dict]:
+        """Return all episodes of one Jellyfin season, with file paths."""
+        return await self._get_items(
+            server_name,
+            f"/Shows/{series_id}/Episodes",
+            {
+                "SeasonId": season_id,
+                "Fields": "Path",
+                "SortBy": "IndexNumber",
+                "SortOrder": "Ascending",
+            },
+        )
+
+    async def download_item(
+        self,
+        server_name: str,
+        item_id: str,
+        directory: Path,
+        filename: str = "",
+        on_progress=None,
+    ) -> tuple[Path, bool]:
+        """
+        Download one Jellyfin item into a folder.
+
+        The file is streamed to a ".part" file and only renamed once
+        it is complete, so a failed download never leaves a broken
+        media file behind.
+
+        Returns:
+            The destination path, and whether a download happened.
+            An existing file is left untouched and reported as False.
+
+        Raises:
+            JellyfinDownloadError: with a message suitable for Discord.
+        """
+        server = self._get_server(server_name)
+
+        if server is None:
+            raise JellyfinDownloadError(
+                "That Jellyfin server is no longer configured."
+            )
+
+        filename = self.safe_name(filename)
+
+        if filename and (directory / filename).exists():
+            return directory / filename, False
+
+        await self.connect()
+
+        if self.session is None:
+            raise JellyfinDownloadError(
+                "The Jellyfin connection could not be opened."
+            )
+
+        temporary: Path | None = None
+        completed = False
+
+        try:
+            # The session's 15-second total timeout suits API calls but
+            # would abort any real media download, so only guard against
+            # a stalled connection here.
+            async with self.session.get(
+                f"{server.url}/Items/{item_id}/Download",
+                headers=self._auth_headers(server),
+                timeout=aiohttp.ClientTimeout(
+                    total=None,
+                    sock_connect=15,
+                    sock_read=60,
+                ),
+            ) as response:
+                if response.status in {401, 403}:
+                    raise JellyfinDownloadError(
+                        f"{server.name} refused the download "
+                        f"(HTTP {response.status}). Its API key must "
+                        "be allowed to download media."
+                    )
+
+                if response.status != 200:
+                    raise JellyfinDownloadError(
+                        f"{server.name} returned HTTP "
+                        f"{response.status} for the download."
+                    )
+
+                if not filename:
+                    filename = self._filename_from_response(response)
+
+                if not filename:
+                    raise JellyfinDownloadError(
+                        f"{server.name} did not report a file name "
+                        "for this item."
+                    )
+
+                destination = directory / filename
+
+                if destination.exists():
+                    return destination, False
+
+                try:
+                    await asyncio.to_thread(
+                        directory.mkdir,
+                        parents=True,
+                        exist_ok=True,
+                    )
+                except OSError as ex:
+                    raise JellyfinDownloadError(
+                        f"Cannot create `{directory}` "
+                        f"({ex.strerror or ex}). Is the library "
+                        "mounted read-write in the container?"
+                    ) from ex
+
+                total = int(
+                    response.headers.get("Content-Length") or 0
+                )
+
+                if total:
+                    usage = await asyncio.to_thread(
+                        shutil.disk_usage,
+                        directory,
+                    )
+
+                    if total > usage.free:
+                        raise JellyfinDownloadError(
+                            "There is not enough free space in "
+                            f"`{directory}` for this file."
+                        )
+
+                temporary = destination.with_name(
+                    f"{destination.name}.part"
+                )
+
+                # Disk writes run in a worker thread so a slow disk
+                # does not stall the rest of the bot.
+                file = await asyncio.to_thread(
+                    temporary.open,
+                    "wb",
+                )
+
+                received = 0
+
+                try:
+                    async for chunk in response.content.iter_chunked(
+                        self.DOWNLOAD_CHUNK_SIZE
+                    ):
+                        await asyncio.to_thread(
+                            file.write,
+                            chunk,
+                        )
+
+                        received += len(chunk)
+
+                        if on_progress is not None:
+                            on_progress(received, total)
+
+                finally:
+                    await asyncio.to_thread(file.close)
+
+                if total and received != total:
+                    raise JellyfinDownloadError(
+                        "The download ended before the whole file "
+                        "was received."
+                    )
+
+            await asyncio.to_thread(
+                temporary.replace,
+                destination,
+            )
+
+            completed = True
+
+            logger.info(
+                "[Jellyfin] Downloaded item %s from %s to %s.",
+                item_id,
+                server.name,
+                destination,
+            )
+
+            return destination, True
+
+        except JellyfinDownloadError:
+            raise
+
+        except asyncio.CancelledError:
+            raise
+
+        except OSError as ex:
+            logger.exception(
+                "[Jellyfin] Could not write item %s.",
+                item_id,
+            )
+
+            raise JellyfinDownloadError(
+                f"Could not write the file ({ex.strerror or ex}). "
+                "Is the library mounted read-write in the container?"
+            ) from ex
+
+        except Exception as ex:
+            logger.exception(
+                "[Jellyfin] Failed to download item %s from %s.",
+                item_id,
+                server.name,
+            )
+
+            raise JellyfinDownloadError(
+                f"The connection to {server.name} failed during "
+                "the download."
+            ) from ex
+
+        finally:
+            if temporary is not None and not completed:
+                try:
+                    await asyncio.to_thread(
+                        temporary.unlink,
+                        missing_ok=True,
+                    )
+                except OSError:
+                    pass
+
     async def refresh(self, server_name: str) -> bool:
         """Ask Jellyfin to refresh its library."""
         server = self._get_server(server_name)
@@ -579,17 +765,10 @@ class JellyfinService:
         if self.session is None:
             return False
 
-        headers = {
-            "Authorization": f'MediaBrowser Token="{server.api_key}"',
-            "User-Agent": "Aegis-Bot/1.0",
-        }
-
-        url = f"{server.url}/Library/Refresh"
-
         try:
             async with self.session.post(
-                url,
-                headers=headers,
+                f"{server.url}/Library/Refresh",
+                headers=self._auth_headers(server),
             ) as response:
                 if response.status not in {200, 204}:
                     body = await response.text()

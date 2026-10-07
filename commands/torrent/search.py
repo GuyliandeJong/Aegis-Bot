@@ -7,6 +7,7 @@ from pathlib import Path
 
 import discord
 
+from commands.torrent.jellyfin_download import JellyfinSourceView
 from services.jackett_service import JackettService
 from services.jellyfin_service import JellyfinService
 from utils.logger import logger
@@ -1079,7 +1080,28 @@ class TorrentSearchMixin:
             await service.close()
 
     @staticmethod
-    def _build_jellyfin_embed(matches):
+    def _jellyfin_download_source(matches, category):
+        """
+        Return the match a title can be downloaded from, if any.
+
+        A download is only offered when the primary library does not
+        have the title, another server does, and a library folder is
+        configured for the category.
+        """
+        if any(match.get("primary") for match in matches):
+            return None
+
+        if JellyfinService.library_dir(category) is None:
+            return None
+
+        for match in matches:
+            if match.get("item_id"):
+                return match
+
+        return None
+
+    @staticmethod
+    def _build_jellyfin_embed(matches, download_source=None):
         """
         Build the "already available" embed.
 
@@ -1120,11 +1142,21 @@ class TorrentSearchMixin:
                 f"Already available on {len(matches)} Jellyfin servers"
             )
 
+        if download_source is not None:
+            title = f"Available on {download_source.get('server')}"
+            closing = (
+                "It is not in your own library yet. You can copy it "
+                f"from {download_source.get('server')} or search for "
+                "a torrent instead."
+            )
+        else:
+            closing = "No torrent search has been performed."
+
         return discord.Embed(
             title=title,
             description=(
                 "\n\n".join(lines)
-                + "\n\nNo torrent search has been performed."
+                + f"\n\n{closing}"
             ),
             color=discord.Color.green(),
         )
@@ -1173,16 +1205,32 @@ class TorrentSearchMixin:
                 ),
             )
 
-            view = TorrentJellyfinSearchView(
-                owner_id=interaction.user.id,
-                query=query,
-                category=category,
-                torrent_cog=self,
+            download_source = self._jellyfin_download_source(
+                jellyfin_matches,
+                category,
             )
+
+            if download_source is not None:
+                view = JellyfinSourceView(
+                    owner_id=interaction.user.id,
+                    query=query,
+                    category=category,
+                    torrent_cog=self,
+                    match=download_source,
+                )
+            else:
+                view = TorrentJellyfinSearchView(
+                    owner_id=interaction.user.id,
+                    query=query,
+                    category=category,
+                    torrent_cog=self,
+                )
+
             await interaction.edit_original_response(
                 content=None,
                 embed=self._build_jellyfin_embed(
-                    jellyfin_matches
+                    jellyfin_matches,
+                    download_source,
                 ),
                 view=view,
             )

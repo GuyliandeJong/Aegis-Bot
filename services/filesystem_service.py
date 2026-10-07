@@ -16,8 +16,11 @@ class FilesystemService:
         "/host/mnt/",
     )
 
-    async def get_filesystems(self) -> FilesystemStatus:
-        filesystems = []
+    def _mounted(self):
+        """
+        Yield (display mountpoint, partition, usage) for the
+        filesystems worth showing, one per device.
+        """
         seen_devices = set()
 
         for partition in psutil.disk_partitions(all=True):
@@ -48,6 +51,19 @@ class FilesystemService:
 
             seen_devices.add(partition.device)
 
+            yield display_mount, partition, usage
+
+    async def get_used_bytes(self) -> dict[str, tuple[int, int]]:
+        """Return {mountpoint: (used bytes, total bytes)}."""
+        return {
+            mount: (usage.used, usage.total)
+            for mount, _partition, usage in self._mounted()
+        }
+
+    async def get_filesystems(self) -> FilesystemStatus:
+        filesystems = []
+
+        for display_mount, partition, usage in self._mounted():
             filesystems.append(
                 Filesystem(
                     device=partition.device,

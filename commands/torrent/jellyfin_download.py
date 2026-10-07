@@ -11,6 +11,7 @@ from pathlib import Path
 import discord
 
 from commands.torrent.formatting import TorrentFormattingMixin
+from services import activity_log
 from services.jellyfin_compare import missing_content
 from services.jellyfin_service import (
     JellyfinDownloadError,
@@ -402,6 +403,7 @@ class JellyfinTransfer:
         self.error: str | None = None
         self.refreshed = False
         self.subtitle_files = 0
+        self.copied_bytes = 0
 
     def _on_progress(self, received: int, total: int) -> None:
         self.received = received
@@ -655,6 +657,11 @@ class JellyfinTransfer:
 
                 if downloaded:
                     self.downloaded.append(path.name)
+
+                    try:
+                        self.copied_bytes += path.stat().st_size
+                    except OSError:
+                        pass
                 else:
                     self.skipped.append(path.name)
 
@@ -709,6 +716,15 @@ class JellyfinTransfer:
             len(self.skipped),
             self.error,
         )
+
+        if self.downloaded:
+            activity_log.record(
+                "jellyfin_copy",
+                title=self.title,
+                server=self.server_name,
+                files=len(self.downloaded),
+                bytes=self.copied_bytes,
+            )
 
         await self._edit(self.result_embed())
         open_messages.forget(self.message, "transfer")

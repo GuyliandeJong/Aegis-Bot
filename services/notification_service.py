@@ -1,6 +1,7 @@
 import discord
 
 from config.settings import settings
+from services import activity_log
 from utils import theme
 from utils.logger import logger
 
@@ -25,6 +26,7 @@ class NotificationService:
         *,
         fields: list[tuple[str, str, bool]] | None = None,
         content: str | None = None,
+        level: str = "info",
     ):
         """Send a formatted notification to the configured alert channel."""
 
@@ -71,6 +73,8 @@ class NotificationService:
             title,
         )
 
+        activity_log.record("alert", level=level, title=title)
+
     async def info(
         self,
         title: str,
@@ -87,6 +91,7 @@ class NotificationService:
             color=theme.PRIMARY_COLOR,
             fields=fields,
             content=content,
+            level="info",
         )
 
     async def warning(
@@ -105,6 +110,7 @@ class NotificationService:
             color=theme.WARNING_COLOR,
             fields=fields,
             content=content,
+            level="warning",
         )
 
     async def critical(
@@ -123,6 +129,7 @@ class NotificationService:
             color=theme.ERROR_COLOR,
             fields=fields,
             content=content,
+            level="critical",
         )
 
     async def recovered(
@@ -141,6 +148,7 @@ class NotificationService:
             color=theme.SUCCESS_COLOR,
             fields=fields,
             content=content,
+            level="recovered",
         )
 
     async def success(
@@ -159,4 +167,5 @@ class NotificationService:
             color=theme.SUCCESS_COLOR,
             fields=fields,
             content=content,
+            level="success",
         )

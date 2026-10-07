@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from services.hardware_service import HardwareService
 from services.server_service import ServerService
 from utils.embed_models import EmbedField
 from utils.embeds import create_embed
@@ -37,6 +38,14 @@ class Server(commands.Cog):
         try:
             # Retrieve the current server status.
             status = await service.get_status()
+
+            # Power supplies, fans and power draw are extra: /server
+            # still answers when iDRAC does not report them.
+            try:
+                hardware = await HardwareService().get_hardware_health()
+            except Exception as ex:
+                logger.warning("Hardware health unavailable: %s", ex)
+                hardware = None
 
             # Build the server information embed using the
             # centralized Aegis-Bot theme.
@@ -92,6 +101,13 @@ class Server(commands.Cog):
                 ],
             )
 
+            if hardware is not None:
+                embed.add_field(
+                    name="🔌 Power Supplies and Fans",
+                    value=hardware_summary(hardware),
+                    inline=False,
+                )
+
             logger.info(
                 "Server status requested by %s",
                 interaction.user,
@@ -125,6 +141,34 @@ class Server(commands.Cog):
             embed=embed,
             ephemeral=True,
         )
+
+
+def hardware_summary(hardware: dict) -> str:
+    """"2 power supplies OK · 6 fans OK · drawing 182 W"."""
+    parts = []
+
+    for kind, plural in (("Power supply", "power supplies"), ("Fan", "fans")):
+        members = [
+            component
+            for component in hardware["components"].values()
+            if component["kind"] == kind
+        ]
+
+        if not members:
+            continue
+
+        bad = [m for m in members if m["health"].lower() != "ok"]
+
+        parts.append(
+            f"{len(members)} {plural} OK"
+            if not bad
+            else f"{len(bad)} of {len(members)} {plural} not OK"
+        )
+
+    if hardware.get("power_watts") is not None:
+        parts.append(f"drawing {hardware['power_watts']:.0f} W")
+
+    return " · ".join(parts) or "Not reported by iDRAC"
 
 
 async def setup(bot: commands.Bot):

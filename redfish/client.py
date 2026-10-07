@@ -85,6 +85,10 @@ class RedfishClient:
         )
 
 
+    async def get_power(self) -> dict:
+        """Get chassis power supplies and power consumption."""
+        return await self.get("/Chassis/System.Embedded.1/Power")
+
     async def get_thermal(self) -> dict:
         """Get chassis thermal information."""
         return await self.get("/Chassis/System.Embedded.1/Thermal")

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from config.settings import settings
 from monitors.filesystem_monitor import FilesystemMonitor
+from monitors.hardware_monitor import HardwareMonitor
 from monitors.jellyfin_new_content_monitor import JellyfinNewContentMonitor
 from monitors.monitor_manager import MonitorManager
 from monitors.wan_monitor import WanMonitor
@@ -142,6 +143,9 @@ async def on_ready():
         )
         monitor_manager.register(
             StorageMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            HardwareMonitor(monitor_manager.notification_service)
         )
         monitor_manager.register(
             TorrentMonitor(monitor_manager.notification_service)

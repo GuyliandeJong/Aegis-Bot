@@ -1,5 +1,9 @@
 """Formatting helpers for torrent information."""
 from datetime import timedelta
+
+from commands.torrent.constants import STATE_LABELS
+
+
 class TorrentFormattingMixin:
     """Mixin containing torrent formatting helpers."""
     @staticmethod
@@ -132,35 +136,8 @@ class TorrentFormattingMixin:
         normalized = str(
             state
         ).strip().lower()
-        states = {
-            "downloading": "Downloading",
-            "forceddl": "Downloading — Forced",
-            "metadl": "Downloading — Metadata",
-            "stalleddl": "Downloading — Stalled",
-            "queueddl": "Queued — Downloading",
-            "pauseddl": "Paused — Downloading",
-            "checkingdl": "Checking — Download",
-            "checkingresumedata": "Checking Resume Data",
-            "allocating": "Allocating",
-            "error": "Error",
-            "missingfiles": "Missing Files",
-            "uploading": "Seeding",
-            "forcedup": "Seeding — Forced",
-            "stalledup": "Seeding — Stalled",
-            "queuedup": "Queued — Seeding",
-            "pausedup": "Paused — Seeding",
-            "completed": "Completed",
-            "checkingup": "Checking — Seeding",
-            "stoppedup": "Stopped — Seeding",
-            "stoppeddl": "Stopped — Downloading",
-            "stopped": "Stopped",
-            "paused": "Paused",
-            "checking": "Checking",
-            "moving": "Moving",
-            "unknown": "Unknown",
-        }
-        if normalized in states:
-            return states[normalized]
+        if normalized in STATE_LABELS:
+            return STATE_LABELS[normalized]
         return normalized.replace(
             "_",
             " ",

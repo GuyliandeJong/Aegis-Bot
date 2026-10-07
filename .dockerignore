@@ -1,0 +1,10 @@
+# Keep secrets, runtime state and repository metadata out of the image.
+.env
+.env.*
+config/settings.py
+data/
+.git/
+.venv/
+__pycache__/
+*.pyc
+*.code-workspace

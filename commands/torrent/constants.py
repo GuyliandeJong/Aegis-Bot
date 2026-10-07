@@ -85,4 +85,5 @@ STATE_LABELS = {
     "paused": "Paused",
     "checking": "Checking",
     "moving": "Moving",
+    "unknown": "Unknown",
 }

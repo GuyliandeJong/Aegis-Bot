@@ -12,20 +12,6 @@ from utils.logger import logger
 class TorrentAddMixin:
     """Mixin providing torrent adding."""
 
-    @staticmethod
-    def _is_valid_magnet(
-        magnet: str,
-    ) -> bool:
-        """Perform basic validation of a BitTorrent magnet URL."""
-        magnet = magnet.strip()
-
-        if not magnet.lower().startswith(
-            "magnet:?"
-        ):
-            return False
-
-        return "xt=urn:btih:" in magnet.lower()
-
     async def _add(
         self,
         interaction: discord.Interaction,

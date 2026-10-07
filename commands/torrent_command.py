@@ -10,7 +10,6 @@ from commands.torrent.constants import (
     ALLOWED_CATEGORIES,
     SEEDING_STATES,
 )
-from commands.torrent.control import TorrentControlMixin
 from commands.torrent.formatting import TorrentFormattingMixin
 from commands.torrent.info import TorrentInfoMixin
 from commands.torrent.list import TorrentListMixin
@@ -39,7 +38,6 @@ class Torrent(
     TorrentListMixin,
     TorrentInfoMixin,
     TorrentStatusMixin,
-    TorrentControlMixin,
     TorrentAddMixin,
     TorrentSearchMixin,
     commands.Cog,

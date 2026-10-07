@@ -252,6 +252,11 @@ async def expire_view(view: discord.ui.View) -> None:
     message = getattr(view, "message", None)
 
     if message is None:
+        logger.warning(
+            "[JellyfinDownload] %s expired, but its message is "
+            "unknown; the buttons could not be disabled.",
+            type(view).__name__,
+        )
         return
 
     try:
@@ -262,8 +267,19 @@ async def expire_view(view: discord.ui.View) -> None:
             ),
             view=view,
         )
-    except discord.HTTPException:
-        pass
+
+        logger.info(
+            "[JellyfinDownload] %s expired; buttons disabled.",
+            type(view).__name__,
+        )
+
+    except Exception as ex:
+        logger.warning(
+            "[JellyfinDownload] %s expired, but the message could "
+            "not be updated: %s",
+            type(view).__name__,
+            ex,
+        )
 
 
 async def _report_error(

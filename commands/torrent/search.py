@@ -1225,6 +1225,151 @@ class TorrentSearchMixin:
             color=discord.Color.green(),
         )
 
+    async def _find_torrents(
+        self,
+        query,
+        category,
+    ):
+        """
+        Search Jackett and rank the results by the preferences.
+
+        Tries the exact query first and broadens it only when that
+        finds nothing. Returns (ranked results, errors per indexer,
+        the query that was searched, whether it was broadened).
+        Raises when Jackett cannot be searched at all.
+        """
+        service = JackettService()
+
+        try:
+            # Always try the exact user query first.
+            results, errors = (
+                await self._run_search(
+                    service,
+                    query,
+                )
+            )
+
+            searched_query = query
+            fallback_used = False
+
+            # Only broaden the search if the exact query returned
+            # absolutely nothing.
+            if not results:
+                fallback_queries = (
+                    self._search_fallback_queries(
+                        query
+                    )
+                )
+
+                for fallback_query in fallback_queries:
+                    logger.info(
+                        "[TorrentSearch] No results for '%s'. "
+                        "Trying fallback query '%s'.",
+                        query,
+                        fallback_query,
+                    )
+
+                    (
+                        fallback_results,
+                        fallback_errors,
+                    ) = await self._run_search(
+                        service,
+                        fallback_query,
+                    )
+
+                    errors.update(
+                        fallback_errors
+                    )
+
+                    if not fallback_results:
+                        continue
+
+                    # A fallback query may return results that are
+                    # technically valid to Jackett but unrelated to
+                    # what the user typed. Filter them against the
+                    # original query before accepting them.
+                    relevant_results = (
+                        self._filter_fallback_results(
+                            fallback_results,
+                            query,
+                        )
+                    )
+
+                    if not relevant_results:
+                        logger.info(
+                            "[TorrentSearch] Fallback query "
+                            "'%s' returned results, but none "
+                            "were sufficiently relevant to '%s'.",
+                            fallback_query,
+                            query,
+                        )
+                        continue
+
+                    results = relevant_results
+                    searched_query = fallback_query
+                    fallback_used = True
+
+                    logger.info(
+                        "[TorrentSearch] Fallback query "
+                        "'%s' returned %d relevant result(s).",
+                        fallback_query,
+                        len(results),
+                    )
+
+                    break
+
+        finally:
+            await service.close()
+
+        preferences = self._load_preferences()
+
+        category_preferences = (
+            self._category_preferences(
+                preferences,
+                category,
+            )
+        )
+
+        has_preferred_resolution = (
+            self._has_preferred_resolution(
+                results,
+                category_preferences.get(
+                    "preferred_resolutions",
+                    [],
+                ),
+            )
+        )
+
+        ranked_results = [
+            self._score_result(
+                result,
+                query,
+                category_preferences,
+                has_preferred_resolution,
+            )
+            for result in results
+        ]
+
+        ranked_results.sort(
+            key=lambda result: (
+                result["score"],
+                result["seeders"],
+                result["grabs"],
+            ),
+            reverse=True,
+        )
+
+        ranked_results = ranked_results[
+            :self.MAX_RESULTS
+        ]
+
+        return (
+            ranked_results,
+            errors,
+            searched_query,
+            fallback_used,
+        )
+
     async def _search(
         self,
         interaction,
@@ -1389,85 +1534,16 @@ class TorrentSearchMixin:
             )
             return
 
-        service = JackettService()
-
         try:
-            # Always try the exact user query first.
-            results, errors = (
-                await self._run_search(
-                    service,
-                    query,
-                )
+            (
+                ranked_results,
+                errors,
+                searched_query,
+                fallback_used,
+            ) = await self._find_torrents(
+                query,
+                category,
             )
-
-            searched_query = query
-            fallback_used = False
-
-            # Only broaden the search if the exact query returned
-            # absolutely nothing.
-            if not results:
-                fallback_queries = (
-                    self._search_fallback_queries(
-                        query
-                    )
-                )
-
-                for fallback_query in fallback_queries:
-                    logger.info(
-                        "[TorrentSearch] No results for '%s'. "
-                        "Trying fallback query '%s'.",
-                        query,
-                        fallback_query,
-                    )
-
-                    (
-                        fallback_results,
-                        fallback_errors,
-                    ) = await self._run_search(
-                        service,
-                        fallback_query,
-                    )
-
-                    errors.update(
-                        fallback_errors
-                    )
-
-                    if not fallback_results:
-                        continue
-
-                    # A fallback query may return results that are
-                    # technically valid to Jackett but unrelated to
-                    # what the user typed. Filter them against the
-                    # original query before accepting them.
-                    relevant_results = (
-                        self._filter_fallback_results(
-                            fallback_results,
-                            query,
-                        )
-                    )
-
-                    if not relevant_results:
-                        logger.info(
-                            "[TorrentSearch] Fallback query "
-                            "'%s' returned results, but none "
-                            "were sufficiently relevant to '%s'.",
-                            fallback_query,
-                            query,
-                        )
-                        continue
-
-                    results = relevant_results
-                    searched_query = fallback_query
-                    fallback_used = True
-
-                    logger.info(
-                        "[TorrentSearch] Fallback query "
-                        "'%s' returned %d relevant result(s).",
-                        fallback_query,
-                        len(results),
-                    )
-
-                    break
 
         except Exception as ex:
             logger.exception(
@@ -1484,51 +1560,6 @@ class TorrentSearchMixin:
                 view=None,
             )
             return
-
-        finally:
-            await service.close()
-
-        preferences = self._load_preferences()
-
-        category_preferences = (
-            self._category_preferences(
-                preferences,
-                category,
-            )
-        )
-
-        has_preferred_resolution = (
-            self._has_preferred_resolution(
-                results,
-                category_preferences.get(
-                    "preferred_resolutions",
-                    [],
-                ),
-            )
-        )
-
-        ranked_results = [
-            self._score_result(
-                result,
-                query,
-                category_preferences,
-                has_preferred_resolution,
-            )
-            for result in results
-        ]
-
-        ranked_results.sort(
-            key=lambda result: (
-                result["score"],
-                result["seeders"],
-                result["grabs"],
-            ),
-            reverse=True,
-        )
-
-        ranked_results = ranked_results[
-            :self.MAX_RESULTS
-        ]
 
         if not ranked_results:
             detail = ""

@@ -39,3 +39,14 @@ logger.addHandler(file_handler)
 
 
 logger.propagate = False
+
+
+# discord.py reports errors raised inside commands, buttons and
+# dropdowns on its own "discord" logger, which discards everything
+# unless handlers are attached. Without this, a failing button simply
+# stops responding and nothing is written anywhere.
+discord_logger = logging.getLogger("discord")
+discord_logger.setLevel(logging.WARNING)
+discord_logger.addHandler(console_handler)
+discord_logger.addHandler(file_handler)
+discord_logger.propagate = False

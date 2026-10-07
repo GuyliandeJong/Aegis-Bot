@@ -50,6 +50,52 @@ def _status_embed(title: str, description: str) -> discord.Embed:
     )
 
 
+async def _report_error(
+    interaction: discord.Interaction,
+    error: Exception,
+) -> None:
+    """
+    Log an unexpected failure and show it in Discord.
+
+    Without this the message would stay on its last "Looking up…"
+    text forever, with nothing to explain why.
+    """
+    logger.error(
+        "[JellyfinDownload] Unexpected error for %s: %s",
+        interaction.user,
+        error,
+        exc_info=error,
+    )
+
+    embed = discord.Embed(
+        title="Jellyfin download failed",
+        description=(
+            "Something went wrong while preparing the download.\n\n"
+            f"`{type(error).__name__}: {str(error)[:300]}`"
+        ),
+        color=discord.Color.red(),
+    )
+
+    try:
+        if interaction.response.is_done():
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=None,
+            )
+        else:
+            await interaction.response.send_message(
+                embed=embed,
+                ephemeral=True,
+            )
+
+    except discord.HTTPException as ex:
+        logger.warning(
+            "[JellyfinDownload] Could not show the error in Discord: %s",
+            ex,
+        )
+
+
 class JellyfinTransfer:
     """
     Runs one download in the background and keeps a Discord message
@@ -364,11 +410,17 @@ class JellyfinSeasonView(discord.ui.View):
         self.match = match
         self.directory = directory
 
-        self.seasons = {
-            str(season.get("Id")): season
-            for season in seasons[:25]
-            if season.get("Id")
-        }
+        # Discord allows 25 options, each needing a unique value.
+        self.seasons = {}
+
+        for season in seasons:
+            if not isinstance(season, dict) or not season.get("Id"):
+                continue
+
+            self.seasons[str(season["Id"])] = season
+
+            if len(self.seasons) == 25:
+                break
 
         self.select = discord.ui.Select(
             placeholder="Choose a season to download…",
@@ -376,11 +428,11 @@ class JellyfinSeasonView(discord.ui.View):
             max_values=1,
             options=[
                 discord.SelectOption(
-                    label=str(
-                        season.get("Name")
+                    label=(
+                        str(season.get("Name") or "").strip()
                         or f"Season {season.get('IndexNumber')}"
                     )[:100],
-                    value=season_id,
+                    value=season_id[:100],
                 )
                 for season_id, season in self.seasons.items()
             ],
@@ -401,6 +453,14 @@ class JellyfinSeasonView(discord.ui.View):
             ephemeral=True,
         )
         return False
+
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        item,
+    ):
+        await _report_error(interaction, error)
 
     @staticmethod
     def _season_folder(season: dict) -> str:
@@ -446,6 +506,14 @@ class JellyfinSeasonView(discord.ui.View):
             await service.close()
 
         directory = self.directory / self._season_folder(season)
+
+        logger.info(
+            "[JellyfinDownload] %s returned %d episode(s) for '%s' %s.",
+            server_name,
+            len(episodes),
+            self.match.get("title"),
+            season_name,
+        )
 
         files = [
             TransferFile(
@@ -525,6 +593,14 @@ class JellyfinSourceView(discord.ui.View):
         )
         return False
 
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        item,
+    ):
+        await _report_error(interaction, error)
+
     async def _download(self, interaction: discord.Interaction):
         if await _reject_if_busy(interaction):
             return
@@ -598,7 +674,23 @@ class JellyfinSourceView(discord.ui.View):
         finally:
             await service.close()
 
-        if not seasons:
+        view = JellyfinSeasonView(
+            owner_id=self.owner_id,
+            match=self.match,
+            seasons=seasons,
+            directory=directory,
+        )
+
+        logger.info(
+            "[JellyfinDownload] %s returned %d season(s) for '%s'; "
+            "%d can be offered.",
+            server_name,
+            len(seasons),
+            self.match.get("title"),
+            len(view.seasons),
+        )
+
+        if not view.seasons:
             await interaction.edit_original_response(
                 embed=_status_embed(
                     "Nothing to download",
@@ -615,10 +707,5 @@ class JellyfinSourceView(discord.ui.View):
                 "Choose the season to copy into your library. "
                 "Only that season is downloaded.",
             ),
-            view=JellyfinSeasonView(
-                owner_id=self.owner_id,
-                match=self.match,
-                seasons=seasons,
-                directory=directory,
-            ),
+            view=view,
         )

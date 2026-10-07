@@ -128,6 +128,86 @@ def describe_missing(entries: list[dict], limit: int = 6) -> str:
     return ", ".join(parts)
 
 
+def missing_keys(entries: list[dict]) -> list[str]:
+    """Stable keys for missing content, to remember what was reported."""
+    keys = []
+
+    for entry in entries:
+        if entry["complete"]:
+            keys.append(f"S{entry['number']:02d}")
+            continue
+
+        for episode in entry["episodes"]:
+            for number in episode_numbers(episode):
+                keys.append(f"S{entry['number']:02d}E{number:02d}")
+
+    return sorted(set(keys))
+
+
+def _normalize(title) -> str:
+    title = str(title or "").lower()
+    title = re.sub(r"[^a-z0-9]+", " ", title)
+    return re.sub(r"\s+", " ", title).strip()
+
+
+def _provider_keys(item: dict) -> set[str]:
+    ids = item.get("ProviderIds")
+
+    if not isinstance(ids, dict):
+        return set()
+
+    return {
+        f"{name.lower()}:{str(value).strip().lower()}"
+        for name, value in ids.items()
+        if name.lower() in {"tvdb", "tmdb", "imdb"}
+        and str(value or "").strip()
+    }
+
+
+def match_series(own: list[dict], theirs: list[dict]) -> list[tuple[dict, dict]]:
+    """
+    Pair series that are the same show in two libraries.
+
+    A shared TVDB, TMDB or IMDb id decides. Without one, the
+    normalized title and the year must both be equal; a title alone
+    is not enough, because remakes share names.
+    """
+    by_provider: dict[str, dict] = {}
+    by_title: dict[tuple[str, int], dict] = {}
+
+    for item in theirs:
+        for key in _provider_keys(item):
+            by_provider.setdefault(key, item)
+
+        year = item.get("ProductionYear")
+
+        if isinstance(year, int):
+            by_title.setdefault((_normalize(item.get("Name")), year), item)
+
+    pairs = []
+    used = set()
+
+    for item in own:
+        match = None
+
+        for key in _provider_keys(item):
+            if key in by_provider:
+                match = by_provider[key]
+                break
+
+        if match is None:
+            year = item.get("ProductionYear")
+
+            if isinstance(year, int):
+                match = by_title.get((_normalize(item.get("Name")), year))
+
+        if match is not None and id(match) not in used:
+            used.add(id(match))
+            pairs.append((item, match))
+
+    return pairs
+
+
 def quality_score(quality: dict | None, preferences: dict) -> int | None:
     """
     Score a copy the way torrent results are scored: resolution plus

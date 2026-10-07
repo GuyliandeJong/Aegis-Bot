@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from config.settings import settings
 from monitors.filesystem_monitor import FilesystemMonitor
+from monitors.jellyfin_new_content_monitor import JellyfinNewContentMonitor
 from monitors.monitor_manager import MonitorManager
 from monitors.wan_monitor import WanMonitor
 from monitors.temperature_monitor import TemperatureMonitor
@@ -146,6 +147,9 @@ async def on_ready():
         )
         monitor_manager.register(
             TorrentHealthMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            JellyfinNewContentMonitor(monitor_manager.notification_service)
         )
 
         monitor_task = asyncio.create_task(monitor_manager.run())

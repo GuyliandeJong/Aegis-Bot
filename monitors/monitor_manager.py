@@ -39,17 +39,25 @@ class MonitorManager:
 
         monitor_name = monitor.__class__.__name__
 
+        # A monitor may allow itself longer than the global timeout,
+        # for example one that scans whole Jellyfin libraries.
+        timeout = getattr(
+            monitor,
+            "TIMEOUT",
+            settings.MONITOR_TIMEOUT,
+        )
+
         try:
             await asyncio.wait_for(
                 monitor.check(),
-                timeout=settings.MONITOR_TIMEOUT,
+                timeout=timeout,
             )
 
         except asyncio.TimeoutError:
             logger.error(
                 "[MonitorManager] Monitor %s timed out after %ss.",
                 monitor_name,
-                settings.MONITOR_TIMEOUT,
+                timeout,
             )
 
         except asyncio.CancelledError:

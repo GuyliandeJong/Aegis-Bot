@@ -957,6 +957,31 @@ class JellyfinService:
             timeout=60,
         )
 
+    async def list_library(
+        self,
+        server_name: str,
+        item_type: str,
+    ) -> list[dict]:
+        """
+        Return every item of one type on a server, with few fields.
+
+        Used by the daily new-content check: one request lists all
+        series, one all episodes, instead of one request per series.
+        """
+        return await self._get_items(
+            server_name,
+            "/Items",
+            {
+                "IncludeItemTypes": item_type,
+                "Recursive": "true",
+                "IsMissing": "false",
+                "Fields": "ProductionYear,ProviderIds,Path",
+                "EnableImages": "false",
+                "EnableUserData": "false",
+            },
+            timeout=180,
+        )
+
     async def download_item(
         self,
         server_name: str,

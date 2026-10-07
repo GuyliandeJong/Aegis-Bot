@@ -22,6 +22,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 |---|---|---|
 | `check_monitors.py` | CPU and memory thresholds, alert cooldown, temperature recovery | Fake services and clock |
 | `check_jellyfin_lookup.py` | Searching several Jellyfin servers, title and year matching | Fake HTTP |
+| `check_torrent_extras.py` | The watchlist (button, store, twice-daily check, notification), `/torrent cleanup`, the free-space warning | Fake qBittorrent, Jackett results and channels |
 | `check_wol_permissions.py` | `/wol`, and who may delete files | Fake Discord objects |
 | `check_download.py` | Downloading a file: success, refusal, cut-off, no space, retry, a second download queued | Fake HTTP, real temp files |
 | `check_series_flow.py` | Season picker to files on disk | Real discord.py and aiohttp, local fake Jellyfin |

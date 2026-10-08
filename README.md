@@ -22,11 +22,12 @@ It runs in Docker and serves a single Discord server (guild).
 | `/cpu`, `/memory`, `/filesystems`, `/network` | Live readings from the host | Everyone |
 | `/storage`, `/temperature`, `/idrac` | RAID, sensors and iDRAC details through Redfish | Everyone |
 | `/server` | Server model, service tag, BIOS and OS through Redfish | Administrators |
+| `/esxi` | ESXi datastores (usage) and virtual machines (running or not) | Administrators |
 | `/wan` | Public IP address | Administrators |
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone |
 
-`/wan`, `/server`, `/idrac` and `/network` reply privately: only the
+`/wan`, `/server`, `/idrac`, `/network` and `/esxi` reply privately: only the
 person who ran the command sees the answer.
 
 "Administrators" is Discord's administrator permission, set as the
@@ -216,6 +217,7 @@ state changes.
 | Watchlist | Titles people are waiting for | Twice a day |
 | Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
+| ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 
@@ -267,6 +269,27 @@ outages (number, total and longest) confirmed by the WAN monitor.
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
 (default 10). Hard disks do not report this.
+
+### ESXi
+
+When ESXi is configured, the bot checks the host every five minutes
+through its vSphere API (`https://<host>/sdk`). It alerts when a
+datastore reaches `ESXI_DATASTORE_WARNING` percent used (default 85),
+`ESXI_DATASTORE_CRITICAL` (default 95) or becomes inaccessible, when
+a running virtual machine stops or is suspended, and when the host
+does not answer three checks in a row. `/esxi` shows the same
+information. Create a separate ESXi user with the read-only role for
+the bot; it needs nothing more.
+
+```text
+ESXI_HOST=
+ESXI_USERNAME=
+ESXI_PASSWORD=
+ESXI_DATASTORE_WARNING=85
+ESXI_DATASTORE_CRITICAL=95
+# Virtual machines not to watch, comma separated.
+ESXI_IGNORE_VMS=
+```
 
 ### When the bot itself is down
 
@@ -384,6 +407,14 @@ JELLYFIN_REFRESH_ON_COMPLETE=true
 WEEKLY_SUMMARY=true
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10
+
+# ESXi host (optional). Use a user with the read-only role.
+ESXI_HOST=
+ESXI_USERNAME=
+ESXI_PASSWORD=
+ESXI_DATASTORE_WARNING=85
+ESXI_DATASTORE_CRITICAL=95
+ESXI_IGNORE_VMS=
 
 # Warn when an SSD has this percentage of its rated life left, or less.
 SSD_LIFE_WARNING=10

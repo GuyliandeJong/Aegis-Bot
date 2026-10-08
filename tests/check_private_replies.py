@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REPLIES = {"defer", "send_message", "send"}
 
-for name in ("wan", "server", "idrac", "network"):
+for name in ("wan", "server", "idrac", "network", "esxi"):
     tree = ast.parse((ROOT / "commands" / f"{name}.py").read_text(encoding="utf-8"))
     calls = []
     for node in ast.walk(tree):

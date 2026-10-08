@@ -172,6 +172,20 @@ EXPECTED = {
         "[Already available on 2 Jellyfin servers] "
         "view=TorrentJellyfinSearchView",
     ],
+    "check_esxi.py": [
+        "datastore media      capacity=4000 GiB free=1000 GiB accessible=True",
+        "vm homeassistant  poweredOn",
+        "calls: ['RetrieveServiceContent', 'Login', 'CreateContainerView', 'RetrievePropertiesEx', 'DestroyView', 'CreateContainerView', 'RetrievePropertiesEx', 'DestroyView', 'Logout']",
+        "password sent escaped: True",
+        "first check, alerts: []",
+        "warning   Datastore Filling Up — media",
+        "warning   VM Stopped — homeassistant",
+        "critical  Datastore Critical — datastore1",
+        "recovered VM Running — homeassistant",
+        "recovered Datastore Recovered — media",
+        "alerts: [('warning', 'ESXi Not Reachable'), ('recovered', 'ESXi Reachable Again')]",
+        "not configured -> requests: []",
+    ],
     "check_expiry.py": [
         "expired; buttons disabled",
         "'disabled': [True]",
@@ -193,6 +207,7 @@ EXPECTED = {
         "/server   all private",
         "/idrac    all private",
         "/network  all private",
+        "/esxi     all private",
     ],
     "check_requesters_links.py": [
         "searched Jackett for ['Gattaca 1997']",

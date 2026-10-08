@@ -64,24 +64,29 @@ def finished_torrents(torrents: list[dict]) -> list[dict]:
     return finished
 
 
-def cleanup_embed(finished: list[dict]) -> discord.Embed:
+PAGE_SIZE = 25
+
+
+def page_count(finished: list[dict]) -> int:
+    return max(1, -(-len(finished) // PAGE_SIZE))
+
+
+def cleanup_embed(finished: list[dict], page: int = 0, chosen=()) -> discord.Embed:
     ratio_target, days_target = seeding_targets()
     done = [t for t in finished if t["done"]]
+    shown = finished[page * PAGE_SIZE:(page + 1) * PAGE_SIZE]
 
     lines = []
 
-    for torrent in finished[:25]:
+    for torrent in shown:
         mark = "✅" if torrent["done"] else "⏳"
+        picked = " ☑️" if str(torrent.get("hash")) in chosen else ""
         lines.append(
-            f"{mark} **{str(torrent.get('name'))[:70]}**\n"
+            f"{mark} **{str(torrent.get('name'))[:60]}**{picked}\n"
             f"ratio {float(torrent.get('ratio') or 0):.2f} · "
             f"seeded {format_compact_duration(torrent.get('seeding_time'))} · "
-            f"{format_bytes(torrent.get('size'))} · "
-            f"{torrent.get('category') or 'Uncategorized'}"
+            f"{format_bytes(torrent.get('size'))}"
         )
-
-    if len(finished) > 25:
-        lines.append(f"…and {len(finished) - 25} more.")
 
     summary = (
         f"{len(finished)} finished torrent(s); {len(done)} reached "
@@ -89,44 +94,45 @@ def cleanup_embed(finished: list[dict]) -> discord.Embed:
         f"({format_bytes(sum(int(t.get('size') or 0) for t in done))})."
     )
 
-    return discord.Embed(
+    if chosen:
+        summary += f"\n**{len(chosen)} chosen** across all pages."
+
+    embed = discord.Embed(
         title="Seeding overview",
-        description=summary + "\n\n" + "\n".join(lines),
+        description=(summary + "\n\n" + "\n".join(lines))[:4096],
         color=discord.Color.blurple(),
     )
+    embed.set_footer(text=f"Page {page + 1} of {page_count(finished)}")
+
+    return embed
 
 
 class CleanupView(ExpiringView):
-    """Choose finished torrents and remove them, with or without files."""
+    """
+    Choose finished torrents and remove them, with or without files.
+
+    Shows 25 torrents per page. What is chosen on one page stays
+    chosen when moving to another.
+    """
 
     def __init__(self, owner_id: int, finished: list[dict]):
-        super().__init__(timeout=300)
+        super().__init__(timeout=600)
 
         self.owner_id = owner_id
+        self.finished = finished
         self.torrents = {
             str(t.get("hash")): t
-            for t in finished[:25]
+            for t in finished
             if t.get("hash")
         }
         self.chosen: list[str] = []
+        self.page = 0
         self.message = None
 
         self.select = discord.ui.Select(
             placeholder="Choose torrents to remove…",
-            min_values=1,
-            max_values=max(1, len(self.torrents)),
-            options=[
-                discord.SelectOption(
-                    label=str(t.get("name") or "Unknown")[:100],
-                    description=(
-                        f"{'✅' if t['done'] else '⏳'} ratio "
-                        f"{float(t.get('ratio') or 0):.2f} · "
-                        f"{format_bytes(t.get('size'))}"
-                    )[:100],
-                    value=torrent_hash,
-                )
-                for torrent_hash, t in self.torrents.items()
-            ],
+            min_values=0,
+            row=0,
         )
         self.select.callback = self._choose
         self.add_item(self.select)
@@ -134,7 +140,7 @@ class CleanupView(ExpiringView):
         self.keep_button = discord.ui.Button(
             label="Remove, keep files",
             style=discord.ButtonStyle.primary,
-            disabled=True,
+            row=1,
         )
         self.keep_button.callback = self._remove_keep
         self.add_item(self.keep_button)
@@ -142,24 +148,91 @@ class CleanupView(ExpiringView):
         self.files_button = discord.ui.Button(
             label="Remove with files…",
             style=discord.ButtonStyle.danger,
-            disabled=True,
+            row=1,
         )
         self.files_button.callback = self._ask_files
         self.add_item(self.files_button)
 
-    async def interaction_check(self, interaction: discord.Interaction):
-        return interaction.user.id == self.owner_id
+        self.previous_button = discord.ui.Button(
+            label="◀ Previous",
+            style=discord.ButtonStyle.secondary,
+            row=2,
+        )
+        self.previous_button.callback = self._previous
+        self.add_item(self.previous_button)
 
-    async def _choose(self, interaction: discord.Interaction):
-        self.chosen = list(self.select.values)
+        self.next_button = discord.ui.Button(
+            label="Next ▶",
+            style=discord.ButtonStyle.secondary,
+            row=2,
+        )
+        self.next_button.callback = self._next
+        self.add_item(self.next_button)
 
-        for option in self.select.options:
-            option.default = option.value in self.chosen
+        self._fill_page()
+
+    def _page_torrents(self) -> list[dict]:
+        return [
+            t
+            for t in self.finished[
+                self.page * PAGE_SIZE:(self.page + 1) * PAGE_SIZE
+            ]
+            if t.get("hash")
+        ]
+
+    def _fill_page(self) -> None:
+        """Show the current page's torrents in the picker."""
+        shown = self._page_torrents()
+
+        self.select.options = [
+            discord.SelectOption(
+                label=str(t.get("name") or "Unknown")[:100],
+                description=(
+                    f"{'✅' if t['done'] else '⏳'} ratio "
+                    f"{float(t.get('ratio') or 0):.2f} · "
+                    f"{format_bytes(t.get('size'))}"
+                )[:100],
+                value=str(t.get("hash")),
+                default=str(t.get("hash")) in self.chosen,
+            )
+            for t in shown
+        ]
+        self.select.max_values = max(1, len(shown))
 
         self.keep_button.disabled = not self.chosen
         self.files_button.disabled = not self.chosen
+        self.previous_button.disabled = self.page == 0
+        self.next_button.disabled = self.page >= page_count(self.finished) - 1
 
-        await interaction.response.edit_message(view=self)
+    def embed(self) -> discord.Embed:
+        return cleanup_embed(self.finished, self.page, self.chosen)
+
+    async def interaction_check(self, interaction: discord.Interaction):
+        return interaction.user.id == self.owner_id
+
+    async def _show(self, interaction: discord.Interaction) -> None:
+        self._fill_page()
+        await interaction.response.edit_message(
+            content=None,
+            embed=self.embed(),
+            view=self,
+        )
+
+    async def _choose(self, interaction: discord.Interaction):
+        # Replace this page's part of the choice; keep other pages'.
+        on_page = {str(t.get("hash")) for t in self._page_torrents()}
+        self.chosen = [h for h in self.chosen if h not in on_page]
+        self.chosen += list(self.select.values)
+
+        await self._show(interaction)
+
+    async def _previous(self, interaction: discord.Interaction):
+        self.page = max(0, self.page - 1)
+        await self._show(interaction)
+
+    async def _next(self, interaction: discord.Interaction):
+        self.page = min(page_count(self.finished) - 1, self.page + 1)
+        await self._show(interaction)
 
     async def _remove_keep(self, interaction: discord.Interaction):
         await self._remove(interaction, delete_files=False)
@@ -263,10 +336,7 @@ class _ConfirmFilesView(ExpiringView):
 
     async def _back(self, interaction: discord.Interaction):
         self.stop()
-        await interaction.response.edit_message(
-            content=None,
-            view=self.parent,
-        )
+        await self.parent._show(interaction)
 
 
 class TorrentCleanupMixin:
@@ -307,8 +377,10 @@ class TorrentCleanupMixin:
             )
             return
 
+        view = CleanupView(interaction.user.id, finished)
+
         await interaction.followup.send(
-            embed=cleanup_embed(finished),
-            view=CleanupView(interaction.user.id, finished),
+            embed=view.embed(),
+            view=view,
             ephemeral=True,
         )

@@ -1,3 +1,5 @@
+import os
+
 from config.settings import settings
 from monitors.base_monitor import BaseMonitor
 from monitors.state import state
@@ -247,6 +249,7 @@ class StorageMonitor(BaseMonitor):
                     drive.health,
                     drive.raid_status,
                     drive.predictive_failure,
+                    getattr(drive, "media_life_left", None),
                 )
 
                 # Older versions stored a dictionary containing the
@@ -291,6 +294,7 @@ class StorageMonitor(BaseMonitor):
                                 f"{drive.raid_status}\n\n"
                                 f"**Predictive Failure**\n"
                                 f"{'Yes' if drive.predictive_failure else 'No'}"
+                                + self._life_line(drive)
                             ),
                         )
 
@@ -523,12 +527,30 @@ class StorageMonitor(BaseMonitor):
 
         return "healthy"
 
+    @staticmethod
+    def ssd_life_warning() -> float:
+        """SSD life left, in percent, at or below which a drive warns."""
+        try:
+            return float(os.getenv("SSD_LIFE_WARNING", "10"))
+        except ValueError:
+            return 10.0
+
+    @staticmethod
+    def _life_line(drive) -> str:
+        life = getattr(drive, "media_life_left", None)
+
+        if not isinstance(life, (int, float)):
+            return ""
+
+        return f"\n\n**SSD Life Left**\n{life:.0f}%"
+
     @classmethod
     def _get_drive_status(
         cls,
         health: str,
         raid_status: str,
         predictive_failure: bool,
+        media_life_left: float | None = None,
     ) -> str:
         """
         Determine the effective physical-drive state.
@@ -539,6 +561,13 @@ class StorageMonitor(BaseMonitor):
 
         if predictive_failure:
             return "critical"
+
+        # An SSD close to the end of its rated write endurance.
+        if (
+            isinstance(media_life_left, (int, float))
+            and media_life_left <= cls.ssd_life_warning()
+        ):
+            return "warning"
 
         health_state = cls._normalize_health(
             health

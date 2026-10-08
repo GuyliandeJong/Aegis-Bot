@@ -84,6 +84,7 @@ class StorageService:
                     health=drive["Status"]["Health"],
                     raid_status=dell_drive["RaidStatus"],
                     predictive_failure=drive["FailurePredicted"],
+                    media_life_left=drive.get("PredictedMediaLifeLeftPercent"),
                 )
             )
 

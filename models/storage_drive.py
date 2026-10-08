@@ -14,3 +14,7 @@ class StorageDrive:
     raid_status: str
 
     predictive_failure: bool
+
+    # Percent of an SSD's rated write endurance left; None for hard
+    # disks and when iDRAC does not report it.
+    media_life_left: float | None = None

@@ -105,6 +105,8 @@ async def weekly():
     QS.QBittorrentService.get_torrents = torrents
 
     activity_log.record("jellyfin_copy", title="Gravity Falls — Season 2", server="Friend", files=20, bytes=30 * 1024 ** 3)
+    activity_log.record("wan_outage", seconds=125)
+    activity_log.record("wan_outage", seconds=600)
     for level, title in (("warning", "High Temperature — CPU1"), ("recovered", "Temperature Recovered — CPU1"), ("critical", "Power supply Failure — PS2"), ("success", "Torrent Completed")):
         activity_log.record("alert", level=level, title=title)
 
@@ -119,6 +121,16 @@ async def weekly():
     await mon.check()
     print("next Sunday disks:", notes.sent[-1][3][0][1].splitlines()[0])
     print("next Sunday copies:", notes.sent[-1][3][2][1])
+
+
+def drives():
+    print("\n== drive status ==")
+    from monitors.storage_monitor import StorageMonitor as SM
+    for label, args in (("healthy HDD", ("OK", "Online", False, None)), ("SSD 64% left", ("OK", "Online", False, 64)),
+                        ("SSD 9% left", ("OK", "Online", False, 9)), ("failure predicted", ("OK", "Online", True, 80))):
+        print(f"  {label:18} -> {SM._get_drive_status(*args)}")
+    drive = types.SimpleNamespace(media_life_left=9)
+    print("  alert line:", SM._life_line(drive).strip().replace(chr(10), " "))
 
 
 async def heartbeat():
@@ -175,6 +187,7 @@ async def main():
     parsing()
     await hardware_monitor()
     await weekly()
+    drives()
     await heartbeat()
     watchdog()
 

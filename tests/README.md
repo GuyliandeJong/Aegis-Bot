@@ -23,7 +23,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_library_flow.py` | Reading title, year, season and episode from release names; the Jellyfin refresh and "Now in Jellyfin" message after a torrent completes | Local fake Jellyfin |
 | `check_monitors.py` | CPU and memory thresholds, alert cooldown, temperature recovery | Fake services and clock |
 | `check_jellyfin_lookup.py` | Searching several Jellyfin servers, title and year matching | Fake HTTP |
-| `check_server_health.py` | Power supplies and fans, the `/server` line, the weekly summary, the heartbeat, `scripts/watchdog.sh` | Fake iDRAC data, clock, qBittorrent; fake `docker` and `curl` for the script |
+| `check_server_health.py` | Power supplies, fans and voltages, the `/server` line, the weekly summary with outages, SSD wear, the heartbeat, `scripts/watchdog.sh` | Fake iDRAC data, clock, qBittorrent; fake `docker` and `curl` for the script |
 | `check_torrent_controls.py` | Admin approval off and on (approve, reject, cancel, who may press what), `/torrent speed` | Fake qBittorrent and Discord objects |
 | `check_torrent_extras.py` | `/torrent info` name matching, the watchlist (button, store, twice-daily check, notification), `/torrent cleanup` with paging, the free-space warning | Fake qBittorrent, Jackett results and channels |
 | `check_wol_permissions.py` | `/wol`, and who may delete files | Fake Discord objects |

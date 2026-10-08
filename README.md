@@ -261,7 +261,12 @@ WEEKLY_SUMMARY_HOUR=10       # container time
 ```
 
 Disk growth is measured from one summary to the next, so the first
-summary only shows current usage.
+summary only shows current usage. The summary also counts internet
+outages (number, total and longest) confirmed by the WAN monitor.
+
+Physical drives alert when iDRAC predicts a failure, and SSDs also when
+their remaining write endurance drops to `SSD_LIFE_WARNING` percent
+(default 10). Hard disks do not report this.
 
 ### When the bot itself is down
 
@@ -379,6 +384,9 @@ JELLYFIN_REFRESH_ON_COMPLETE=true
 WEEKLY_SUMMARY=true
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10
+
+# Warn when an SSD has this percentage of its rated life left, or less.
+SSD_LIFE_WARNING=10
 
 # Used only by scripts/watchdog.sh on the server.
 WATCHDOG_WEBHOOK_URL=

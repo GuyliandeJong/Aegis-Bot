@@ -6,6 +6,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from config.settings import settings
+from monitors.esxi_monitor import EsxiMonitor
 from monitors.filesystem_monitor import FilesystemMonitor
 from monitors.hardware_monitor import HardwareMonitor
 from monitors.heartbeat_monitor import HeartbeatMonitor
@@ -166,6 +167,9 @@ async def on_ready():
         )
         monitor_manager.register(
             HeartbeatMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            EsxiMonitor(monitor_manager.notification_service)
         )
 
         monitor_task = asyncio.create_task(monitor_manager.run())

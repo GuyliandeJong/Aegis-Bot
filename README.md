@@ -216,8 +216,9 @@ changes (Critical, Warning, back to OK), and one that iDRAC stops
 listing. `/server` also shows how many power supplies and fans are OK
 and how many watts the server draws. On a server with a single power
 supply that iDRAC cannot read, iDRAC reports neither, and `/server`
-says "not monitored by iDRAC" and "power draw not reported"; fans are
-still watched. This shows what iDRAC reports:
+says "not monitored by iDRAC" and "power draw not reported". The
+system board's voltage ("power good") sensors are watched instead,
+together with the fans: a failing power supply or rail shows there. This shows what iDRAC reports:
 
 ```bash
 docker exec aegis-bot python scripts/redfish_power_check.py

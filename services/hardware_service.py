@@ -81,6 +81,41 @@ def fans(thermal: dict) -> dict[str, dict]:
     return result
 
 
+def voltages(power: dict) -> dict[str, dict]:
+    """
+    Voltage sensors by name, with health.
+
+    On a server whose power supply iDRAC cannot read, these "power
+    good" sensors on the system board are the only sign of a power
+    problem. Most report no reading, only a health.
+    """
+    result = {}
+
+    for index, member in enumerate(power.get("Voltages") or []):
+        if not isinstance(member, dict) or not _installed(member):
+            continue
+
+        status = member.get("Status") or {}
+
+        # A sensor that is switched off has no meaningful health.
+        if str(status.get("State") or "Enabled").lower() != "enabled":
+            continue
+
+        reading = member.get("ReadingVolts")
+
+        result[str(member.get("Name") or f"Voltage {index + 1}")] = {
+            "kind": "Voltage",
+            "health": _health(member),
+            "detail": (
+                f"{reading} V"
+                if isinstance(reading, (int, float))
+                else ""
+            ),
+        }
+
+    return result
+
+
 def power_draw(power: dict) -> float | None:
     """Watts the whole server draws, when reported."""
     for control in power.get("PowerControl") or []:
@@ -112,6 +147,10 @@ class HardwareService:
             await client.close()
 
         return {
-            "components": {**power_supplies(power), **fans(thermal)},
+            "components": {
+                **power_supplies(power),
+                **fans(thermal),
+                **voltages(power),
+            },
             "power_watts": power_draw(power),
         }

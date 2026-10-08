@@ -152,7 +152,11 @@ def hardware_summary(hardware: dict) -> str:
     """
     parts = []
 
-    for kind, plural in (("Power supply", "power supplies"), ("Fan", "fans")):
+    for kind, plural in (
+        ("Power supply", "power supplies"),
+        ("Fan", "fans"),
+        ("Voltage", "voltage sensors"),
+    ):
         members = [
             component
             for component in hardware["components"].values()
@@ -160,7 +164,10 @@ def hardware_summary(hardware: dict) -> str:
         ]
 
         if not members:
-            parts.append(f"{plural} not monitored by iDRAC")
+            # Missing power supplies are worth saying; a server
+            # without voltage sensors listed simply has none to show.
+            if kind == "Power supply":
+                parts.append(f"{plural} not monitored by iDRAC")
             continue
 
         bad = [m for m in members if m["health"].lower() != "ok"]

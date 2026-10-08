@@ -56,12 +56,19 @@ def parsing():
     print("/server line:", SV.hardware_summary({"components": {**HS.power_supplies(POWER), **HS.fans(THERMAL)}, "power_watts": 182.0}))
     empty = {"PowerSupplies": [], "PowerControl": []}
     print("/server line, single unmonitored PSU:", SV.hardware_summary({"components": {**HS.power_supplies(empty), **HS.fans(THERMAL)}, "power_watts": HS.power_draw(empty)}))
+    # As the real server answered: no supplies, no reading, board voltage sensors with health only.
+    real = {"PowerSupplies": [], "PowerControl": [], "Voltages": [
+        {"Name": "System Board 1.8V SW PG", "MemberId": "0", "ReadingVolts": None, "Status": {"Health": "OK", "State": "Enabled"}},
+        {"Name": "System Board 2.5V SW PG", "MemberId": "1", "ReadingVolts": None, "Status": {"Health": "OK", "State": "Enabled"}},
+        {"Name": "CPU1 VCORE PG", "MemberId": "2", "ReadingVolts": None, "Status": {"Health": None, "State": "Disabled"}}]}
+    print("voltage sensors read:", list(HS.voltages(real)))
+    print("/server line, real server:", SV.hardware_summary({"components": {**HS.power_supplies(real), **HS.fans(THERMAL), **HS.voltages(real)}, "power_watts": HS.power_draw(real)}))
 
 
 async def hardware_monitor():
     print("\n== hardware monitor ==")
     notes = Notes(); mon = HM.HardwareMonitor(notes)
-    data = {"components": {**HS.power_supplies(POWER), **HS.fans(THERMAL)}, "power_watts": 182}
+    data = {"components": {**HS.power_supplies(POWER), **HS.fans(THERMAL), "System Board 1.8V SW PG": {"kind": "Voltage", "health": "OK", "detail": ""}}, "power_watts": 182}
     async def health(): return data
     mon.service = types.SimpleNamespace(get_hardware_health=health)
     await mon.check(); print("first check, alerts:", len(notes.sent))
@@ -71,13 +78,15 @@ async def hardware_monitor():
     await mon.check()
     data["components"]["PS2 Status"] = {"kind": "Power supply", "health": "OK", "detail": ""}
     await mon.check()
+    data["components"]["System Board 1.8V SW PG"] = {"kind": "Voltage", "health": "Critical", "detail": ""}
+    await mon.check()
     del data["components"]["System Board Fan2"]
     await mon.check()
     await mon.check()
     for level, title, description, _ in notes.sent:
         print(f"  {level:9} {title} | {description.splitlines()[-1] if description else ''}")
     data["components"] = {}
-    await mon.check(); print("iDRAC lists nothing -> new alerts:", len(notes.sent) - 4)
+    await mon.check(); print("iDRAC lists nothing -> new alerts:", len(notes.sent) - 5)
 
 
 async def weekly():

@@ -18,6 +18,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/torrent status` | qBittorrent version and transfer totals | Everyone |
 | `/torrent watchlist` | Titles you are waiting for; remove them | Everyone (own list) |
 | `/torrent cleanup` | Finished torrents by ratio and seeding time; remove them | Administrators |
+| `/torrent speed` | Show qBittorrent's speed limits; switch between normal and slow | Everyone sees; administrators switch |
 | `/cpu`, `/memory`, `/filesystems`, `/network` | Live readings from the host | Everyone |
 | `/storage`, `/temperature`, `/idrac` | RAID, sensors and iDRAC details through Redfish | Everyone |
 | `/server` | Server model, service tag, BIOS and OS through Redfish | Administrators |
@@ -170,6 +171,24 @@ SEED_DAYS_TARGET=14     # or this many days of seeding
 qBittorrent's own share limits (Options > BitTorrent) can stop or
 remove torrents automatically; the bot only shows and removes on
 request.
+
+### Speed
+
+`/torrent speed` shows the current download and upload limits. With a
+choice, an administrator switches between normal speed and qBittorrent's
+alternative ("slow") limits, which are set in qBittorrent under Options
+> Speed. qBittorrent can also switch them on a schedule there.
+
+### Approval
+
+Off by default. With `REQUEST_APPROVAL=true`, a torrent that someone
+without administrator permission chooses or adds is not added yet: the
+message shows "Waiting for approval" with **Approve** and **Reject**
+for administrators and **Cancel request** for the person who asked,
+and the alert channel gets a link to it. Approved torrents are added
+for the person who asked: they are mentioned when it completes and own
+its controls. Administrators' own torrents are added at once. A request
+nobody answers expires after a day.
 
 ### Free space
 
@@ -349,6 +368,9 @@ JELLYFIN_NEW_CONTENT_HOUR=10
 # What /torrent cleanup counts as seeded enough.
 SEED_RATIO_TARGET=2
 SEED_DAYS_TARGET=14
+
+# true: torrents from non-administrators wait for an administrator's approval.
+REQUEST_APPROVAL=false
 
 # Refresh Jellyfin and say "Now in Jellyfin" after a torrent completes.
 JELLYFIN_REFRESH_ON_COMPLETE=true

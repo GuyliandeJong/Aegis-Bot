@@ -21,6 +21,7 @@ import services.qbittorrent_service as QS
 import commands.torrent.search as SM
 import commands.torrent.add as AM
 import commands.torrent.cleanup as CL
+from commands.torrent.info import name_matches
 import commands.torrent.watchlist as WV
 import monitors.watchlist_monitor as WM
 import isolate  # state files go to a temporary folder
@@ -182,6 +183,33 @@ class Cog2(CL.TorrentCleanupMixin):
     pass
 
 
+async def cleanup_pages():
+    print("\n== /torrent cleanup with many torrents ==")
+    many = [torrent(f"h{n:02d}", f"Torrent {n:02d}", 3 - n / 20, 1) for n in range(60)]
+    deleted = []
+
+    async def get_torrents(self, category=None, filter_name=None): return many
+    async def delete(self, h, delete_files=False): deleted.append(h)
+    QS.QBittorrentService.get_torrents = get_torrents
+    QS.QBittorrentService.delete_torrent = delete
+
+    i = Inter(uid=5, admin=True); await Cog2()._cleanup(i)
+    view = last(i)["view"]; view.to_components()
+    print("first page:", last(i)["embed"].footer.text, "| options:", len(view.select.options), "| previous disabled:", view.previous_button.disabled)
+    view.select._values = ["h00", "h01"]
+    await view.select.callback(Inter(uid=5, admin=True))
+    n = Inter(uid=5, admin=True); await view.next_button.callback(n)
+    print("after Next:", last(n)["embed"].footer.text, "| first option:", view.select.options[0].label)
+    view.select._values = ["h30"]
+    await view.select.callback(Inter(uid=5, admin=True))
+    n = Inter(uid=5, admin=True); await view.next_button.callback(n)
+    print("last page:", last(n)["embed"].footer.text, "| options:", len(view.select.options), "| next disabled:", view.next_button.disabled)
+    b = Inter(uid=5, admin=True); await view.previous_button.callback(b); await view.previous_button.callback(Inter(uid=5, admin=True))
+    print("back on page 1, still ticked:", [o.label for o in view.select.options if o.default], "|", last(b)["embed"].description.splitlines()[1])
+    await view.keep_button.callback(Inter(uid=5, admin=True))
+    print("removed across pages:", deleted)
+
+
 async def space():
     print("\n== free-space warning after adding ==")
     AM.TorrentAddMixin.SPACE_CHECK_INTERVAL = 0
@@ -204,11 +232,20 @@ async def space():
     print("enough space -> messages:", len(i.log))
 
 
+def info_matching():
+    print("\n== /torrent info name matching ==")
+    name = "The.Dark.Knight.Rises.2012.1080p.BluRay.DDP5.1.x265.10bit-GalaxyRG265"
+    for query in ("Dark Knight", "dark knight rises 2012", "knig", "dark kight", "batman"):
+        print(f"  {query!r:26} -> {name_matches(query, name)}")
+
+
 async def main():
+    info_matching()
     await watchlist_store()
     await no_results_button()
     await monitor()
     await cleanup()
+    await cleanup_pages()
     await space()
 
 asyncio.run(main())

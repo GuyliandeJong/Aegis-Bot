@@ -4,6 +4,11 @@ import asyncio
 
 import discord
 
+from commands.torrent.approval import (
+    approval_required,
+    ask_approval,
+    is_admin,
+)
 from commands.torrent.views import TorrentControlView
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_requesters import remember
@@ -20,8 +25,18 @@ class TorrentAddMixin:
         category: str | None,
         source_url: str | None = None,
         magnet: str | None = None,
+        requester=None,
+        approved: bool = False,
     ):
-        """Add a torrent source to qBittorrent."""
+        """
+        Add a torrent source to qBittorrent.
+
+        `requester` is who the torrent is for (mentioned on completion,
+        owner of its controls); it differs from the person interacting
+        when an administrator approves someone else's request.
+        """
+        requester = requester or interaction.user
+
         # The search picker has already deferred by the time it gets here.
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -52,6 +67,16 @@ class TorrentAddMixin:
 
         source_url = source_url.strip()
 
+        # With REQUEST_APPROVAL on, others' torrents wait for an
+        # administrator instead of being added now.
+        if (
+            not approved
+            and approval_required()
+            and not is_admin(interaction.user)
+        ):
+            await ask_approval(self, interaction, category, source_url)
+            return
+
         service = QBittorrentService()
 
         try:
@@ -59,7 +84,7 @@ class TorrentAddMixin:
                 "[Torrent] Adding torrent source for category '%s' "
                 "requested by %s.",
                 category,
-                interaction.user,
+                requester,
             )
 
             torrent_hash = await service.add_torrent(
@@ -83,7 +108,7 @@ class TorrentAddMixin:
             # Notifications about this torrent go to whoever added it.
             remember(
                 torrent_hash,
-                interaction.user.id,
+                requester.id,
             )
 
             torrent = None
@@ -147,7 +172,7 @@ class TorrentAddMixin:
             }
 
         view = TorrentControlView(
-            owner_id=interaction.user.id,
+            owner_id=requester.id,
             torrent_hash=torrent_hash,
             torrent_name=torrent.get(
                 "name",
@@ -174,6 +199,16 @@ class TorrentAddMixin:
             interaction,
             torrent,
         )
+
+        # After an approval the footer names who asked, not who approved.
+        if requester is not interaction.user:
+            embed.set_footer(
+                text=(
+                    f"Requested by {requester.display_name} · "
+                    f"approved by {interaction.user.display_name}"
+                ),
+                icon_url=requester.display_avatar.url,
+            )
 
         embed.title = "Torrent Added"
         embed.description = description
@@ -209,7 +244,7 @@ class TorrentAddMixin:
                 "category",
                 category,
             ),
-            interaction.user,
+            requester,
         )
 
     # How long to wait for a magnet's size, and how often to look.

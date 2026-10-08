@@ -79,6 +79,7 @@ EXPECTED = {
         "still stale (no repeat)        exit=0 sent=[]",
         "container stopped              exit=0 sent=['Aegis-Bot is down: the aegis-bot container is not running.",
         "container back                 exit=0 sent=['Aegis-Bot is running again.",
+        "state kept in home: up | written to data/: False",
     ],
     "check_torrent_extras.py": [
         "add again     : (False, '**dune part two** is already on your watchlist.')",

@@ -251,12 +251,16 @@ and once more when the bot is back.
    WATCHDOG_WEBHOOK_URL=https://discord.com/api/webhooks/...
    ```
 
-3. Add a cron entry for a user that may run `docker` (for example with
-   `sudo crontab -e`):
+3. Add a cron entry with `crontab -e`, as your own user (it must be
+   allowed to run `docker`; no `sudo`):
 
    ```text
    */5 * * * * bash /path/to/Aegis-Bot/scripts/watchdog.sh
    ```
+
+Whether "down" was already reported is kept in
+`~/.local/state/aegis-bot/watchdog_state`, because the container owns
+`data/` and your user cannot write there.
 
 The webhook URL lets anyone who has it post in that channel; keep it in
 `.env` only. The script cannot report a server that is off or has no

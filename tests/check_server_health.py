@@ -143,7 +143,9 @@ def watchdog():
         path = fakebin / name
         path.write_text("#!/bin/bash\n" + body); path.chmod(path.stat().st_mode | stat.S_IEXEC)
     running = root / "running"
-    env = dict(os.environ, PATH=f"{fakebin}:{os.environ['PATH']}", FAKE_RUNNING=str(running))
+    home = root / "home"; home.mkdir()
+    env = dict(os.environ, PATH=f"{fakebin}:{os.environ['PATH']}", FAKE_RUNNING=str(running), HOME=str(home))
+    env.pop("XDG_STATE_HOME", None)
 
     def run(label, is_running, beat_age):
         running.write_text("true" if is_running else "false")
@@ -165,6 +167,7 @@ def watchdog():
     run("container stopped", False, 10)
     run("container back", True, 5)
     print("  webhook used:", sent.read_text().splitlines()[0].split(chr(9))[-1])
+    print("  state kept in home:", (home / ".local/state/aegis-bot/watchdog_state").read_text().strip(), "| written to data/:", (project / "data" / "watchdog_state").exists())
     shutil.rmtree(root, ignore_errors=True)
 
 

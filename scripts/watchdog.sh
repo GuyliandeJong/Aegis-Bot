@@ -12,8 +12,13 @@
 # Needs in .env (next to this project):
 #   WATCHDOG_WEBHOOK_URL=https://discord.com/api/webhooks/...
 #
-# Cron, every five minutes (as a user that may run docker):
+# Cron, every five minutes, in the crontab of your own user (it must
+# be allowed to run docker; no sudo needed):
+#   crontab -e
 #   */5 * * * * bash /path/to/Aegis-Bot/scripts/watchdog.sh
+#
+# Whether "down" was already reported is kept in your home folder,
+# because the container owns data/ and your user cannot write there.
 #
 # It cannot report a server that is off or offline: nothing runs
 # then to send the message.
@@ -24,7 +29,8 @@ set -u
 PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTAINER="aegis-bot"
 HEARTBEAT="$PROJECT/data/heartbeat"
-STATE="$PROJECT/data/watchdog_state"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/aegis-bot"
+STATE="$STATE_DIR/watchdog_state"
 HEARTBEAT_MAX_AGE="${HEARTBEAT_MAX_AGE:-600}"
 
 # Read only this one value from .env; the rest stays untouched.
@@ -54,7 +60,13 @@ else
     fi
 fi
 
-previous="$(cat "$STATE" 2>/dev/null || echo up)"
+if ! mkdir -p "$STATE_DIR" 2>/dev/null || ! touch "$STATE" 2>/dev/null; then
+    echo "Cannot write $STATE; the down message would repeat every run." >&2
+    exit 1
+fi
+
+previous="$(cat "$STATE" 2>/dev/null)"
+previous="${previous:-up}"
 
 send() {
     # $1 is plain text without quotes or backslashes.

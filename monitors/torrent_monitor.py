@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from monitors.base_monitor import BaseMonitor
+from services import library_followup
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_requesters import mention_for
 from utils.formatting import format_bytes, format_compact_duration
@@ -527,6 +528,12 @@ class TorrentMonitor(BaseMonitor):
                     await self.notify_completed(
                         torrent,
                         previous,
+                    )
+
+                    # Refresh Jellyfin and say when it can be watched.
+                    library_followup.start(
+                        self.notification_service,
+                        torrent,
                     )
 
                     previous[

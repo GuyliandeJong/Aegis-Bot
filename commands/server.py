@@ -101,10 +101,12 @@ class Server(commands.Cog):
                 ],
             )
 
-            if hardware is not None:
+            summary = hardware_summary(hardware) if hardware else ""
+
+            if summary:
                 embed.add_field(
-                    name="🔌 Power Supplies and Fans",
-                    value=hardware_summary(hardware),
+                    name="🩺 Hardware Health",
+                    value=summary,
                     inline=False,
                 )
 
@@ -147,8 +149,8 @@ def hardware_summary(hardware: dict) -> str:
     """
     "2 power supplies OK · 6 fans OK · drawing 182 W".
 
-    Says so when iDRAC reports no power supplies or power draw, as on
-    servers with a single power supply it cannot read.
+    Only what iDRAC reports is listed; a server with a power supply
+    iDRAC cannot read shows its fans and voltage sensors alone.
     """
     parts = []
 
@@ -164,10 +166,6 @@ def hardware_summary(hardware: dict) -> str:
         ]
 
         if not members:
-            # Missing power supplies are worth saying; a server
-            # without voltage sensors listed simply has none to show.
-            if kind == "Power supply":
-                parts.append(f"{plural} not monitored by iDRAC")
             continue
 
         bad = [m for m in members if m["health"].lower() != "ok"]
@@ -180,8 +178,6 @@ def hardware_summary(hardware: dict) -> str:
 
     if hardware.get("power_watts") is not None:
         parts.append(f"drawing {hardware['power_watts']:.0f} W")
-    else:
-        parts.append("power draw not reported")
 
     return " · ".join(parts)
 

@@ -58,9 +58,9 @@ EXPECTED = {
     "check_server_health.py": [
         "PS1 Status         Power supply OK   95 W out, 750 W rated",
         "/server line: 2 power supplies OK · 2 fans OK · drawing 182 W",
-        "single unmonitored PSU: power supplies not monitored by iDRAC · 2 fans OK · power draw not reported",
+        "single unmonitored PSU: 2 fans OK",
         "voltage sensors read: ['System Board 1.8V SW PG', 'System Board 2.5V SW PG']",
-        "/server line, real server: power supplies not monitored by iDRAC · 2 fans OK · 2 voltage sensors OK · power draw not reported",
+        "/server line, real server: 2 fans OK · 2 voltage sensors OK",
         "critical  Voltage Failure — System Board 1.8V SW PG | OK → Critical",
         "first check, alerts: 0",
         "critical  Power supply Failure — PS2 Status | OK → Critical",

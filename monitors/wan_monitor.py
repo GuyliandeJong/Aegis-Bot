@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from config.settings import settings
 from monitors.base_monitor import BaseMonitor
 from monitors.state import state
+from services import activity_log
 from services.wan_service import WanService
 from utils.logger import logger
 
@@ -123,6 +124,12 @@ class WanMonitor(BaseMonitor):
                     "after %sm %ss",
                     minutes,
                     seconds,
+                )
+
+                # For the weekly summary.
+                activity_log.record(
+                    "wan_outage",
+                    seconds=int(downtime),
                 )
 
             # Clear the outage timer.

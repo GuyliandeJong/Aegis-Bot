@@ -9,7 +9,7 @@ from monitors.base_monitor import BaseMonitor
 from services import activity_log
 from services.filesystem_service import FilesystemService
 from services.qbittorrent_service import QBittorrentService
-from utils.formatting import format_bytes
+from utils.formatting import format_bytes, format_compact_duration
 from utils.logger import logger
 
 
@@ -118,6 +118,7 @@ class WeeklySummaryMonitor(BaseMonitor):
             ("💾 Disks", await self._disks(), False),
             ("✅ Torrents completed", await self._torrents(since), False),
             ("📥 Copied from Jellyfin", self._copies(since), False),
+            ("🌐 Internet", self._outages(since), False),
             ("🔔 Alerts", self._alerts(since), False),
         ]
 
@@ -202,6 +203,21 @@ class WeeklySummaryMonitor(BaseMonitor):
         return (
             f"{len(copies)} request(s), {files} file(s), "
             f"{format_bytes(size)}: {names}{more}"
+        )
+
+    @staticmethod
+    def _outages(since: float) -> str:
+        outages = activity_log.since(since, "wan_outage")
+
+        if not outages:
+            return "No outages."
+
+        durations = [int(o.get("seconds") or 0) for o in outages]
+
+        return (
+            f"{len(outages)} outage{'s' if len(outages) != 1 else ''}, "
+            f"{format_compact_duration(sum(durations))} in total, "
+            f"longest {format_compact_duration(max(durations))}."
         )
 
     @staticmethod

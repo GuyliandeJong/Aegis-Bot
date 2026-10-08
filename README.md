@@ -412,6 +412,7 @@ config/                Settings template and torrent ranking preferences
 scripts/rebuild.sh     Restart the container and show its startup log
 scripts/watchdog.sh    Cron job: alert through a webhook when the bot is down
 scripts/redfish_power_check.py  Show what iDRAC reports about power supplies
+scripts/redfish_explore.py      List every power-related value on iDRAC's Redfish pages
 tests/                 Checks that run the bot's code against local stand-ins
 ```
 

@@ -144,7 +144,12 @@ class Server(commands.Cog):
 
 
 def hardware_summary(hardware: dict) -> str:
-    """"2 power supplies OK · 6 fans OK · drawing 182 W"."""
+    """
+    "2 power supplies OK · 6 fans OK · drawing 182 W".
+
+    Says so when iDRAC reports no power supplies or power draw, as on
+    servers with a single power supply it cannot read.
+    """
     parts = []
 
     for kind, plural in (("Power supply", "power supplies"), ("Fan", "fans")):
@@ -155,6 +160,7 @@ def hardware_summary(hardware: dict) -> str:
         ]
 
         if not members:
+            parts.append(f"{plural} not monitored by iDRAC")
             continue
 
         bad = [m for m in members if m["health"].lower() != "ok"]
@@ -167,8 +173,10 @@ def hardware_summary(hardware: dict) -> str:
 
     if hardware.get("power_watts") is not None:
         parts.append(f"drawing {hardware['power_watts']:.0f} W")
+    else:
+        parts.append("power draw not reported")
 
-    return " · ".join(parts) or "Not reported by iDRAC"
+    return " · ".join(parts)
 
 
 async def setup(bot: commands.Bot):

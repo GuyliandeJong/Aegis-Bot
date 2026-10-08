@@ -54,6 +54,8 @@ def parsing():
         print(f"{name:18} {comp['kind']:12} {comp['health']:4} {comp['detail']}")
     print("power draw:", HS.power_draw(POWER))
     print("/server line:", SV.hardware_summary({"components": {**HS.power_supplies(POWER), **HS.fans(THERMAL)}, "power_watts": 182.0}))
+    empty = {"PowerSupplies": [], "PowerControl": []}
+    print("/server line, single unmonitored PSU:", SV.hardware_summary({"components": {**HS.power_supplies(empty), **HS.fans(THERMAL)}, "power_watts": HS.power_draw(empty)}))
 
 
 async def hardware_monitor():

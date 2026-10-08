@@ -101,11 +101,12 @@ might be one of the "missing" ones.
 ### Quality
 
 For movies, the availability message shows each server's copy as
-resolution, codec and size, for example `1080p · HEVC · 8.20 GiB`. When
-another server's copy scores higher under the Movies rules in
+resolution, codec, size and score, for example
+`1080p · HEVC · 8.20 GiB · score 55`. The score is the Movies rules in
 `config/torrent_preferences.json` (resolution plus codec, the same
-scores used to rank torrents), the message says so. The bot never
-replaces library files; that is left to you.
+scores used to rank torrents). A line below says which copy fits your
+preferences best, or that they are equal. The bot never replaces
+library files; that is left to you.
 
 ### New episodes on another server
 
@@ -155,8 +156,9 @@ watchlist. Each person can watch up to 25 titles.
 ### Seeding and cleanup
 
 `/torrent cleanup` lists finished torrents, those that reached a
-seeding target first, with ratio, seeding time and size. Choose
-torrents in the list and remove them with or without their files;
+seeding target first, with ratio, seeding time and size, 25 per page
+with Previous and Next buttons. Torrents chosen on one page stay
+chosen on the others. Remove them with or without their files;
 removing files asks for confirmation. Only administrators can use it,
 and the reply is visible to them only.
 
@@ -212,7 +214,12 @@ Monitor state is kept in `data/` so a restart does not repeat alerts.
 The hardware monitor reports a power supply or fan whose health
 changes (Critical, Warning, back to OK), and one that iDRAC stops
 listing. `/server` also shows how many power supplies and fans are OK
-and how many watts the server draws.
+and how many watts the server draws. When power supplies or the power
+draw are missing there, this shows what iDRAC reports:
+
+```bash
+docker exec aegis-bot python scripts/redfish_power_check.py
+```
 
 The weekly summary is posted in the alert channel:
 
@@ -402,6 +409,7 @@ utils/                 Logging, embeds, formatting, theme
 config/                Settings template and torrent ranking preferences
 scripts/rebuild.sh     Restart the container and show its startup log
 scripts/watchdog.sh    Cron job: alert through a webhook when the bot is down
+scripts/redfish_power_check.py  Show what iDRAC reports about power supplies
 tests/                 Checks that run the bot's code against local stand-ins
 ```
 

@@ -16,7 +16,7 @@ from commands.torrent.jellyfin_download import (
 from commands.torrent.watchlist import WatchlistAddView
 from services.jackett_service import JackettService
 from services.jellyfin_compare import (
-    better_copy,
+    compare_copies,
     describe_missing,
     describe_quality,
 )
@@ -1126,7 +1126,7 @@ class TorrentSearchMixin:
         matches,
         download_source=None,
         missing=None,
-        better=None,
+        comparison=None,
     ):
         """
         Build the "already available" embed.
@@ -1164,6 +1164,13 @@ class TorrentSearchMixin:
             )
 
             if quality and match.get("type") == "Movie":
+                score = (comparison or {}).get("scores", {}).get(
+                    str(match.get("server"))
+                )
+
+                if score is not None:
+                    quality += f" · score {score}"
+
                 line += f"\n{quality}"
 
             subtitles = JellyfinService.describe_subtitles(
@@ -1209,13 +1216,10 @@ class TorrentSearchMixin:
         else:
             closing = "No torrent search has been performed."
 
-        if better is not None:
-            closing = (
-                f"**{better.get('server')}** has a copy that fits your "
-                "torrent preferences better. Replacing your copy is "
-                "up to you; the bot does not touch library files.\n\n"
-                + closing
-            )
+        verdict = (comparison or {}).get("verdict")
+
+        if verdict:
+            closing = f"{verdict}\n\n{closing}"
 
         return discord.Embed(
             title=title,
@@ -1490,12 +1494,13 @@ class TorrentSearchMixin:
                         JellyfinService.library_dir(category),
                     )
 
-            # Flag a better copy on another server, for movies; series
-            # episodes differ too much from file to file to compare.
-            better = None
+            # Score each server's copy and say which fits the torrent
+            # preferences best, for movies; series episodes differ too
+            # much from file to file to compare.
+            comparison = None
 
             if category == "Movies":
-                better = better_copy(
+                comparison = compare_copies(
                     jellyfin_matches,
                     self._category_preferences(
                         self._load_preferences(),
@@ -1529,7 +1534,7 @@ class TorrentSearchMixin:
                     jellyfin_matches,
                     download_source,
                     missing,
-                    better,
+                    comparison,
                 ),
                 view=view,
             )

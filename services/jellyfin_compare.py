@@ -252,32 +252,48 @@ def describe_quality(quality: dict | None, format_size) -> str | None:
     return " · ".join(parts) or None
 
 
-def better_copy(matches: list[dict], preferences: dict) -> dict | None:
+def compare_copies(matches: list[dict], preferences: dict) -> dict:
     """
-    Return the other server's match that fits the preferences better
-    than the primary library's copy, or None.
+    Score every server's copy and say which fits the preferences best.
+
+    Returns {"scores": {server: score or None}, "verdict": text or
+    None}. There is no verdict unless at least two copies, one of them
+    the primary library's, could be scored.
     """
-    primary = next((m for m in matches if m.get("primary")), None)
+    scores = {
+        str(match.get("server")): quality_score(match.get("quality"), preferences)
+        for match in matches
+    }
+    primary = next(
+        (str(m.get("server")) for m in matches if m.get("primary")),
+        None,
+    )
+    known = {server: score for server, score in scores.items() if score is not None}
 
-    if primary is None:
-        return None
+    if primary not in known or len(known) < 2:
+        return {"scores": scores, "verdict": None}
 
-    own = quality_score(primary.get("quality"), preferences)
+    best = max(known.values())
+    leaders = [server for server, score in known.items() if score == best]
 
-    if own is None:
-        return None
+    if primary not in leaders:
+        other = leaders[0]
+        verdict = (
+            f"**{other}** has a copy that fits your torrent preferences "
+            f"better (score {best} against {known[primary]}). Replacing "
+            "your copy is up to you; the bot does not touch library files."
+        )
+    elif len(leaders) > 1:
+        verdict = (
+            "The copies fit your torrent preferences equally well "
+            f"(score {best})."
+        )
+    else:
+        runner_up = max(score for server, score in known.items() if server != primary)
+        verdict = (
+            f"Your copy on **{primary}** fits your torrent preferences "
+            f"best (score {best} against {runner_up})."
+        )
 
-    best = None
-    best_score = own
+    return {"scores": scores, "verdict": verdict}
 
-    for match in matches:
-        if match is primary:
-            continue
-
-        score = quality_score(match.get("quality"), preferences)
-
-        if score is not None and score > best_score:
-            best = match
-            best_score = score
-
-    return best

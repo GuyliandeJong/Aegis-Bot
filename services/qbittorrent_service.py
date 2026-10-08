@@ -226,6 +226,32 @@ class QBittorrentService:
             "/app/preferences",
         )
 
+    async def get_alternative_speed(self) -> bool:
+        """Whether qBittorrent's alternative (slow) speed limits are on."""
+
+        result = await self._request(
+            "GET",
+            "/transfer/speedLimitsMode",
+        )
+
+        return str(result).strip() == "1"
+
+    async def set_alternative_speed(self, enabled: bool) -> bool:
+        """
+        Turn the alternative speed limits on or off.
+
+        qBittorrent only offers a toggle, so it is pressed only when
+        the current mode differs. Returns the mode afterwards.
+        """
+
+        if await self.get_alternative_speed() != enabled:
+            await self._request(
+                "POST",
+                "/transfer/toggleSpeedLimitsMode",
+            )
+
+        return await self.get_alternative_speed()
+
     async def get_transfer_info(self) -> dict:
         """Return global transfer information."""
 

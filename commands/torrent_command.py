@@ -15,6 +15,7 @@ from commands.torrent.formatting import TorrentFormattingMixin
 from commands.torrent.info import TorrentInfoMixin
 from commands.torrent.list import TorrentListMixin
 from commands.torrent.search import TorrentSearchMixin
+from commands.torrent.speed import TorrentSpeedMixin
 from commands.torrent.status import TorrentStatusMixin
 from commands.torrent.watchlist import TorrentWatchlistMixin
 
@@ -44,6 +45,7 @@ class Torrent(
     TorrentSearchMixin,
     TorrentWatchlistMixin,
     TorrentCleanupMixin,
+    TorrentSpeedMixin,
     commands.Cog,
 ):
     """
@@ -57,6 +59,7 @@ class Torrent(
         /torrent search
         /torrent watchlist
         /torrent cleanup (administrators)
+        /torrent speed (changing it: administrators)
     """
 
     ALLOWED_CATEGORIES = ALLOWED_CATEGORIES
@@ -354,6 +357,35 @@ class Torrent(
         interaction: discord.Interaction,
     ):
         await self._cleanup(interaction)
+
+    @torrent_group.command(
+        name="speed",
+        description="Show qBittorrent's speed, or switch normal and slow.",
+    )
+    @app_commands.describe(
+        mode="Leave empty to see the current speed (switching: admins).",
+    )
+    @app_commands.choices(
+        mode=[
+            app_commands.Choice(
+                name="Normal speed",
+                value="normal",
+            ),
+            app_commands.Choice(
+                name="Slow (alternative limits)",
+                value="slow",
+            ),
+        ],
+    )
+    async def torrent_speed(
+        self,
+        interaction: discord.Interaction,
+        mode: app_commands.Choice[str] | None = None,
+    ):
+        await self._speed(
+            interaction,
+            mode.value if mode is not None else None,
+        )
 
 
 async def setup(

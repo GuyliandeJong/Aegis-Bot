@@ -20,6 +20,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 
 | Script | Covers | Stand-ins |
 |---|---|---|
+| `check_library_flow.py` | Reading title, year, season and episode from release names; the Jellyfin refresh and "Now in Jellyfin" message after a torrent completes | Local fake Jellyfin |
 | `check_monitors.py` | CPU and memory thresholds, alert cooldown, temperature recovery | Fake services and clock |
 | `check_jellyfin_lookup.py` | Searching several Jellyfin servers, title and year matching | Fake HTTP |
 | `check_server_health.py` | Power supplies and fans, the `/server` line, the weekly summary, the heartbeat, `scripts/watchdog.sh` | Fake iDRAC data, clock, qBittorrent; fake `docker` and `curl` for the script |

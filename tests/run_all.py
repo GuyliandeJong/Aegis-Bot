@@ -20,6 +20,18 @@ ROOT = TESTS.parent
 # Output that must appear for a check to count as passed. These are the
 # results that matter; the rest of the output is context for a reader.
 EXPECTED = {
+    "check_library_flow.py": [
+        "'The Dark Knight Rises'  year=2012 season=None episode=None",
+        "'Fallout'                year=None season=2 episode=3",
+        "'2001 A Space Odyssey'   year=1968",
+        "'Blade Runner 2049'      year=2017",
+        "movie appears after a while -> [('Now in Jellyfin', '**The Dark Knight Rises (2012)** is ready to watch on **Home**.', '<@222>')]",
+        "episode not there yet       -> []",
+        "episode there               -> [('Now in Jellyfin', '**Fallout — Season 2, episode 3**",
+        "season pack, S02 present    -> ['**Fallout — Season 2** is ready",
+        "Music category              -> []",
+        "turned off -> follow-up started: False",
+    ],
     "check_monitors.py": [
         "CPUMonitor: sent 7 notifications",
         "MemoryMonitor: sent 7 notifications",

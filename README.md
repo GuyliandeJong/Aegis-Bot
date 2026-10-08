@@ -205,6 +205,15 @@ Filesystem and temperature alerts for the same component are at least
 not alert on every crossing. A component becoming critical is always
 reported immediately.
 
+When a Movies or Series torrent completes, the bot asks the primary
+Jellyfin server to scan its library, then looks for the title every
+90 seconds for up to 15 minutes. When it is there (for a series: the
+episode, or for a season pack any episode of that season), the
+requester is mentioned with "Now in Jellyfin". Title, year, season and
+episode are read from the release name. If nothing turns up, nothing
+is posted; that usually means the category saves outside the library.
+`JELLYFIN_REFRESH_ON_COMPLETE=false` turns this off.
+
 Torrent notifications (completed, stalled, error) mention the person
 who added the torrent through the bot. Torrents added some other way,
 for example in qBittorrent itself, mention `DISCORD_USER_ID`.
@@ -340,6 +349,9 @@ JELLYFIN_NEW_CONTENT_HOUR=10
 # What /torrent cleanup counts as seeded enough.
 SEED_RATIO_TARGET=2
 SEED_DAYS_TARGET=14
+
+# Refresh Jellyfin and say "Now in Jellyfin" after a torrent completes.
+JELLYFIN_REFRESH_ON_COMPLETE=true
 
 # Weekly summary in the alert channel.
 WEEKLY_SUMMARY=true

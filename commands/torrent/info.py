@@ -1,5 +1,7 @@
 """qBittorrent torrent information command implementation."""
 
+import re
+
 import discord
 
 from commands.torrent.views import TorrentControlView
@@ -10,6 +12,29 @@ from utils.embeds import create_embed
 from utils.logger import logger
 from utils.open_messages import ExpiringView
 
+
+
+def _words(value) -> list[str]:
+    return re.sub(r"[^0-9a-z]+", " ", str(value or "").casefold()).split()
+
+
+def name_matches(query, name) -> bool:
+    """
+    Whether every word of the query occurs in a torrent name.
+
+    Release names separate words with dots, dashes or underscores
+    ("The.Dark.Knight.Rises.2012"), so both sides are split on
+    anything that is not a letter or digit. A word may be the start
+    or part of a longer one, so "knig" still finds "Knight".
+    """
+    query_words = _words(query)
+
+    if not query_words:
+        return False
+
+    name_text = " ".join(_words(name))
+
+    return all(word in name_text for word in query_words)
 
 class TorrentMatchView(ExpiringView):
     """
@@ -279,13 +304,10 @@ class TorrentInfoMixin:
             matches = [
                 torrent
                 for torrent in torrents
-                if search
-                in str(
-                    torrent.get(
-                        "name",
-                        "",
-                    )
-                ).casefold()
+                if name_matches(
+                    search,
+                    torrent.get("name", ""),
+                )
             ]
 
         else:
@@ -498,13 +520,10 @@ class TorrentInfoMixin:
         matches = [
             torrent
             for torrent in torrents
-            if search_query
-            in str(
-                torrent.get(
-                    "name",
-                    "",
-                )
-            ).lower()
+            if name_matches(
+                search_query,
+                torrent.get("name", ""),
+            )
         ]
 
         if not matches:

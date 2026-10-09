@@ -8,7 +8,7 @@ from stubs import HTTP
 
 os.environ.update({
     "JELLYFIN_1_URL": "http://home:8096", "JELLYFIN_1_API_KEY": "k1", "JELLYFIN_1_NAME": "Home",
-    "JELLYFIN_2_URL": "http://friend:8096", "JELLYFIN_2_API_KEY": "k2",
+    "JELLYFIN_2_URL": "http://friend:8096", "JELLYFIN_2_API_KEY": "k2", "JELLYFIN_2_NAME": "Jellyfin 2",
 })
 LIB = {
     "http://home:8096": [{"Name": "Dune", "ProductionYear": 2021, "Id": "a", "Type": "Movie"}],

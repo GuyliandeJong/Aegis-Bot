@@ -31,8 +31,10 @@ class EsxiMonitor(BaseMonitor):
     suspended, and when it runs again. Names in ESXI_IGNORE_VMS
     (comma separated) are not watched.
 
-    The first check only records the current state. Does nothing when
-    ESXI_HOST, ESXI_USERNAME or ESXI_PASSWORD is missing.
+    The first check records the current state; of that, only a
+    datastore that is already filling up or inaccessible is reported.
+    Does nothing when ESXI_HOST, ESXI_USERNAME or ESXI_PASSWORD is
+    missing.
     """
 
     STATE_FILE = Path("/app/data/esxi_monitor_state.json")
@@ -161,7 +163,9 @@ class EsxiMonitor(BaseMonitor):
 
             known[name] = current
 
-            if previous is None:
+            # A datastore seen for the first time is only reported when
+            # it is already filling up; a healthy one is just recorded.
+            if previous is None and current == "healthy":
                 continue
 
             capacity = datastore["capacity"]

@@ -178,6 +178,8 @@ EXPECTED = {
         "calls: ['RetrieveServiceContent', 'Login', 'CreateContainerView', 'RetrievePropertiesEx', 'DestroyView', 'CreateContainerView', 'RetrievePropertiesEx', 'DestroyView', 'Logout']",
         "password sent escaped: True",
         "first check, alerts: []",
+        "already over the level at the first check -> [('warning', 'Datastore Filling Up — datastore1'), ('warning', 'Datastore Filling Up — media')]",
+        "next check, unchanged -> 2 alert(s) in total",
         "warning   Datastore Filling Up — media",
         "warning   VM Stopped — homeassistant",
         "critical  Datastore Critical — datastore1",

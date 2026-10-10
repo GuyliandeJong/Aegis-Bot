@@ -277,8 +277,9 @@ through its vSphere API (`https://<host>/sdk`). It alerts when a
 datastore reaches `ESXI_DATASTORE_WARNING` percent used (default 85),
 `ESXI_DATASTORE_CRITICAL` (default 95) or becomes inaccessible, when
 a running virtual machine stops or is suspended, and when the host
-does not answer three checks in a row. `/esxi` shows the same
-information. Create a separate ESXi user with the read-only role for
+does not answer three checks in a row. A datastore that is already
+over a level when the bot first sees it is reported once. `/esxi` shows
+the same information. Create a separate ESXi user with the read-only role for
 the bot; it needs nothing more.
 
 ```text

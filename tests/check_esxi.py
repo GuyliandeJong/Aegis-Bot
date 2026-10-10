@@ -124,6 +124,16 @@ async def main():
         await mon.check()
         print("  alerts:", notes.sent)
 
+        print("\n== first sight ==")
+        EM.EsxiMonitor.STATE_FILE = isolate.DATA / "esxi-fresh.json"
+        os.environ["ESXI_DATASTORE_WARNING"] = "1"
+        notes = Notes(); fresh = EM.EsxiMonitor(notes)
+        await fresh.check()
+        print("  already over the level at the first check ->", notes.sent)
+        await fresh.check()
+        print("  next check, unchanged ->", len(notes.sent), "alert(s) in total")
+        del os.environ["ESXI_DATASTORE_WARNING"]
+
         del os.environ["ESXI_HOST"]
         CALLS.clear(); await mon.check()
         print("  not configured -> requests:", CALLS)

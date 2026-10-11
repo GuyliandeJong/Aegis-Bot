@@ -263,7 +263,12 @@ WEEKLY_SUMMARY_HOUR=10       # container time
 ```
 
 Disk growth is measured from one summary to the next, so the first
-summary only shows current usage. The summary also counts internet
+summary only shows current usage. Completed torrents and Jellyfin copies are
+listed in full, with readable titles ("Inception (2010)", "Fallout —
+S02E03") and their size. When a list does not fit in the summary, the
+bot opens a thread under it with the complete list; it needs the
+"Create Public Threads" permission in the alert channel for that, and
+otherwise posts the list below the summary. The summary also counts internet
 outages (number, total and longest) confirmed by the WAN monitor.
 
 Physical drives alert when iDRAC predicts a failure, and SSDs also when

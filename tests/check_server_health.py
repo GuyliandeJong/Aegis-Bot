@@ -28,6 +28,7 @@ import services.qbittorrent_service as QS
 import services.filesystem_service as FS
 import commands.server as SV
 import isolate  # state files go to a temporary folder
+GIB_ = 1024 ** 3
 HM.HardwareMonitor.STATE_FILE = isolate.DATA / "hardware.json"
 WS.WeeklySummaryMonitor.STATE_FILE = isolate.DATA / "weekly.json"
 HB.HeartbeatMonitor.FILE = isolate.DATA / "heartbeat"
@@ -121,6 +122,33 @@ async def weekly():
     await mon.check()
     print("next Sunday disks:", notes.sent[-1][3][0][1].splitlines()[0])
     print("next Sunday copies:", notes.sent[-1][3][2][1])
+
+    # A busy week: too many titles for the field.
+    class Thread:
+        def __init__(t): t.posts = []
+        async def send(t, text): t.posts.append(text)
+    thread, channel_posts = Thread(), []
+
+    class Summary:
+        channel = types.SimpleNamespace(send=lambda text: channel_posts.append(text))
+        async def create_thread(m, name, auto_archive_duration): thread.name = name; return thread
+
+    class BusyNotes(Notes):
+        async def info(s, title, description="", **k): s.sent.append(("info", title, description, k.get("fields"))); return Summary()
+
+    async def many(self, category=None, filter_name=None):
+        start = clock["now"].timestamp() - 86400
+        return [{"name": f"Some.Long.Movie.Title.Number.{n:02d}.20{n % 25:02d}.1080p.BluRay.x265-GROUP", "size": GIB_ * (n + 1),
+                 "completion_on": int(start + n)} for n in range(40)]
+    QS.QBittorrentService.get_torrents = many
+    busy = BusyNotes(); mon2 = WS.WeeklySummaryMonitor(busy); mon2._now = mon._now
+    mon2.state["last_run"] = None
+    clock["now"] = datetime(2026, 10, 25, 10, 30)
+    await mon2.check()
+    field = busy.sent[-1][3][1][1]
+    print("busy week field:", field.replace(chr(10), " / "))
+    print("thread:", thread.name, "| messages:", len(thread.posts), "| lines:", sum(p.count("•") for p in thread.posts),
+          "| longest message:", max(len(p) for p in thread.posts), "| first:", thread.posts[0].splitlines()[1])
 
 
 def drives():

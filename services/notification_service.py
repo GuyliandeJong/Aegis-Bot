@@ -28,7 +28,11 @@ class NotificationService:
         content: str | None = None,
         level: str = "info",
     ):
-        """Send a formatted notification to the configured alert channel."""
+        """
+        Send a formatted notification to the configured alert channel.
+
+        Returns the sent message, or None when the channel is missing.
+        """
 
         channel = self.bot.get_channel(
             settings.ALERT_CHANNEL_ID
@@ -60,7 +64,7 @@ class NotificationService:
             text="Aegis-Bot"
         )
 
-        await channel.send(
+        message = await channel.send(
             content=content,
             embed=embed,
             allowed_mentions=discord.AllowedMentions(
@@ -75,6 +79,8 @@ class NotificationService:
 
         activity_log.record("alert", level=level, title=title)
 
+        return message
+
     async def info(
         self,
         title: str,
@@ -85,7 +91,7 @@ class NotificationService:
     ):
         """Send an informational notification."""
 
-        await self._send(
+        return await self._send(
             title=title,
             description=description,
             color=theme.PRIMARY_COLOR,
@@ -104,7 +110,7 @@ class NotificationService:
     ):
         """Send a warning notification."""
 
-        await self._send(
+        return await self._send(
             title=title,
             description=description,
             color=theme.WARNING_COLOR,
@@ -123,7 +129,7 @@ class NotificationService:
     ):
         """Send a critical notification."""
 
-        await self._send(
+        return await self._send(
             title=title,
             description=description,
             color=theme.ERROR_COLOR,
@@ -142,7 +148,7 @@ class NotificationService:
     ):
         """Send a recovery notification."""
 
-        await self._send(
+        return await self._send(
             title=title,
             description=description,
             color=theme.SUCCESS_COLOR,
@@ -161,7 +167,7 @@ class NotificationService:
     ):
         """Send a successful-operation notification."""
 
-        await self._send(
+        return await self._send(
             title=title,
             description=description,
             color=theme.SUCCESS_COLOR,

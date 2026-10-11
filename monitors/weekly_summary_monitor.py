@@ -9,6 +9,7 @@ from monitors.base_monitor import BaseMonitor
 from services import activity_log
 from services.filesystem_service import FilesystemService
 from services.qbittorrent_service import QBittorrentService
+from services.release_name import parse
 from utils.formatting import format_bytes, format_compact_duration
 from utils.logger import logger
 
@@ -16,6 +17,26 @@ from utils.logger import logger
 DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
 WEEK = 7 * 24 * 60 * 60
+
+
+def readable_title(name) -> str:
+    """
+    "Inception.2010.1080p.BluRay.x265" becomes "Inception (2010)",
+    "Fallout.S02E03.1080p" becomes "Fallout — S02E03".
+    """
+    release = parse(name)
+    title = release["title"] or str(name or "Unknown")
+
+    if release["year"]:
+        title += f" ({release['year']})"
+
+    if release["season"] is not None:
+        if release["episode"] is not None:
+            title += f" — S{release['season']:02d}E{release['episode']:02d}"
+        else:
+            title += f" — Season {release['season']}"
+
+    return title[:90]
 
 
 class WeeklySummaryMonitor(BaseMonitor):
@@ -105,7 +126,7 @@ class WeeklySummaryMonitor(BaseMonitor):
         self.state["since"] = now.timestamp()
         self.save_state()
 
-        await self.notification_service.info(
+        message = await self.notification_service.info(
             title="Weekly summary",
             description=(
                 f"Since <t:{int(since)}:D>."
@@ -113,7 +134,13 @@ class WeeklySummaryMonitor(BaseMonitor):
             fields=fields,
         )
 
+        if self.overflow and message is not None:
+            await self._post_full_lists(message, now)
+
     async def build(self, since: float) -> list[tuple[str, str, bool]]:
+        # Lists too long for their field, posted in a thread afterwards.
+        self.overflow: list[tuple[str, list[str]]] = []
+
         fields = [
             ("💾 Disks", await self._disks(), False),
             ("✅ Torrents completed", await self._torrents(since), False),
@@ -182,14 +209,23 @@ class WeeklySummaryMonitor(BaseMonitor):
         if not done:
             return "None."
 
+        done.sort(key=lambda t: int(t.get("completion_on") or 0))
         size = sum(int(torrent.get("size") or 0) for torrent in done)
-        names = ", ".join(str(t.get("name"))[:40] for t in done[:5])
-        more = f" and {len(done) - 5} more" if len(done) > 5 else ""
 
-        return f"{len(done)} ({format_bytes(size)}): {names}{more}"
+        lines = [
+            f"• {readable_title(t.get('name'))} · "
+            f"{format_bytes(t.get('size'))}"
+            for t in done
+        ]
 
-    @staticmethod
-    def _copies(since: float) -> str:
+        return self._list_field(
+            "✅ Torrents completed",
+            f"{len(done)} torrent{'s' if len(done) != 1 else ''}, "
+            f"{format_bytes(size)}",
+            lines,
+        )
+
+    def _copies(self, since: float) -> str:
         copies = activity_log.since(since, "jellyfin_copy")
 
         if not copies:
@@ -197,13 +233,72 @@ class WeeklySummaryMonitor(BaseMonitor):
 
         files = sum(int(c.get("files") or 0) for c in copies)
         size = sum(int(c.get("bytes") or 0) for c in copies)
-        names = ", ".join(str(c.get("title"))[:40] for c in copies[:5])
-        more = f" and {len(copies) - 5} more" if len(copies) > 5 else ""
 
-        return (
+        lines = [
+            f"• {c.get('title')} · {int(c.get('files') or 0)} file(s), "
+            f"{format_bytes(c.get('bytes'))}"
+            for c in copies
+        ]
+
+        return self._list_field(
+            "📥 Copied from Jellyfin",
             f"{len(copies)} request(s), {files} file(s), "
-            f"{format_bytes(size)}: {names}{more}"
+            f"{format_bytes(size)}",
+            lines,
         )
+
+    # A field value may hold 1024 characters.
+    FIELD_LIMIT = 1024
+
+    def _list_field(self, heading: str, total: str, lines: list[str]) -> str:
+        """
+        The whole list when it fits in the field; otherwise the total,
+        with the list kept for a thread under the summary.
+        """
+        text = total + "\n" + "\n".join(lines)
+
+        if len(text) <= self.FIELD_LIMIT:
+            return text
+
+        self.overflow.append((heading, lines))
+
+        return f"{total}\nThe full list is in the thread below."
+
+    # A message may hold 2000 characters.
+    MESSAGE_LIMIT = 1900
+
+    async def _post_full_lists(self, message, now: datetime) -> None:
+        """
+        Post the lists that did not fit in a thread under the summary,
+        or below it when the bot may not create threads.
+        """
+        target = message.channel
+
+        try:
+            target = await message.create_thread(
+                name=f"Weekly summary {now.strftime('%Y-%m-%d')}",
+                # Seven days, then Discord archives it; it stays readable.
+                auto_archive_duration=10080,
+            )
+        except Exception as ex:
+            logger.warning(
+                "[WeeklySummary] Could not create a thread, posting the "
+                "lists in the channel: %s",
+                ex,
+            )
+
+        for heading, lines in self.overflow:
+            chunk = f"**{heading}**"
+
+            for line in lines:
+                if len(chunk) + len(line) + 1 > self.MESSAGE_LIMIT:
+                    await target.send(chunk)
+                    chunk = ""
+
+                chunk = f"{chunk}\n{line}" if chunk else line
+
+            if chunk:
+                await target.send(chunk)
 
     @staticmethod
     def _outages(since: float) -> str:

@@ -88,6 +88,9 @@ MEMORY_EMOJI = "🧠"
 # Temperature information.
 TEMPERATURE_EMOJI = "🌡️"
 
+# Docker container information.
+CONTAINER_EMOJI = "🐳"
+
 # ------------------------------------------------------------
 # Usage bar
 # ------------------------------------------------------------

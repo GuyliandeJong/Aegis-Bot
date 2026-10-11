@@ -420,6 +420,14 @@ Docker's own API through. Only the Discord users listed in
 the person who asked.
 
 - `list`, `info` and `logs` only read. `start` runs at once.
+- `list` is paged (15 per page) with a Refresh button. Running
+  containers come first. Dots show state: green healthy or running,
+  yellow starting or paused, red unhealthy or exited with an error,
+  white stopped. Exit codes 0, 137 and 143 count as stopped on purpose.
+- `info` and every finished action show a details panel with Start,
+  Restart, Stop, Logs and Refresh buttons. Buttons that do not apply
+  (Start on a running container, Stop on a protected one) are disabled.
+  Stop and Restart from the panel use the same confirmation.
 - `stop` and `restart` ask for one confirmation.
 - `kill` asks for a confirmation and then for the container name.
 - `remove` asks for a confirmation, the container name and a final

@@ -287,11 +287,18 @@ if [ -n "$REMOTE" ]; then
 
     # Mirrors: only changed files are uploaded (compared by checksum;
     # Proton Drive cannot store modification times). The versions they
-    # replace go to previous/<this run>.
+    # replace go to previous/<this run>. From here on CHANGED counts the
+    # files uploaded, not the changes in the local copy.
+    CHANGED=0
     for rel in "${SYNCS[@]}"; do
         rclone sync "$MIRROR_DIR/$rel" "$REMOTE/mirror/current/$rel" --links --checksum \
             --backup-dir "$REMOTE/mirror/previous/$STAMP/$rel" \
-            --retries 10 --low-level-retries 10 2>> "$RCLONE_LOG" \
+            --retries 10 --low-level-retries 10 -v 2> "$LOCAL_DIR/rclone.part"
+        result=$?
+        cat "$LOCAL_DIR/rclone.part" >> "$RCLONE_LOG"
+        CHANGED=$((CHANGED + $(grep -c ': Copied' "$LOCAL_DIR/rclone.part" || true)))
+        rm -f "$LOCAL_DIR/rclone.part"
+        [ "$result" -eq 0 ] \
             || fail "mirror upload of /$rel failed: $(rclone_error) (full log: $RCLONE_LOG)"
     done
 
@@ -307,7 +314,11 @@ write_status true "$SIZE" "$UPLOADED" ""
 human="$(numfmt --to=iec-i --suffix=B "$SIZE" 2>/dev/null || echo "$SIZE bytes")"
 mirrored=""
 if [ "${#SYNCS[@]}" -gt 0 ]; then
-    mirrored=" Mirrored ${#SYNCS[@]} folder(s), $CHANGED file(s) changed."
+    if [ "$UPLOADED" = true ]; then
+        mirrored=" Mirrored ${#SYNCS[@]} folder(s), $CHANGED file(s) uploaded."
+    else
+        mirrored=" Mirrored ${#SYNCS[@]} folder(s), $CHANGED file(s) changed."
+    fi
 fi
 
 if [ "$UPLOADED" = true ]; then

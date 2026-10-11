@@ -336,7 +336,8 @@ class WeeklySummaryMonitor(BaseMonitor):
             changed = int(status.get("changed") or 0)
             line += (
                 f" Mirrored {mirrored} folder{'s' if mirrored != 1 else ''}, "
-                f"{changed} file{'s' if changed != 1 else ''} changed."
+                f"{changed} file{'s' if changed != 1 else ''} "
+                f"{'uploaded' if status.get('uploaded') else 'changed'}."
             )
 
         return line

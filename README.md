@@ -301,7 +301,8 @@ ESXI_IGNORE_VMS=
 
 `scripts/backup.sh` runs on the server from root's cron. It packs this
 project (including `.env` and `data/`) and the folders in
-`BACKUP_PATHS` into one `.tar.gz`, skipping caches, transcodes, logs,
+`BACKUP_PATHS` into one `.tar.gz`, split into parts of
+`BACKUP_PART_SIZE` (256M) in a folder per backup, skipping caches, transcodes, logs,
 `MediaCover` and `metadata` folders. Containers in
 `BACKUP_STOP_CONTAINERS` are stopped while it packs, so their databases
 are copied consistently, and started again afterwards, also when
@@ -353,6 +354,8 @@ BACKUP_SYNC_PATHS=
 BACKUP_MIRROR_DIR=/var/backups/aegis-bot/mirror
 # Containers stopped while the archive is made, separated by spaces.
 BACKUP_STOP_CONTAINERS=
+# Size of each archive part; a failed upload only repeats one part.
+BACKUP_PART_SIZE=256M
 # Local archives: where, and how many to keep.
 BACKUP_LOCAL_DIR=/var/backups/aegis-bot
 BACKUP_KEEP_LOCAL=4
@@ -361,9 +364,11 @@ BACKUP_REMOTE=proton:Backups/home
 BACKUP_KEEP_REMOTE=8
 ```
 
-To restore, unpack an archive at the root; it holds full paths:
-`sudo tar -xzf aegis-backup-<date>.tar.gz -C /`, or add a folder name
-at the end to restore only that. A mirrored folder comes back with
+To restore, join the parts and unpack them at the root; the archive
+holds full paths:
+`cat aegis-backup-<date>/aegis-backup-<date>.tar.gz.* | sudo tar -xzf - -C /`,
+or add a folder name at the end to restore only that. From Proton
+Drive, first `sudo rclone copy proton:Backups/home/aegis-backup-<date> ./aegis-backup-<date>`. A mirrored folder comes back with
 `sudo rclone copy --links <BACKUP_REMOTE>/mirror/current/<path> /<path>`,
 or from the local mirror when the disk survived.
 

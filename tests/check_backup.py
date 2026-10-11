@@ -5,6 +5,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import io
 import tarfile
 import tempfile
 import time
@@ -64,13 +65,13 @@ if cmd == "copy":
         sys.exit("2026/10/11 04:00:01 ERROR : big.tar.gz: Failed to copy: couldn't connect\\n"
                  "2026/10/11 04:00:09 ERROR : big.tar.gz: Failed to copy: a draft exist")
     (ROOT / "draft_env").write_text(os.environ.get("RCLONE_PROTONDRIVE_REPLACE_EXISTING_DRAFT", ""))
-    where(args[2]).mkdir(parents=True, exist_ok=True); shutil.copy(args[1], where(args[2]))
+    shutil.copytree(args[1], where(args[2]), dirs_exist_ok=True)
 elif cmd == "lsf":
     d = where(args[1])
     if d.is_dir():
         for p in sorted(d.iterdir()):
-            if "--dirs-only" in sys.argv and p.is_dir(): print(p.name + "/")
-            if "--files-only" in sys.argv and p.is_file(): print(p.name)
+            if "--files-only" not in sys.argv and p.is_dir(): print(p.name + "/")
+            if "--dirs-only" not in sys.argv and p.is_file(): print(p.name)
 elif cmd == "deletefile": where(args[1]).unlink(missing_ok=True)
 elif cmd == "purge": shutil.rmtree(where(args[1]))
 elif cmd == "sync":
@@ -104,6 +105,16 @@ def settings(**values):
     (PROJECT / ".env").write_text("\n".join(lines) + "\n")
 
 
+def members(folder):
+    """Names in a split archive: the parts joined in order, as a restore does."""
+    parts = sorted(Path(folder).glob("*.tar.gz.*"))
+    return tarfile.open(fileobj=io.BytesIO(b"".join(p.read_bytes() for p in parts))).getnames()
+
+
+def newest():
+    return max(LOCAL.glob("aegis-backup-*"), key=os.path.getmtime)
+
+
 def run(label):
     CALLS.write_text("")
     hook = ROOT / "webhook.txt"; hook.write_text("")
@@ -115,24 +126,27 @@ def run(label):
 
 
 settings(BACKUP_PATHS=f"{APPS}/jellyfin {APPS}/sonarr/ '{APPS}/plex'", BACKUP_STOP_CONTAINERS="jellyfin sonarr stopped-app",
-         BACKUP_REMOTE="proton:Backups", BACKUP_KEEP_LOCAL="2", BACKUP_KEEP_REMOTE="3")
+         BACKUP_REMOTE="proton:Backups", BACKUP_KEEP_LOCAL="2", BACKUP_KEEP_REMOTE="3", BACKUP_PART_SIZE="2K")
 RUNNING.write_text("jellyfin\nsonarr\n")
 
 print("== first backup ==")
 status = run("run 1")
-archive = sorted(LOCAL.glob("aegis-backup-*.tar.gz"))[-1]
-names = sorted(tarfile.open(archive).getnames())
+archive = newest()
+names = sorted(members(archive))
+parts = sorted(p.name for p in archive.iterdir())
+print("  split into parts:", len(parts) > 1, "| names:", parts[0][-11:], parts[1][-11:], "| each at most 2 KiB:", all(p.stat().st_size <= 2048 for p in archive.iterdir()))
 rel = lambda p: str(p).lstrip("/")
 print("  contains .env:", rel(PROJECT / ".env") in names, "| jellyfin config:", rel(APPS / "jellyfin/config/system.xml") in names,
       "| sonarr db:", rel(APPS / "sonarr/sonarr.db") in names)
 print("  skipped cache/MediaCover/logs:", not any(x in n for n in names for x in ("/cache/", "/MediaCover/", "/logs/")))
 print("  plex: kept databases:", any("Plug-in Support/Databases/file.bin" in n for n in names),
       "| skipped Cache/Metadata/Media/Logs:", not any(f"Plex Media Server/{x}/" in n for n in names for x in ("Cache", "Metadata", "Media", "Logs")))
-print("  archive mode:", oct(archive.stat().st_mode & 0o777), "| local dir mode:", oct(LOCAL.stat().st_mode & 0o777))
+print("  archive mode:", oct(next(archive.iterdir()).stat().st_mode & 0o777), "| local dir mode:", oct(LOCAL.stat().st_mode & 0o777))
 docker = [l for l in CALLS.read_text().splitlines() if l.startswith("docker stop") or l.startswith("docker start")]
 print("  docker:", docker)
 print("  project packed once:", sum(1 for n in names if n == rel(PROJECT / ".env")) == 1)
-print("  remote:", sorted(p.name for p in REMOTE.iterdir()) == [archive.name], "| size in status:", status["size"] == archive.stat().st_size)
+print("  remote:", sorted(p.name for p in (REMOTE / archive.name).iterdir()) == parts, "| size in status:", status["size"] >= sum(p.stat().st_size for p in archive.iterdir()))
+print("  parts checked by checksum:", "--checksum" in [l for l in CALLS.read_text().splitlines() if l.startswith("rclone copy")][0].split())
 
 print("\n== retention ==")
 for n in range(4):
@@ -142,7 +156,8 @@ for n in range(4):
     old = REMOTE / f"aegis-backup-2026-01-0{n + 1}_0400.tar.gz"; old.write_text("old")
     oldlocal = LOCAL / f"aegis-backup-2026-01-0{n + 1}_0400.tar.gz"; oldlocal.write_text("old"); os.utime(oldlocal, (1, 1))
 run("run 2")
-print("  local kept:", len(list(LOCAL.glob("aegis-backup-*.tar.gz"))), "| remote kept:", sorted(p.name[13:23] for p in REMOTE.iterdir()))
+print("  local kept:", len(list(LOCAL.glob("aegis-backup-*"))), "| remote kept:", sorted(p.name[13:23] for p in REMOTE.iterdir()),
+      "| oldest single files removed:", not (REMOTE / "aegis-backup-2026-01-01_0400.tar.gz").exists() and not (REMOTE / "aegis-backup-2026-01-02_0400.tar.gz").exists())
 
 print("\n== failures ==")
 (ROOT / "remote_down").write_text("")
@@ -162,7 +177,7 @@ settings(BACKUP_PATHS=f"{APPS}/jellyfin")
 run("no upload configured")
 settings(BACKUP_PATHS=f"{ROOT}")
 run("parent folder listed")
-names = tarfile.open(sorted(LOCAL.glob("aegis-backup-*.tar.gz"), key=os.path.getmtime)[-1]).getnames()
+names = members(newest())
 print("  project packed once inside the parent:", names.count(rel(PROJECT / ".env")) == 1)
 
 print("\n== mirrored folders ==")
@@ -176,7 +191,7 @@ settings(BACKUP_PATHS=f"{APPS}", BACKUP_SYNC_PATHS=f"{MC_A} {MC_B}/", BACKUP_STO
          BACKUP_REMOTE="proton:Backups", BACKUP_KEEP_REMOTE="2")
 RUNNING.write_text("mc-a\n")
 st = run("mirror run 1")
-names = tarfile.open(LOCAL / st["archive"]).getnames()
+names = members(LOCAL / st["archive"])
 print("  worlds left out of the archive:", not any("minecraft-" in n for n in names), "| other apps still in:", rel(APPS / "sonarr/sonarr.db") in names)
 mirror, current = LOCAL / "mirror" / rel(MC_A), REMOTE / "mirror" / "current" / rel(MC_A)
 print("  local mirror:", sorted(str(p.relative_to(mirror)) for p in mirror.rglob("*") if p.is_file()))

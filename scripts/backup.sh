@@ -25,6 +25,9 @@
 #                           database)
 #   BACKUP_LOCAL_DIR        where archives are kept (/var/backups/aegis-bot)
 #   BACKUP_KEEP_LOCAL       archives kept locally (4)
+#   BACKUP_PART_SIZE        the archive is split into parts of this size
+#                           (256M), so a failed upload only repeats one
+#                           part instead of the whole archive
 #   BACKUP_REMOTE           rclone destination, e.g. proton:Backups/home
 #                           (empty: no upload)
 #   BACKUP_KEEP_REMOTE      archives, and runs of replaced mirror files,
@@ -61,6 +64,7 @@ LOCAL_DIR="$(env_value BACKUP_LOCAL_DIR)"; LOCAL_DIR="${LOCAL_DIR:-/var/backups/
 KEEP_LOCAL="$(env_value BACKUP_KEEP_LOCAL)"; KEEP_LOCAL="${KEEP_LOCAL:-4}"
 REMOTE="$(env_value BACKUP_REMOTE)"
 KEEP_REMOTE="$(env_value BACKUP_KEEP_REMOTE)"; KEEP_REMOTE="${KEEP_REMOTE:-8}"
+PART_SIZE="$(env_value BACKUP_PART_SIZE)"; PART_SIZE="${PART_SIZE:-256M}"
 WEBHOOK="$(env_value WATCHDOG_WEBHOOK_URL)"
 SYNC_PATHS="$(env_value BACKUP_SYNC_PATHS)"
 MIRROR_DIR="$(env_value BACKUP_MIRROR_DIR)"; MIRROR_DIR="${MIRROR_DIR:-$LOCAL_DIR/mirror}"
@@ -86,7 +90,9 @@ MIRROR_EXCLUDES=(
 
 STARTED="$(date +%s)"
 STAMP="$(date +%Y-%m-%d_%H%M)"
-NAME="aegis-backup-$STAMP.tar.gz"
+# One folder per backup holding the parts <NAME>.tar.gz.000, .001, ...
+# Restore: cat <NAME>/<NAME>.tar.gz.* | tar -xzf - -C /
+NAME="aegis-backup-$STAMP"
 ARCHIVE="$LOCAL_DIR/$NAME"
 # rclone's messages from the last run, kept for troubleshooting.
 RCLONE_LOG="$LOCAL_DIR/rclone.log"
@@ -141,9 +147,9 @@ fail() {
     size=0
 
     if [ "$ARCHIVE_DONE" = true ]; then
-        size="$(stat -c %s "$ARCHIVE")"
+        size="$(du -sb "$ARCHIVE" | cut -f1)"
     else
-        rm -f "$ARCHIVE"
+        rm -rf "$ARCHIVE"
     fi
 
     write_status false "$size" "$UPLOADED" "$1"
@@ -211,8 +217,10 @@ for container in $STOP; do
     fi
 done
 
-tar -czf "$ARCHIVE" -C / "${EXCLUDE_ARGS[@]}" "${SOURCES[@]}" 2> "$ARCHIVE.errors"
-result=$?
+mkdir -p "$ARCHIVE"
+tar -czf - -C / "${EXCLUDE_ARGS[@]}" "${SOURCES[@]}" 2> "$ARCHIVE.errors" \
+    | split -b "$PART_SIZE" -d -a 3 - "$ARCHIVE/$NAME.tar.gz."
+result=("${PIPESTATUS[@]}")
 
 # Copy the mirrored folders while their containers are still stopped;
 # after the first run only changed files are copied.
@@ -229,36 +237,42 @@ start_stopped
 
 # tar exits 1 when a file changed while it was read; the archive is
 # still complete. Anything else is a real failure.
-if [ "$result" -gt 1 ]; then
+if [ "${result[0]}" -gt 1 ]; then
     reason="$(head -c 150 "$ARCHIVE.errors" | tr '\n"\\' '   ')"
     rm -f "$ARCHIVE.errors"
     fail "tar failed: $reason"
 fi
 rm -f "$ARCHIVE.errors"
+[ "${result[1]}" -eq 0 ] || fail "splitting the archive failed (disk full?)"
 
 ARCHIVE_DONE=true
-SIZE="$(stat -c %s "$ARCHIVE")"
+SIZE="$(du -sb "$ARCHIVE" | cut -f1)"
 
 [ -z "$MIRROR_ERROR" ] || fail "mirror of $MIRROR_ERROR"
 
-# Keep the newest archives locally.
-ls -1t "$LOCAL_DIR"/aegis-backup-*.tar.gz 2>/dev/null \
-    | tail -n +"$((KEEP_LOCAL + 1))" | xargs -r rm -f
+# Keep the newest archives locally (also single-file ones from older
+# versions of this script).
+ls -1dt "$LOCAL_DIR"/aegis-backup-* 2>/dev/null \
+    | tail -n +"$((KEEP_LOCAL + 1))" | xargs -r rm -rf
 
 if [ -n "$REMOTE" ]; then
     command -v rclone > /dev/null || fail "rclone is not installed"
 
-    rclone copy "$ARCHIVE" "$REMOTE" --retries 3 --low-level-retries 10 \
+    # A retry skips the parts that already arrived (same checksum).
+    rclone copy "$ARCHIVE" "$REMOTE/$NAME" --checksum --retries 10 --low-level-retries 10 \
         2> "$RCLONE_LOG" \
         || fail "upload to $REMOTE failed: $(rclone_error) (full log: $RCLONE_LOG)"
     UPLOADED=true
 
     # Keep the newest archives in the destination; names sort by date.
-    rclone lsf "$REMOTE" --files-only 2>/dev/null \
-        | grep '^aegis-backup-.*\.tar\.gz$' | sort \
+    rclone lsf "$REMOTE" 2>/dev/null \
+        | grep '^aegis-backup-' | sort \
         | head -n -"$KEEP_REMOTE" \
         | while read -r old; do
-            rclone deletefile "$REMOTE/$old" > /dev/null 2>&1 || true
+            case "$old" in
+                */) rclone purge "$REMOTE/${old%/}" > /dev/null 2>&1 || true ;;
+                *) rclone deletefile "$REMOTE/$old" > /dev/null 2>&1 || true ;;
+            esac
         done
 
     # Mirrors: only changed files are uploaded (compared by checksum;
@@ -267,7 +281,7 @@ if [ -n "$REMOTE" ]; then
     for rel in "${SYNCS[@]}"; do
         rclone sync "$MIRROR_DIR/$rel" "$REMOTE/mirror/current/$rel" --links --checksum \
             --backup-dir "$REMOTE/mirror/previous/$STAMP/$rel" \
-            --retries 3 --low-level-retries 10 2>> "$RCLONE_LOG" \
+            --retries 10 --low-level-retries 10 2>> "$RCLONE_LOG" \
             || fail "mirror upload of /$rel failed: $(rclone_error) (full log: $RCLONE_LOG)"
     done
 

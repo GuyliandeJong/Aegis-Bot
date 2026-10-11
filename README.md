@@ -25,6 +25,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/esxi` | ESXi datastores (usage) and virtual machines (running or not) | Administrators |
 | `/wan` | Public IP address | Administrators |
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
+| `/container` | Lists, inspects and controls Docker containers through Portainer: `list`, `info`, `logs`, `start`, `stop`, `restart`, `kill`, `remove` | Only the users in `PORTAINER_ALLOWED_USER_IDS` |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone |
 
 `/wan`, `/server`, `/idrac`, `/network` and `/esxi` reply privately: only the
@@ -411,6 +412,29 @@ the messages whose buttons were still active to say so, and marks a
 Jellyfin download that was cut off as stopped. Requesting the download
 again skips the files that were already copied.
 
+## Container management
+
+`/container` manages Docker containers through Portainer, which passes
+Docker's own API through. Only the Discord users listed in
+`PORTAINER_ALLOWED_USER_IDS` can use it, and every answer is private to
+the person who asked.
+
+- `list`, `info` and `logs` only read. `start` runs at once.
+- `stop` and `restart` ask for one confirmation.
+- `kill` asks for a confirmation and then for the container name.
+- `remove` asks for a confirmation, the container name and a final
+  confirmation. A running container is refused, nothing is forced and
+  volumes are never removed.
+- Containers named in `PORTAINER_PROTECTED` cannot be stopped,
+  restarted, killed or removed. The bot's own container and any
+  `portainer/*` image are always protected too, because stopping them
+  would cut off this control. The bot's own container is recognised by
+  its hostname, which only works while the container keeps Docker's
+  default hostname.
+- Every confirmation step expires after 30 seconds.
+- The container is looked up by name again just before the action, so
+  one that was recreated since it was picked is left alone.
+
 ## Configuration
 
 Configuration lives in two untracked files.
@@ -500,6 +524,20 @@ ESXI_IGNORE_VMS=
 # Warn when an SSD has this percentage of its rated life left, or less.
 SSD_LIFE_WARNING=10
 
+# Container management through Portainer (/container). The address must
+# be reachable from inside the bot's container. Create the key under
+# My account > Access tokens in Portainer.
+PORTAINER_URL=
+PORTAINER_API_KEY=
+PORTAINER_ENDPOINT_ID=
+# Comma separated Discord user IDs. Empty means nobody.
+PORTAINER_ALLOWED_USER_IDS=
+# Comma separated container names that cannot be stopped, restarted,
+# killed or removed from Discord.
+PORTAINER_PROTECTED=
+# false for a self-signed certificate.
+PORTAINER_VERIFY_TLS=true
+
 # Used only by scripts/watchdog.sh on the server.
 WATCHDOG_WEBHOOK_URL=
 
@@ -562,7 +600,7 @@ The same output is kept in `data/logs/aegis.log`.
 bot.py                 Entry point: loads commands, starts monitors
 commands/              One file per slash command
 commands/torrent/      The /torrent group, its views and the Jellyfin download
-services/              Clients for qBittorrent, Jackett, Jellyfin, GPTWOL, Redfish data
+services/              Clients for qBittorrent, Jackett, Jellyfin, GPTWOL, Portainer, Redfish data
 monitors/              Background checks and their persisted state
 models/                Small data classes returned by services
 redfish/               HTTP client for the iDRAC Redfish API

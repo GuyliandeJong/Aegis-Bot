@@ -12,7 +12,9 @@
 #                           (required; this project is always included)
 #   BACKUP_EXCLUDE          extra patterns to skip, separated by spaces
 #   BACKUP_STOP_CONTAINERS  containers stopped while packing, separated
-#                           by spaces; only those running are restarted
+#                           by spaces; only those running are restarted,
+#                           in reverse order (list an app before its
+#                           database)
 #   BACKUP_LOCAL_DIR        where archives are kept (/var/backups/aegis-bot)
 #   BACKUP_KEEP_LOCAL       archives kept locally (4)
 #   BACKUP_REMOTE           rclone destination, e.g. proton:Backups/home
@@ -84,9 +86,13 @@ write_status() {
 }
 
 start_stopped() {
-    for container in "${STOPPED[@]}"; do
-        docker start "$container" > /dev/null 2>&1 \
-            || send "Backup: could not start $container again. Start it by hand."
+    # Reverse order: list an app before its database in
+    # BACKUP_STOP_CONTAINERS, and the database is started first.
+    local index
+
+    for (( index=${#STOPPED[@]}-1; index>=0; index-- )); do
+        docker start "${STOPPED[$index]}" > /dev/null 2>&1 \
+            || send "Backup: could not start ${STOPPED[$index]} again. Start it by hand."
     done
     STOPPED=()
 }
@@ -119,13 +125,23 @@ chmod 700 "$LOCAL_DIR"
 
 # Everything to pack, as paths relative to /, so a restore can be
 # unpacked with: tar -xzf <archive> -C /
-SOURCES=("${PROJECT#/}")
+SOURCES=()
+PROJECT_COVERED=false
 
 for path in $PATHS; do
     path="${path%/}"
     [ -e "$path" ] || fail "$path does not exist"
     SOURCES+=("${path#/}")
+
+    # A listed folder that contains this project already includes it.
+    case "$PROJECT/" in
+        "$path"/*) PROJECT_COVERED=true ;;
+    esac
 done
+
+if [ "$PROJECT_COVERED" = false ]; then
+    SOURCES+=("${PROJECT#/}")
+fi
 
 EXCLUDE_ARGS=()
 for pattern in "${EXCLUDES[@]}" $EXTRA_EXCLUDE; do

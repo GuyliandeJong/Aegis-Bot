@@ -88,6 +88,7 @@ print("  plex: kept databases:", any("Plug-in Support/Databases/file.bin" in n f
 print("  archive mode:", oct(archive.stat().st_mode & 0o777), "| local dir mode:", oct(LOCAL.stat().st_mode & 0o777))
 docker = [l for l in CALLS.read_text().splitlines() if l.startswith("docker stop") or l.startswith("docker start")]
 print("  docker:", docker)
+print("  project packed once:", sum(1 for n in names if n == rel(PROJECT / ".env")) == 1)
 print("  remote:", sorted(p.name for p in REMOTE.iterdir()) == [archive.name], "| size in status:", status["size"] == archive.stat().st_size)
 
 print("\n== retention ==")
@@ -114,6 +115,10 @@ settings()
 run("no paths set")
 settings(BACKUP_PATHS=f"{APPS}/jellyfin")
 run("no upload configured")
+settings(BACKUP_PATHS=f"{ROOT}")
+run("parent folder listed")
+names = tarfile.open(sorted(LOCAL.glob("aegis-backup-*.tar.gz"), key=os.path.getmtime)[-1]).getnames()
+print("  project packed once inside the parent:", names.count(rel(PROJECT / ".env")) == 1)
 
 print("\n== weekly summary line ==")
 m = types.ModuleType("utils.logger"); m.logger = types.SimpleNamespace(warning=print, error=print, info=print); sys.modules["utils.logger"] = m

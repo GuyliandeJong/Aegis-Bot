@@ -297,6 +297,58 @@ ESXI_DATASTORE_CRITICAL=95
 ESXI_IGNORE_VMS=
 ```
 
+### Backup
+
+`scripts/backup.sh` runs on the server from root's cron. It packs this
+project (including `.env` and `data/`) and the folders in
+`BACKUP_PATHS` into one `.tar.gz`, skipping caches, transcodes, logs,
+`MediaCover` and `metadata` folders. Containers in
+`BACKUP_STOP_CONTAINERS` are stopped while it packs, so their databases
+are copied consistently, and started again afterwards, also when
+something fails. The last `BACKUP_KEEP_LOCAL` archives stay in
+`BACKUP_LOCAL_DIR` (root only, because they contain passwords); the
+newest is uploaded with rclone to `BACKUP_REMOTE`, where the last
+`BACKUP_KEEP_REMOTE` are kept. The result goes to the watchdog's
+webhook and into the weekly summary. If only the upload fails, the
+local archive is kept.
+
+Setup on the server:
+
+1. rclone with its Proton Drive backend, configured as root (cron runs
+   as root). The backend is an unofficial beta. Check that the
+   installed rclone has it with `rclone help backends`; distribution
+   packages can be too old, in which case install the current release
+   from rclone.org.
+2. `sudo rclone config`: new remote, name `proton`, storage
+   `protondrive`, then your Proton username, password and, if used,
+   the 2FA code.
+3. The settings in `.env`, then a test run:
+   `sudo bash scripts/backup.sh`
+4. Cron, `sudo crontab -e`:
+
+   ```text
+   0 4 * * 0 bash /path/to/Aegis-Bot/scripts/backup.sh
+   ```
+
+```text
+# Folders to back up, separated by spaces. This project is always included.
+BACKUP_PATHS=
+# Extra patterns to skip, separated by spaces, e.g. */Downloads/*
+BACKUP_EXCLUDE=
+# Containers stopped while the archive is made, separated by spaces.
+BACKUP_STOP_CONTAINERS=
+# Local archives: where, and how many to keep.
+BACKUP_LOCAL_DIR=/var/backups/aegis-bot
+BACKUP_KEEP_LOCAL=4
+# rclone destination; empty keeps backups locally only.
+BACKUP_REMOTE=proton:Backups/home
+BACKUP_KEEP_REMOTE=8
+```
+
+To restore, unpack an archive at the root; it holds full paths:
+`sudo tar -xzf aegis-backup-<date>.tar.gz -C /`, or add a folder name
+at the end to restore only that.
+
 ### When the bot itself is down
 
 No monitor can report that the bot has stopped. `scripts/watchdog.sh`
@@ -495,6 +547,7 @@ utils/                 Logging, embeds, formatting, theme
 config/                Settings template and torrent ranking preferences
 scripts/rebuild.sh     Restart the container and show its startup log
 scripts/watchdog.sh    Cron job: alert through a webhook when the bot is down
+scripts/backup.sh      Cron job: back up configs and upload them to Proton Drive
 scripts/redfish_power_check.py  Show what iDRAC reports about power supplies
 scripts/redfish_explore.py      List every power-related value on iDRAC's Redfish pages
 tests/                 Checks that run the bot's code against local stand-ins

@@ -159,6 +159,22 @@ EXPECTED = {
     "check_series_flow.py": [
         "result   : Jellyfin download complete",
     ],
+    "check_backup.py": [
+        "run 1: exit=0 ok=True uploaded=True error=''",
+        "contains .env: True | jellyfin config: True | sonarr db: True",
+        "skipped cache/MediaCover/logs: True",
+        "archive mode: 0o600 | local dir mode: 0o700",
+        "docker: ['docker stop jellyfin', 'docker stop sonarr', 'docker start jellyfin', 'docker start sonarr']",
+        "remote: True | size in status: True",
+        "local kept: 2 | remote kept: ['2026-01-03', '2026-01-04',",
+        "archive kept locally after a failed upload: True | size recorded: True",
+        "container will not stop: exit=1 ok=False uploaded=False error='could not stop broken'",
+        "no paths set: exit=1 ok=False uploaded=False error='BACKUP_PATHS is not set in .env'",
+        "no upload configured: exit=0 ok=True uploaded=False error=''",
+        "KiB, uploaded to proton:Backups.",
+        "failed       : upload to proton:Backups failed",
+        "never run    : No backup has run yet.",
+    ],
     "check_discord_http.py": [
         "callback task: FINISHED",
         '"edit_original", ["Download from Jellyfin"]',

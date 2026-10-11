@@ -29,6 +29,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_wol_permissions.py` | `/wol`, and who may delete files | Fake Discord objects |
 | `check_download.py` | Downloading a file: success, refusal, cut-off, no space, retry, a second download queued | Fake HTTP, real temp files |
 | `check_series_flow.py` | Season picker to files on disk | Real discord.py and aiohttp, local fake Jellyfin |
+| `check_backup.py` | `scripts/backup.sh`: archive contents and excludes, stopping and restarting containers, local and remote retention, failures, the status file; the summary's Backup line | Fake `docker`, `rclone` and `curl`, real `tar` on temporary folders |
 | `check_discord_http.py` | The download button through discord.py's request code | Local fake Discord API |
 | `check_seasons_subtitles.py` | Missing seasons and episodes, reusing an existing season folder, subtitle reporting, separate subtitle files | Two local fake Jellyfin servers |
 | `check_esxi.py` | ESXi over the vSphere SOAP API: login, datastores, VMs, logout; datastore and VM alerts; host not reachable | Local fake ESXi `/sdk` |

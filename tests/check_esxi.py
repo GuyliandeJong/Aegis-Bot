@@ -12,6 +12,10 @@ m = types.ModuleType("utils.logger"); m.logger = logging.getLogger("aegis"); sys
 c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(ALERT_COOLDOWN=0); sys.modules["config.settings"] = c
 PORT = 18114
 os.environ.update({"ESXI_HOST": f"127.0.0.1:{PORT}", "ESXI_USERNAME": "monitor", "ESXI_PASSWORD": "p<&>w", "ESXI_IGNORE_VMS": "Scratch"})
+# Inside the bot's container the real .env is loaded; the levels from
+# there must not change what this check expects (85 / 95).
+for name in ("ESXI_DATASTORE_WARNING", "ESXI_DATASTORE_CRITICAL"):
+    os.environ.pop(name, None)
 
 import services.esxi_service as ES
 import monitors.esxi_monitor as EM

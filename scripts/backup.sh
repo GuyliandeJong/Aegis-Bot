@@ -199,7 +199,19 @@ if [ "$PROJECT_COVERED" = false ]; then
 fi
 
 EXCLUDE_ARGS=()
-for pattern in "${EXCLUDES[@]}" $EXTRA_EXCLUDE; do
+# Split without expanding wildcards against the current folder.
+read -ra EXTRA <<< "$EXTRA_EXCLUDE"
+
+# A full path that does not exist excludes nothing; tar would not say
+# so and the folder would silently end up in the archive.
+for pattern in "${EXTRA[@]}"; do
+    case "$pattern" in
+        /*[*?[]*) ;;
+        /*) [ -e "$pattern" ] || fail "BACKUP_EXCLUDE: $pattern does not exist" ;;
+    esac
+done
+
+for pattern in "${EXCLUDES[@]}" "${EXTRA[@]}"; do
     # Archive entries have no leading /, so a full path from .env
     # only matches without it.
     EXCLUDE_ARGS+=("--exclude=${pattern#/}")

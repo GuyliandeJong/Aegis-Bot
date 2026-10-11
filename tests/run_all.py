@@ -178,6 +178,8 @@ EXPECTED = {
         "second run while one is busy: 1 Backup skipped: another backup is still running. | status untouched: True",
         "drafts replaced: true",
         "container will not stop: exit=1 ok=False uploaded=False error='could not stop broken'",
+        "exclude path missing: exit=1 ok=False uploaded=False error='BACKUP_EXCLUDE: /path/from/docker-inspect/for/ente-minio does not exist'",
+        "sonarr left out: True | pattern applied: True | jellyfin kept: True",
         "no paths set: exit=1 ok=False uploaded=False error='BACKUP_PATHS is not set in .env'",
         "no upload configured: exit=0 ok=True uploaded=False error=''",
         "KiB, uploaded to proton:Backups.",

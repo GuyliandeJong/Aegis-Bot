@@ -146,6 +146,7 @@ class WeeklySummaryMonitor(BaseMonitor):
             ("✅ Torrents completed", await self._torrents(since), False),
             ("📥 Copied from Jellyfin", self._copies(since), False),
             ("🌐 Internet", self._outages(since), False),
+            ("🗄️ Backup", self._backup(since), False),
             ("🔔 Alerts", self._alerts(since), False),
         ]
 
@@ -299,6 +300,37 @@ class WeeklySummaryMonitor(BaseMonitor):
 
             if chunk:
                 await target.send(chunk)
+
+    # Written by scripts/backup.sh, which runs on the server from cron.
+    BACKUP_STATUS = Path("/app/data/backup_status.json")
+
+    @classmethod
+    def _backup(cls, since: float) -> str:
+        try:
+            status = json.loads(cls.BACKUP_STATUS.read_text())
+        except FileNotFoundError:
+            return "No backup has run yet."
+        except Exception as ex:
+            logger.warning("[WeeklySummary] Backup status unreadable: %s", ex)
+            return "Backup status unreadable."
+
+        when = int(status.get("time") or 0)
+
+        if when < since:
+            return f"No backup this week; the last one ran <t:{when}:D>."
+
+        if not status.get("ok"):
+            return f"Failed <t:{when}:f>: {status.get('error') or 'unknown error'}"
+
+        where = (
+            f"uploaded to {status.get('remote')}"
+            if status.get("uploaded")
+            else "kept locally only"
+        )
+
+        return (
+            f"<t:{when}:f>: {format_bytes(status.get('size'))}, {where}."
+        )
 
     @staticmethod
     def _outages(since: float) -> str:

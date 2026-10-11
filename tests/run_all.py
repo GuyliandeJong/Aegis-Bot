@@ -171,6 +171,8 @@ EXPECTED = {
         "remote: True | size in status: True",
         "local kept: 2 | remote kept: ['2026-01-03', '2026-01-04',",
         "archive kept locally after a failed upload: True | size recorded: True",
+        "first error shown: True",
+        "drafts replaced: true",
         "container will not stop: exit=1 ok=False uploaded=False error='could not stop broken'",
         "no paths set: exit=1 ok=False uploaded=False error='BACKUP_PATHS is not set in .env'",
         "no upload configured: exit=0 ok=True uploaded=False error=''",

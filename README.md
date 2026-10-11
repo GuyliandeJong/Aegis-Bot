@@ -310,7 +310,9 @@ something fails. The last `BACKUP_KEEP_LOCAL` archives stay in
 newest is uploaded with rclone to `BACKUP_REMOTE`, where the last
 `BACKUP_KEEP_REMOTE` are kept. The result goes to the watchdog's
 webhook and into the weekly summary. If only the upload fails, the
-local archive is kept.
+local archive is kept; the message shows rclone's first error, and the
+full output of the last run is in `<BACKUP_LOCAL_DIR>/rclone.log`.
+Drafts left on Proton Drive by an interrupted upload are replaced.
 
 Folders in `BACKUP_SYNC_PATHS` (large ones that change little, such as
 game worlds) are left out of the archive and mirrored instead: while

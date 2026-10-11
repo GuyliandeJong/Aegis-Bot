@@ -44,6 +44,10 @@ umask 077
 PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATUS="$PROJECT/data/backup_status.json"
 
+# Proton Drive: an upload that fails halfway leaves a draft, and every
+# retry of the same file then fails with "a draft exist". Replace it.
+export RCLONE_PROTONDRIVE_REPLACE_EXISTING_DRAFT=true
+
 env_value() {
     # One value from .env; quotes and Windows line ends removed.
     grep -E "^$1=" "$PROJECT/.env" 2>/dev/null | tail -n 1 \
@@ -84,6 +88,8 @@ STARTED="$(date +%s)"
 STAMP="$(date +%Y-%m-%d_%H%M)"
 NAME="aegis-backup-$STAMP.tar.gz"
 ARCHIVE="$LOCAL_DIR/$NAME"
+# rclone's messages from the last run, kept for troubleshooting.
+RCLONE_LOG="$LOCAL_DIR/rclone.log"
 STOPPED=()
 SYNCS=()
 CHANGED=0
@@ -92,6 +98,16 @@ UPLOADED=false
 # Set once the archive is complete; a later failure (the upload) then
 # keeps it locally instead of deleting it.
 ARCHIVE_DONE=false
+
+rclone_error() {
+    # The first error rclone logged (the cause; later ones are usually
+    # retries), without the date, as plain text for the webhook.
+    local line
+    line="$(grep -m 1 -E 'ERROR|CRITICAL|Failed' "$RCLONE_LOG" 2>/dev/null)"
+    [ -n "$line" ] || line="$(tail -n 1 "$RCLONE_LOG" 2>/dev/null)"
+    printf '%s' "$line" | sed -E 's/^[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9:]{8} //' \
+        | head -c 200 | tr '\n"\\' '   '
+}
 
 send() {
     [ -n "$WEBHOOK" ] || return 0
@@ -233,9 +249,8 @@ if [ -n "$REMOTE" ]; then
     command -v rclone > /dev/null || fail "rclone is not installed"
 
     rclone copy "$ARCHIVE" "$REMOTE" --retries 3 --low-level-retries 10 \
-        2> "$LOCAL_DIR/rclone.errors" \
-        || fail "upload to $REMOTE failed: $(tail -c 150 "$LOCAL_DIR/rclone.errors" | tr '\n"\\' '   ')"
-    rm -f "$LOCAL_DIR/rclone.errors"
+        2> "$RCLONE_LOG" \
+        || fail "upload to $REMOTE failed: $(rclone_error) (full log: $RCLONE_LOG)"
     UPLOADED=true
 
     # Keep the newest archives in the destination; names sort by date.
@@ -252,10 +267,9 @@ if [ -n "$REMOTE" ]; then
     for rel in "${SYNCS[@]}"; do
         rclone sync "$MIRROR_DIR/$rel" "$REMOTE/mirror/current/$rel" --links --checksum \
             --backup-dir "$REMOTE/mirror/previous/$STAMP/$rel" \
-            --retries 3 --low-level-retries 10 2> "$LOCAL_DIR/rclone.errors" \
-            || fail "mirror upload of /$rel failed: $(tail -c 150 "$LOCAL_DIR/rclone.errors" | tr '\n"\\' '   ')"
+            --retries 3 --low-level-retries 10 2>> "$RCLONE_LOG" \
+            || fail "mirror upload of /$rel failed: $(rclone_error) (full log: $RCLONE_LOG)"
     done
-    rm -f "$LOCAL_DIR/rclone.errors"
 
     rclone lsf "$REMOTE/mirror/previous" --dirs-only 2>/dev/null \
         | sort | head -n -"$KEEP_REMOTE" \

@@ -59,7 +59,11 @@ def skipped(rel):
         if "/" not in x and fnmatch.fnmatch(rel.rsplit("/", 1)[-1], x): return True
     return False
 if cmd == "copy":
-    if (ROOT / "remote_down").exists(): sys.exit("couldn't connect")
+    if (ROOT / "remote_down").exists():
+        # The cause first, then the retries that trip over the draft it left.
+        sys.exit("2026/10/11 04:00:01 ERROR : big.tar.gz: Failed to copy: couldn't connect\\n"
+                 "2026/10/11 04:00:09 ERROR : big.tar.gz: Failed to copy: a draft exist")
+    (ROOT / "draft_env").write_text(os.environ.get("RCLONE_PROTONDRIVE_REPLACE_EXISTING_DRAFT", ""))
     where(args[2]).mkdir(parents=True, exist_ok=True); shutil.copy(args[1], where(args[2]))
 elif cmd == "lsf":
     d = where(args[1])
@@ -144,6 +148,8 @@ print("\n== failures ==")
 (ROOT / "remote_down").write_text("")
 st = run("upload fails")
 print("  archive kept locally after a failed upload:", (LOCAL / st["archive"]).exists(), "| size recorded:", st["size"] > 0)
+print("  first error shown:", st["error"].startswith("upload to proton:Backups failed: ERROR : big.tar.gz: Failed to copy: couldn't connect (full log:"))
+print("  drafts replaced:", (ROOT / "draft_env").read_text())
 os.remove(ROOT / "remote_down")
 RUNNING.write_text("broken\n")
 settings(BACKUP_PATHS=f"{APPS}/jellyfin", BACKUP_STOP_CONTAINERS="broken", BACKUP_REMOTE="")

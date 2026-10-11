@@ -26,6 +26,10 @@ shutil.copy(HERE.parent / "scripts" / "backup.sh", PROJECT / "scripts")
 (APPS / "sonarr" / "sonarr.db").write_text("db")
 (APPS / "sonarr" / "MediaCover" / "poster.jpg").write_bytes(b"0" * 50_000)
 (APPS / "sonarr" / "logs" / "sonarr.txt").write_text("log")
+plex = APPS / "plex" / "Library" / "Application Support" / "Plex Media Server"
+for sub in ("Cache", "Metadata", "Media/localhost", "Logs", "Plug-in Support/Databases"):
+    (plex / sub).mkdir(parents=True)
+    (plex / sub / "file.bin").write_text("x")
 
 CALLS = ROOT / "calls.txt"
 RUNNING = ROOT / "running"
@@ -67,7 +71,7 @@ def run(label):
     return status
 
 
-settings(BACKUP_PATHS=f"{APPS}/jellyfin {APPS}/sonarr/", BACKUP_STOP_CONTAINERS="jellyfin sonarr stopped-app",
+settings(BACKUP_PATHS=f"{APPS}/jellyfin {APPS}/sonarr/ '{APPS}/plex'", BACKUP_STOP_CONTAINERS="jellyfin sonarr stopped-app",
          BACKUP_REMOTE="proton:Backups", BACKUP_KEEP_LOCAL="2", BACKUP_KEEP_REMOTE="3")
 RUNNING.write_text("jellyfin\nsonarr\n")
 
@@ -79,6 +83,8 @@ rel = lambda p: str(p).lstrip("/")
 print("  contains .env:", rel(PROJECT / ".env") in names, "| jellyfin config:", rel(APPS / "jellyfin/config/system.xml") in names,
       "| sonarr db:", rel(APPS / "sonarr/sonarr.db") in names)
 print("  skipped cache/MediaCover/logs:", not any(x in n for n in names for x in ("/cache/", "/MediaCover/", "/logs/")))
+print("  plex: kept databases:", any("Plug-in Support/Databases/file.bin" in n for n in names),
+      "| skipped Cache/Metadata/Media/Logs:", not any(f"Plex Media Server/{x}/" in n for n in names for x in ("Cache", "Metadata", "Media", "Logs")))
 print("  archive mode:", oct(archive.stat().st_mode & 0o777), "| local dir mode:", oct(LOCAL.stat().st_mode & 0o777))
 docker = [l for l in CALLS.read_text().splitlines() if l.startswith("docker stop") or l.startswith("docker start")]
 print("  docker:", docker)

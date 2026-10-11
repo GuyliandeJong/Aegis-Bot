@@ -163,6 +163,7 @@ EXPECTED = {
         "run 1: exit=0 ok=True uploaded=True error=''",
         "contains .env: True | jellyfin config: True | sonarr db: True",
         "skipped cache/MediaCover/logs: True",
+        "plex: kept databases: True | skipped Cache/Metadata/Media/Logs: True",
         "archive mode: 0o600 | local dir mode: 0o700",
         "docker: ['docker stop jellyfin', 'docker stop sonarr', 'docker start jellyfin', 'docker start sonarr']",
         "remote: True | size in status: True",

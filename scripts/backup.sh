@@ -51,8 +51,11 @@ WEBHOOK="$(env_value WATCHDOG_WEBHOOK_URL)"
 # Large or throwaway content that is rebuilt by the apps themselves.
 EXCLUDES=(
     "*/cache/*" "*/Cache/*" "*/.cache/*" "*/transcodes/*" "*/Transcodes/*"
-    "*/logs/*" "*/log/*" "*.log" "*.log.*" "*/MediaCover/*" "*/metadata/*"
+    "*/logs/*" "*/Logs/*" "*/log/*" "*.log" "*.log.*" "*/crash-reports/*"
+    "*/MediaCover/*" "*/metadata/*" "*/Metadata/*"
     "*/Backups/*" "*/backups/*" "*/__pycache__/*" "*.part"
+    # Plex: generated thumbnails and crash dumps.
+    "*/Plex Media Server/Media/*" "*/Crash Reports/*"
 )
 
 STARTED="$(date +%s)"

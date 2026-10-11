@@ -25,6 +25,7 @@ the consequence.
 """
 
 import math
+import re
 from datetime import datetime, timezone
 
 import discord
@@ -279,13 +280,102 @@ async def _authorize(interaction: discord.Interaction) -> bool:
 # ----------------------------------------------------------------
 
 
+_UNITS = {
+    "second": "s", "minute": "m", "hour": "h", "day": "d",
+    "week": "w", "month": "mo", "year": "y",
+}
+
+
+def _short_age(text: str) -> str:
+    """Docker's "2 hours", "About a minute", "Less than a second" as 2h, 1m, <1s."""
+    text = text.strip().lower()
+
+    if text.startswith("less than"):
+        return "<1s"
+
+    match = re.match(r"(about )?(an?|\d+) (second|minute|hour|day|week|month|year)s?", text)
+
+    if not match:
+        return text
+
+    amount = "1" if match.group(2) in ("a", "an") else match.group(2)
+    return f"{amount}{_UNITS[match.group(3)]}"
+
+
+def _list_group(container: dict) -> str:
+    """attention, running or stopped."""
+    state = container["state"]
+
+    if state == "running":
+        return "attention" if container["health"] == "unhealthy" else "running"
+
+    if state in ("restarting", "dead", "paused"):
+        return "attention"
+
+    if state == "exited" and container["exit_code"] not in CALM_EXIT_CODES | {None}:
+        return "attention"
+
+    return "stopped"
+
+
+def _list_line(container: dict) -> str:
+    """One container: dot, name, and only what the dot does not say."""
+    dot, _, _ = _state_style(container)
+    name = f"**{_name(container['name'])}**"
+    status = container["status"]
+    state = container["state"]
+    details = []
+
+    if state == "running":
+        if container["health"] in ("unhealthy", "starting"):
+            details.append(container["health"])
+
+        up = re.match(r"Up (.+?)(?: \(|$)", status)
+
+        if up:
+            details.append(f"up {_short_age(up.group(1))}")
+
+    elif state == "exited":
+        # A clean or requested stop needs no exit code; a crash does.
+        code = container["exit_code"]
+        details.append(
+            "stopped" if code in CALM_EXIT_CODES or code is None
+            else f"exited ({code})"
+        )
+        ago = re.search(r"\) (.+) ago$", status)
+
+        if ago:
+            details.append(f"{_short_age(ago.group(1))} ago")
+
+    elif state == "created":
+        details.append("created, never started")
+
+    else:
+        details.append(state or "unknown")
+
+    return f"{dot} {name} — {' · '.join(details)}" if details else f"{dot} {name}"
+
+
+LIST_GROUPS = (
+    ("attention", "⚠️ Needs attention"),
+    ("running", "Running"),
+    ("stopped", "Not running"),
+)
+
+
 def _list_embed(
     interaction: discord.Interaction,
     containers: list[dict],
     show: str,
     page: int,
 ) -> tuple[discord.Embed, int, int]:
-    """The list embed for one page. Returns (embed, page, total_pages)."""
+    """
+    The list embed for one page. Returns (embed, page, total_pages).
+
+    Containers are grouped: problems first (unhealthy, crashed,
+    restarting), then running, then stopped on purpose. Each group
+    header shows its full count, also when it continues on a page.
+    """
     if show == "running":
         shown = [c for c in containers if c["state"] == "running"]
     elif show == "stopped":
@@ -293,8 +383,9 @@ def _list_embed(
     else:
         shown = list(containers)
 
-    # Running first, then by name.
-    shown.sort(key=lambda c: (c["state"] != "running", c["name"].lower()))
+    order = [key for key, _ in LIST_GROUPS]
+    shown.sort(key=lambda c: (order.index(_list_group(c)), c["name"].lower()))
+    counts = {key: sum(1 for c in shown if _list_group(c) == key) for key in order}
 
     total_pages = max(1, math.ceil(len(shown) / PAGE_SIZE))
     page = max(0, min(page, total_pages - 1))
@@ -307,20 +398,30 @@ def _list_embed(
     )
 
     if chunk:
-        lines = []
+        sections = []
+        current = None
 
         for container in chunk:
-            dot, label, _ = _state_style(container)
-            lines.append(f"{dot} **{_name(container['name'])}** — {label}")
+            group = _list_group(container)
 
-        body = "\n".join(lines)
+            if group != current:
+                current = group
+                label = dict(LIST_GROUPS)[group]
+                sections.append([f"**{label} ({counts[group]})**"])
+
+            sections[-1].append(_list_line(container))
+
+        body = "\n\n".join("\n".join(lines) for lines in sections)
     else:
         body = "No containers match this filter."
+
+    color = theme.WARNING_COLOR if counts["attention"] else theme.PRIMARY_COLOR
 
     embed = create_embed(
         interaction=interaction,
         title=_title("Containers"),
         description=f"{header}\n\n{body}",
+        color=color,
     )
     embed.set_footer(
         text=(

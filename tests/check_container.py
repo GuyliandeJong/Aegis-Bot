@@ -27,6 +27,9 @@ CONTAINERS = {
     "aegis-bot": ["abcdef123456" + "0" * 52, "aegis-bot", "running", "Up 1 hour"],
     "portainer": ["p" * 64, "portainer/portainer-ce:2.21", "running", "Up 5 days"],
     "old-app": ["o" * 64, "busybox", "exited", "Exited (1) 2 days ago"],
+    "radarr": ["r" * 64, "linuxserver/radarr", "running", "Up About a minute (unhealthy)"],
+    "minecraft": ["m" * 64, "itzg/minecraft-server", "exited", "Exited (143) 4 hours ago"],
+    "scratch": ["c" * 64, "busybox", "created", "Created"],
 }
 REQUESTS = []
 
@@ -129,6 +132,10 @@ async def main():
         print("  title:", i.embed.title, "| private:", i.shown[0][4], "| view message set:", i.view.message is not None)
         print("  api key header sent:", all(r[3] == "key-123" for r in REQUESTS), "| all=1:", REQUESTS[-1][2].get("all"))
         print("  is an ExpiringView:", isinstance(i.view, C.ExpiringView))
+        for line in i.embed.description.split("\n"):
+            print("  |", line)
+        print("  color warns about problems:", getattr(i.embed.color, "value", i.embed.color) == C.theme.WARNING_COLOR)
+        print("  short ages:", [C._short_age(t) for t in ("Less than a second", "About an hour", "5 weeks", "3 months", "2 years")])
 
         print("\n== info ==")
         i = Interaction(); await cog.info.callback(cog, i, "sonarr")

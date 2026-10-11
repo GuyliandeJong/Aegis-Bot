@@ -1,4 +1,4 @@
-"""scripts/backup.sh with fake docker, rclone and curl: archive contents, excludes, stopped containers, local and remote retention, failures, status file; and the summary's Backup line."""
+"""scripts/backup.sh with fake docker, rclone and curl: archive contents, excludes, stopped containers, local and remote retention, failures, status file, mirrored folders that only upload changes; and the summary's Backup line."""
 import json
 import os
 import shutil
@@ -38,15 +38,54 @@ FAKES = {
     "docker": f'''echo "docker $*" >> "{CALLS}"
 if [ "$1" = inspect ]; then grep -qx "${{@: -1}}" "{RUNNING}" && echo true || echo false; fi
 if [ "$1" = stop ] && [ "$2" = broken ]; then exit 1; fi''',
-    # rclone: copy/lsf/deletefile against a local folder standing in for Proton Drive.
+    # rclone: a local folder stands in for Proton Drive (proton:Backups).
     "rclone": f'''echo "rclone $*" >> "{CALLS}"
-case "$1" in
-  copy) [ -f "{ROOT}/remote_down" ] && {{ echo "couldn't connect" >&2; exit 1; }}; cp "$2" "{REMOTE}/" ;;
-  lsf) ls -1 "{REMOTE}" ;;
-  deletefile) rm -f "{REMOTE}/${{2##*/}}" ;;
-esac''',
+exec python3 "{BIN}/fake_rclone.py" "$@"''',
     "curl": f'''for a in "$@"; do last="$a"; done; printf '%s\\n' "$7" >> "{ROOT}/webhook.txt"''',
 }
+(BIN / "fake_rclone.py").write_text(f'''
+import fnmatch, os, shutil, sys
+from pathlib import Path
+REMOTE, ROOT = Path({str(REMOTE)!r}), Path({str(ROOT)!r})
+where = lambda p: Path(p.replace("proton:Backups", str(REMOTE), 1))
+args = [a for a in sys.argv[1:] if a.startswith("--") is False]
+opts = dict(a[2:].split("=", 1) for a in sys.argv[1:] if a.startswith("--") and "=" in a)
+excludes = [a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--exclude=")]
+if "--backup-dir" in sys.argv: opts["backup-dir"] = sys.argv[sys.argv.index("--backup-dir") + 1]; args.remove(opts["backup-dir"])
+cmd = args[0]
+def skipped(rel):
+    for x in excludes:
+        if x.endswith("/**") and x[:-3] in rel.split("/")[:-1]: return True
+        if "/" not in x and fnmatch.fnmatch(rel.rsplit("/", 1)[-1], x): return True
+    return False
+if cmd == "copy":
+    if (ROOT / "remote_down").exists(): sys.exit("couldn't connect")
+    where(args[2]).mkdir(parents=True, exist_ok=True); shutil.copy(args[1], where(args[2]))
+elif cmd == "lsf":
+    d = where(args[1])
+    if d.is_dir():
+        for p in sorted(d.iterdir()):
+            if "--dirs-only" in sys.argv and p.is_dir(): print(p.name + "/")
+            if "--files-only" in sys.argv and p.is_file(): print(p.name)
+elif cmd == "deletefile": where(args[1]).unlink(missing_ok=True)
+elif cmd == "purge": shutil.rmtree(where(args[1]))
+elif cmd == "sync":
+    if (ROOT / "mirror_down").exists() and "proton:" in args[2]: sys.exit("connection reset")
+    src, dst = where(args[1]), where(args[2]); dst.mkdir(parents=True, exist_ok=True)
+    old = where(opts["backup-dir"]) if "backup-dir" in opts else None
+    want = {{str(p.relative_to(src)) for p in src.rglob("*") if p.is_file() and not skipped(str(p.relative_to(src)))}}
+    have = {{str(p.relative_to(dst)) for p in dst.rglob("*") if p.is_file()}}
+    def keep(rel):
+        if old: (old / rel).parent.mkdir(parents=True, exist_ok=True); shutil.move(dst / rel, old / rel)
+        else: (dst / rel).unlink()
+    for rel in sorted(want):
+        if rel in have and (dst / rel).read_bytes() == (src / rel).read_bytes(): continue
+        if rel in have: keep(rel)
+        (dst / rel).parent.mkdir(parents=True, exist_ok=True); shutil.copy2(src / rel, dst / rel)
+        print(f"INFO  : {{rel}}: Copied ({{'replaced existing' if rel in have else 'new'}})", file=sys.stderr)
+    for rel in sorted(have - want):
+        keep(rel); print(f"INFO  : {{rel}}: Deleted", file=sys.stderr)
+''')
 for name, body in FAKES.items():
     path = BIN / name
     path.write_text("#!/bin/bash\n" + body + "\n")
@@ -120,6 +159,49 @@ run("parent folder listed")
 names = tarfile.open(sorted(LOCAL.glob("aegis-backup-*.tar.gz"), key=os.path.getmtime)[-1]).getnames()
 print("  project packed once inside the parent:", names.count(rel(PROJECT / ".env")) == 1)
 
+print("\n== mirrored folders ==")
+for name, files in {"minecraft-a": {"world/region/r.0.0.mca": "region v1", "server.properties": "motd=a", "logs/latest.log": "log"},
+                    "minecraft-b": {"world/level.dat": "level", "crash-reports/crash.txt": "boom"}}.items():
+    for sub, text in files.items():
+        (APPS / name / sub).parent.mkdir(parents=True, exist_ok=True); (APPS / name / sub).write_text(text)
+shutil.rmtree(REMOTE); REMOTE.mkdir()
+MC_A, MC_B = APPS / "minecraft-a", APPS / "minecraft-b"
+settings(BACKUP_PATHS=f"{APPS}", BACKUP_SYNC_PATHS=f"{MC_A} {MC_B}/", BACKUP_STOP_CONTAINERS="mc-a",
+         BACKUP_REMOTE="proton:Backups", BACKUP_KEEP_REMOTE="2")
+RUNNING.write_text("mc-a\n")
+st = run("mirror run 1")
+names = tarfile.open(LOCAL / st["archive"]).getnames()
+print("  worlds left out of the archive:", not any("minecraft-" in n for n in names), "| other apps still in:", rel(APPS / "sonarr/sonarr.db") in names)
+mirror, current = LOCAL / "mirror" / rel(MC_A), REMOTE / "mirror" / "current" / rel(MC_A)
+print("  local mirror:", sorted(str(p.relative_to(mirror)) for p in mirror.rglob("*") if p.is_file()))
+print("  uploaded:", sorted(str(p.relative_to(current)) for p in current.rglob("*") if p.is_file()),
+      "| crash report skipped:", not (REMOTE / "mirror" / "current" / rel(MC_B) / "crash-reports").exists())
+calls = [l.split()[:2] + (["local"] if "/mirror/current/" not in l and l.startswith("rclone sync") else []) for l in CALLS.read_text().splitlines()]
+order = [" ".join(c) for c in calls if c[0] == "docker" and c[1] in ("stop", "start") or c[:2] == ["rclone", "sync"]]
+print("  order:", order)
+print("  mirrored:", st["mirrored"], "| changed:", st["changed"])
+print("  webhook:", (ROOT / "webhook.txt").read_text().split("uploaded to proton:Backups.")[1].strip()[:45])
+st = run("mirror run 2, nothing changed")
+print("  changed:", st["changed"], "| previous versions:", (REMOTE / "mirror" / "previous").exists())
+(MC_A / "world/region/r.0.0.mca").write_text("region v2"); (MC_A / "server.properties").unlink()
+st = run("mirror run 3, one changed, one deleted")
+previous = next((REMOTE / "mirror" / "previous").iterdir()) / rel(MC_A)
+print("  changed:", st["changed"], "| current:", (current / "world/region/r.0.0.mca").read_text(), "| deleted from current:", not (current / "server.properties").exists())
+print("  kept in previous:", sorted(f"{p.relative_to(previous)}={p.read_text()}" for p in previous.rglob("*") if p.is_file()))
+for day in ("2026-01-01_0400", "2026-01-02_0400"):
+    (REMOTE / "mirror" / "previous" / day).mkdir()
+run("mirror run 4")
+print("  previous runs kept:", len(list((REMOTE / "mirror" / "previous").iterdir())), "| oldest removed:", not (REMOTE / "mirror" / "previous" / "2026-01-01_0400").exists())
+settings(BACKUP_PATHS=f"{APPS}/jellyfin", BACKUP_SYNC_PATHS=f"{APPS}/minecraft-gone")
+run("mirror folder missing")
+settings(BACKUP_PATHS=f"{APPS}/jellyfin", BACKUP_SYNC_PATHS=f"{MC_A}", BACKUP_REMOTE="proton:Backups")
+(ROOT / "mirror_down").write_text("")
+st = run("mirror upload fails")
+print("  archive still uploaded:", (REMOTE / st["archive"]).exists())
+os.remove(ROOT / "mirror_down")
+settings(BACKUP_PATHS=f"{APPS}/jellyfin", BACKUP_SYNC_PATHS=f"{MC_A}")
+run("mirror without upload")
+
 print("\n== weekly summary line ==")
 m = types.ModuleType("utils.logger"); m.logger = types.SimpleNamespace(warning=print, error=print, info=print); sys.modules["utils.logger"] = m
 c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(); sys.modules["config.settings"] = c
@@ -131,6 +213,9 @@ print("  locally only :", WS.WeeklySummaryMonitor._backup(now - 3600).split(": "
 st = json.loads(WS.WeeklySummaryMonitor.BACKUP_STATUS.read_text()); st.update(uploaded=True, remote="proton:Backups")
 WS.WeeklySummaryMonitor.BACKUP_STATUS.write_text(json.dumps(st))
 print("  uploaded     :", WS.WeeklySummaryMonitor._backup(now - 3600).split(": ", 1)[1])
+st.update(mirrored=7, changed=1); WS.WeeklySummaryMonitor.BACKUP_STATUS.write_text(json.dumps(st))
+print("  with mirrors :", WS.WeeklySummaryMonitor._backup(now - 3600).split(", ", 1)[1])
+st.update(mirrored=0)
 print("  older backup :", WS.WeeklySummaryMonitor._backup(now + 3600)[:35])
 st.update(ok=False, error="upload to proton:Backups failed"); WS.WeeklySummaryMonitor.BACKUP_STATUS.write_text(json.dumps(st))
 print("  failed       :", WS.WeeklySummaryMonitor._backup(now - 3600).split(": ", 1)[1])

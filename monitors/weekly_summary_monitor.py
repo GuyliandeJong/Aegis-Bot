@@ -328,9 +328,18 @@ class WeeklySummaryMonitor(BaseMonitor):
             else "kept locally only"
         )
 
-        return (
-            f"<t:{when}:f>: {format_bytes(status.get('size'))}, {where}."
-        )
+        line = f"<t:{when}:f>: {format_bytes(status.get('size'))}, {where}."
+
+        mirrored = int(status.get("mirrored") or 0)
+
+        if mirrored:
+            changed = int(status.get("changed") or 0)
+            line += (
+                f" Mirrored {mirrored} folder{'s' if mirrored != 1 else ''}, "
+                f"{changed} file{'s' if changed != 1 else ''} changed."
+            )
+
+        return line
 
     @staticmethod
     def _outages(since: float) -> str:

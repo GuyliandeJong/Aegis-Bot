@@ -312,6 +312,16 @@ newest is uploaded with rclone to `BACKUP_REMOTE`, where the last
 webhook and into the weekly summary. If only the upload fails, the
 local archive is kept.
 
+Folders in `BACKUP_SYNC_PATHS` (large ones that change little, such as
+game worlds) are left out of the archive and mirrored instead: while
+the containers are stopped they are copied to `BACKUP_MIRROR_DIR`
+(only changed files after the first run), then synced to
+`<BACKUP_REMOTE>/mirror/current`. The first run uploads everything,
+later runs only what changed, compared by checksum because Proton
+Drive cannot store modification times. Files a run replaces or deletes
+are moved to `<BACKUP_REMOTE>/mirror/previous/<date>`; the last
+`BACKUP_KEEP_REMOTE` of those runs are kept.
+
 Setup on the server:
 
 1. rclone with its Proton Drive backend, configured as root (cron runs
@@ -333,8 +343,12 @@ Setup on the server:
 ```text
 # Folders to back up, separated by spaces. This project is always included.
 BACKUP_PATHS=
-# Extra patterns to skip, separated by spaces, e.g. */Downloads/*
+# Extra patterns or full paths to skip, separated by spaces, e.g. */Downloads/*
 BACKUP_EXCLUDE=
+# Folders mirrored instead of packed: full upload once, then only changes.
+BACKUP_SYNC_PATHS=
+# Local copy of those folders; needs as much space as they use.
+BACKUP_MIRROR_DIR=/var/backups/aegis-bot/mirror
 # Containers stopped while the archive is made, separated by spaces.
 BACKUP_STOP_CONTAINERS=
 # Local archives: where, and how many to keep.
@@ -347,7 +361,9 @@ BACKUP_KEEP_REMOTE=8
 
 To restore, unpack an archive at the root; it holds full paths:
 `sudo tar -xzf aegis-backup-<date>.tar.gz -C /`, or add a folder name
-at the end to restore only that.
+at the end to restore only that. A mirrored folder comes back with
+`sudo rclone copy --links <BACKUP_REMOTE>/mirror/current/<path> /<path>`,
+or from the local mirror when the disk survived.
 
 ### When the bot itself is down
 

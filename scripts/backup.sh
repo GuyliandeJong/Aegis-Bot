@@ -168,6 +168,16 @@ fi
 mkdir -p "$LOCAL_DIR" || fail "cannot create $LOCAL_DIR"
 chmod 700 "$LOCAL_DIR"
 
+# One run at a time: a second run (cron while a manual one is still
+# uploading) would stop the containers again and upload alongside it.
+# It leaves the status file alone.
+exec 9> "$LOCAL_DIR/.lock"
+if ! flock -n 9; then
+    send "Backup skipped: another backup is still running."
+    echo "Backup skipped: another backup is still running." >&2
+    exit 1
+fi
+
 # Everything to pack, as paths relative to /, so a restore can be
 # unpacked with: tar -xzf <archive> -C /
 SOURCES=()

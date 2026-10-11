@@ -166,6 +166,11 @@ print("  archive kept locally after a failed upload:", (LOCAL / st["archive"]).e
 print("  first error shown:", st["error"].startswith("upload to proton:Backups failed: ERROR : big.tar.gz: Failed to copy: couldn't connect (full log:"))
 print("  drafts replaced:", (ROOT / "draft_env").read_text())
 os.remove(ROOT / "remote_down")
+before = (PROJECT / "data" / "backup_status.json").read_text()
+with open(LOCAL / ".lock", "w") as held:
+    import fcntl; fcntl.flock(held, fcntl.LOCK_EX)
+    second = subprocess.run(["bash", str(PROJECT / "scripts" / "backup.sh")], env=ENV, capture_output=True, text=True)
+print("  second run while one is busy:", second.returncode, second.stderr.strip(), "| status untouched:", (PROJECT / "data" / "backup_status.json").read_text() == before)
 RUNNING.write_text("broken\n")
 settings(BACKUP_PATHS=f"{APPS}/jellyfin", BACKUP_STOP_CONTAINERS="broken", BACKUP_REMOTE="")
 run("container will not stop")

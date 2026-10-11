@@ -175,6 +175,7 @@ EXPECTED = {
         "oldest single files removed: True",
         "archive kept locally after a failed upload: True | size recorded: True",
         "first error shown: True",
+        "second run while one is busy: 1 Backup skipped: another backup is still running. | status untouched: True",
         "drafts replaced: true",
         "container will not stop: exit=1 ok=False uploaded=False error='could not stop broken'",
         "no paths set: exit=1 ok=False uploaded=False error='BACKUP_PATHS is not set in .env'",

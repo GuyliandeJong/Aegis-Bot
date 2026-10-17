@@ -40,6 +40,17 @@ EXPECTED = {
         "legacy state 'ok', 50, 50 : ('. | .'",
         "High Temperature | Temperature Recovered",
     ],
+    "check_jackett_search.py": [
+        "\"Castlevania: Belmont's Curse\"   -> 'Castlevania Belmont Curse'",
+        "'Castlevania: Belmont’s Curse'   -> 'Castlevania Belmont Curse'",
+        "'Spider-Man: No Way Home'        -> 'Spider Man No Way Home'",
+        "'Ходячий замок'                  -> 'Ходячий замок'",
+        "rutracker-ru  Castlevania: Belmont’s Curse [P]",
+        "thepiratebay  Castlevania: Belmont’s Curse – Midnight Edition",
+        "errors: {}",
+        "('1337x', \"Castlevania: Belmont's Curse\"), ('rutracker-ru', 'Castlevania Belmont Curse')]",
+        "queries: [('rutracker-ru', 'Dune'), ('thepiratebay', 'Dune'), ('1337x', 'Dune')]",
+    ],
     "check_jellyfin_extras.py": [
         "season 2: complete=False episodes=['t5', 't6']",
         "season 3: complete=True episodes=['t7', 't8']",

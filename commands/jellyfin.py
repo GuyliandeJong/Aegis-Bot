@@ -1,11 +1,12 @@
 """
-/jellyfin movies: the movies on all Jellyfin servers, with watched state.
+/jellyfin movies: look up a movie on all Jellyfin servers, with
+watched state.
 
-    /jellyfin movies [show] [search]
+    /jellyfin movies <title>
 
-show: All, Not watched (on no server), Watched (on any server), or
-Not in my library (only on the other servers). Watched state is that
-of JELLYFIN_<n>_USER on each server. The reply is private.
+The title has autocomplete from all servers, with the watched marks.
+Watched state is that of JELLYFIN_<n>_USER on each server. The reply
+is private and always read fresh from the servers.
 """
 
 import math
@@ -50,7 +51,6 @@ def movies_embed(
     interaction: discord.Interaction,
     shown: list[dict],
     total: int,
-    show: str,
     search: str,
     server_order: list[str],
     users: dict[str, str],
@@ -64,16 +64,13 @@ def movies_embed(
     chunk = shown[page * PAGE_SIZE:(page + 1) * PAGE_SIZE]
 
     watched = sum(1 for m in shown if movie_library.watched_anywhere(m))
-    parts = [f"**{len(shown)}** movies"]
+    parts = [f"**{len(shown)}** {'movie' if len(shown) == 1 else 'movies'} matching `{search}`"]
 
-    if users:
+    if users and len(shown) > 1:
         parts.append(f"**{watched}** watched")
         parts.append(f"**{len(shown) - watched}** not watched")
 
     lines = [" • ".join(parts)]
-
-    if search:
-        lines.append(f"Matching `{search}`, out of {total}.")
 
     for name in failed:
         lines.append(f"{theme.WARNING_EMOJI} {name} did not answer; its movies are missing.")
@@ -86,7 +83,7 @@ def movies_embed(
     if chunk:
         lines.extend(_line(movie, server_order) for movie in chunk)
     else:
-        lines.append("No movies match.")
+        lines.append(f"No movie title contains `{search}`, out of {total} movies.")
 
     legend = f"{WATCHED} watched · {NOT_WATCHED} not watched"
 
@@ -101,10 +98,7 @@ def movies_embed(
         description="\n".join(lines),
     )
 
-    footer = [
-        movie_library.FILTERS.get(show, "All"),
-        f"Page {page + 1}/{total_pages}",
-    ]
+    footer = [f"Page {page + 1}/{total_pages}"]
 
     if users:
         footer.append(
@@ -182,21 +176,15 @@ class JellyfinCog(commands.Cog):
 
     @jellyfin.command(
         name="movies",
-        description="Movies on all Jellyfin servers, and whether they are watched.",
+        description="Look up a movie on all Jellyfin servers, and whether it is watched.",
     )
-    @app_commands.describe(
-        show="Which movies to list.",
-        search="Only titles containing these words.",
-    )
-    @app_commands.choices(
-        show=[app_commands.Choice(name=label, value=value) for value, label in movie_library.FILTERS.items()]
-    )
+    @app_commands.describe(title="Movie title, or words from it.")
     async def movies(
         self,
         interaction: discord.Interaction,
-        show: str = "all",
-        search: str = "",
+        title: str,
     ):
+        search = title.strip()
         await interaction.response.defer(ephemeral=True)
 
         service = JellyfinService()
@@ -224,9 +212,7 @@ class JellyfinCog(commands.Cog):
             )
             return
 
-        primary = service.primary_server()
-        primary_name = primary.name if primary else answered[0]
-        shown = movie_library.apply(movies, show, search, primary_name)
+        shown = movie_library.find(movies, search)
         # Servers whose watched state is shown: a user is set and found.
         users = {
             server.name: server.user
@@ -257,7 +243,7 @@ class JellyfinCog(commands.Cog):
 
         def render(page_interaction, page):
             return movies_embed(
-                page_interaction, shown, len(movies), show, search,
+                page_interaction, shown, len(movies), search,
                 answered, users, failed, page, notes,
             )
 
@@ -270,6 +256,37 @@ class JellyfinCog(commands.Cog):
         )
         view.interaction = interaction
         view.message = message
+
+
+    @movies.autocomplete("title")
+    async def movie_titles(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Up to 25 matching titles, with their watched marks."""
+        movies = movie_library.cached()
+
+        if not current.strip():
+            return []
+
+        # Configured order, the primary library first, as in the reply.
+        order = [server.name for server in JellyfinService().servers]
+        choices = []
+
+        for movie in movie_library.find(movies, current)[:25]:
+            year = f" ({movie['year']})" if movie["year"] else ""
+            marks = " · ".join(
+                f"{_server_mark(movie['servers'][name])} {name}"
+                for name in order
+                if name in movie["servers"]
+            )
+            label = f"{movie['title']}{year} — {marks}"
+            choices.append(
+                app_commands.Choice(name=label[:100], value=movie["title"][:100])
+            )
+
+        return choices
 
 
 async def setup(bot):

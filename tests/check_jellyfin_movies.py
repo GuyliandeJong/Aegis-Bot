@@ -24,9 +24,9 @@ import isolate  # state files go to a temporary folder
 # (name, year, tmdb, played)
 LIBRARIES = {
     "home": [("Arrival", 2016, "329865", True), ("Dune", 2021, "438631", False), ("Heat", 1995, "", False),
-             ("The Thing", 1982, "1091", False)],
+             ("The Thing", 1982, "1091", False), ("Children of Dune", 2003, "", False)],
     "friend": [("Arrival", 2016, "329865", False), ("Dune", 2021, "438631", True), ("Heat", 1995, "", False),
-               ("Ronin", 1998, "8195", False), ("Alien", 1979, "348", True)],
+               ("Ronin", 1998, "8195", False), ("Alien", 1979, "348", True), ("Dune: Part Two", 2024, "693134", False)],
 }
 USERS = {"home": [{"Name": "Alex", "Id": "u-home"}], "friend": [{"Name": "Friend", "Id": "x"}, {"Name": "Alex", "Id": "u-friend"}]}
 DOWN = set()
@@ -69,10 +69,14 @@ def body(embed):
     return [l for l in embed.description.split("\n")]
 
 
-async def run(show="all", search=""):
+async def run(title):
     i = Interaction()
-    await J.JellyfinCog().movies.callback(J.JellyfinCog(), i, show, search)
+    await J.JellyfinCog().movies.callback(J.JellyfinCog(), i, title)
     return i
+
+
+def titles(i):
+    return [l.split("**")[1] for l in body(i.sent[-1][1]) if " — " in l]
 
 
 async def main():
@@ -83,53 +87,56 @@ async def main():
                         web.get(f"/{server}/Users/{{user}}/Items", items)])
     runner = web.AppRunner(app); await runner.setup(); await web.TCPSite(runner, "127.0.0.1", PORT).start()
     try:
-        print("== all movies ==")
-        i = await run()
+        print("== one title ==")
+        i = await run("arrival")
         content, embed, view, private = i.sent[-1]
         for line in body(embed):
             print("  |", line)
         print("  footer:", embed.footer.text)
         print("  private:", private, "| asked per user:", sorted(set((s, u) for s, u, _ in SEEN)), "| view message set:", view.message is not None)
 
-        print("\n== filters ==")
-        for show in ("unwatched", "watched", "not_mine"):
-            i = await run(show)
-            titles = [l.split("**")[1] for l in body(i.sent[-1][1]) if " — " in l]
-            print(f"  {show:10}", titles)
-        i = await run("all", "ali")
-        print("  search 'ali':", [l.split("**")[1] for l in body(i.sent[-1][1]) if " — " in l], "|", body(i.sent[-1][1])[1])
+        print("\n== search ==")
+        print("  'dune', exact first:", titles(await run("dune")))
+        print("  'THE thing':", titles(await run("THE thing")))
+        print("  no match:", body((await run("zzz")).sent[-1][1])[2])
+
+        print("\n== autocomplete ==")
+        cog = J.JellyfinCog()
+        choices = await cog.movie_titles(Interaction(), "dun")
+        print("  'dun':", [(c.name, c.value) for c in choices])
+        print("  empty:", await cog.movie_titles(Interaction(), " "))
 
         print("\n== no user set for Friend ==")
         del os.environ["JELLYFIN_2_USER"]
-        i = await run()
+        i = await run("ronin")
         lines = body(i.sent[-1][1])
         print("  ", [l for l in lines if l.startswith("**Ronin")][0], "|", lines[-1], "|", i.sent[-1][1].footer.text)
         print("   explained:", [l for l in lines if "JELLYFIN_*_USER" in l])
         os.environ["JELLYFIN_2_USER"] = "nobody"
-        i = await run()
+        i = await run("ronin")
         print("   wrong name:", [l for l in body(i.sent[-1][1]) if "JELLYFIN_*_USER" in l])
         os.environ["JELLYFIN_2_USER"] = "alex"
 
         print("\n== a server down ==")
         DOWN.add("friend")
-        i = await run()
+        i = await run("arrival")
         lines = body(i.sent[-1][1])
-        print("  ", lines[1], "| movies:", lines[0])
+        print("  ", lines[1], "|", [l for l in lines if " — " in l])
         DOWN.add("home")
-        i = await run()
+        i = await run("arrival")
         print("   both down:", i.sent[-1][0])
         DOWN.clear()
 
         print("\n== paging ==")
         LIBRARIES["home"] += [(f"Film {n:02}", 2000, f"9{n:03}", n % 2 == 0) for n in range(30)]
-        i = await run()
+        i = await run("film")
         embed, view = i.sent[-1][1], i.sent[-1][2]
-        print("  page 1:", embed.footer.text.split(" • ")[1], "| buttons:", [(b.label, b.disabled) for b in view.children])
+        print("  30 matches:", embed.footer.text.split(" • ")[0], "| buttons:", [(b.label, b.disabled) for b in view.children])
         other = Interaction(uid=2)
         print("  someone else pages:", await view.interaction_check(other), other.sent[-1][0])
         press = Interaction()
         await view.next_button.callback(press)
-        print("  after Next:", press.sent[-1][1].footer.text.split(" • ")[1], "| Next disabled:", view.next_button.disabled)
+        print("  after Next:", press.sent[-1][1].footer.text.split(" • ")[0], "| Next disabled:", view.next_button.disabled)
 
         print("\n== matching ==")
         merged = ML.combine([("A", [{"Name": "Blade Runner", "ProductionYear": 1982, "ProviderIds": {}}], False),

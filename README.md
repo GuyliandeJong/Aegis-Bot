@@ -25,7 +25,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/esxi` | ESXi datastores (usage) and virtual machines (running or not) | Administrators |
 | `/wan` | Public IP address | Administrators |
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
-| `/jellyfin movies` | Movies on all Jellyfin servers, with watched state; filter on not watched, watched or not in your library, and search | Everyone (private reply) |
+| `/jellyfin movies` | Looks up a movie on all Jellyfin servers, with watched state; the title has autocomplete | Everyone (private reply) |
 | `/container` | Lists, inspects and controls Docker containers through Portainer: `list`, `info`, `logs`, `start`, `stop`, `restart`, `kill`, `remove` | Only the users in `PORTAINER_ALLOWED_USER_IDS` |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone |
 
@@ -168,19 +168,18 @@ The other server's API key must be allowed to download media.
 
 ### Movies on all servers
 
-`/jellyfin movies` lists the movies of every Jellyfin server in one
-list: each title once, with the servers it is on and whether it was
-watched there (✅ watched, ⚪ not watched). Movies are matched across
-servers by their TMDb or IMDb id, otherwise by title and year.
-
-- `show`: All, Not watched (on no server), Watched (on any server), or
-  Not in my library (only on the other servers, which can be copied with
-  `/torrent search`).
-- `search`: only titles containing these words.
+`/jellyfin movies <title>` looks a movie up on every Jellyfin server:
+each match once, with the servers it is on and whether it was watched
+there (✅ watched, ⚪ not watched). While you type the title, Discord
+suggests matching titles from all servers with these marks; the list
+behind the suggestions is at most ten minutes old, the reply itself is
+read fresh. Movies are matched across servers by their TMDb or IMDb id,
+otherwise by title and year.
 
 Watched state is per Jellyfin user: set `JELLYFIN_<n>_USER` to your
-user name on each server. A server without it shows ▫️. The reply is
-private and pages 20 movies at a time.
+user name on each server. A server without it shows ▫️, and the reply
+says which setting is missing or which user was not found. The reply
+is private.
 
 ### Watchlist
 

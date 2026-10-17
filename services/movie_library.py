@@ -9,8 +9,10 @@ JELLYFIN_<n>_USER; it is None for a server without that setting.
 
 import asyncio
 import re
+import time
 
 from services.jellyfin_service import JellyfinService
+from utils.logger import logger
 
 
 def _normalize(title: str) -> str:
@@ -75,36 +77,75 @@ def watched_anywhere(movie: dict) -> bool:
     return any(state is True for state in movie["servers"].values())
 
 
-FILTERS = {
-    "all": "All",
-    "unwatched": "Not watched",
-    "watched": "Watched",
-    "not_mine": "Not in my library",
-}
+def find(movies: list[dict], search: str) -> list[dict]:
+    """
+    Movies whose title contains every word of `search`.
 
+    An exact title comes first, then titles starting with the search,
+    then the rest, each group in title order.
+    """
+    query = _normalize(search)
+    words = query.split()
 
-def apply(movies: list[dict], show: str, search: str, primary: str) -> list[dict]:
-    """Filter the combined list for /jellyfin movies."""
-    words = _normalize(search).split()
+    if not words:
+        return []
 
-    def wanted(movie: dict) -> bool:
+    def rank(movie: dict) -> int:
         title = _normalize(movie["title"])
 
-        if words and not all(word in title.split() or word in title for word in words):
-            return False
+        if title == query:
+            return 0
 
-        if show == "unwatched":
-            return not watched_anywhere(movie)
+        if title.startswith(query):
+            return 1
 
-        if show == "watched":
-            return watched_anywhere(movie)
+        return 2
 
-        if show == "not_mine":
-            return primary not in movie["servers"]
+    found = [
+        movie for movie in movies
+        if all(word in _normalize(movie["title"]) for word in words)
+    ]
+    found.sort(key=rank)
+    return found
 
-        return True
 
-    return [movie for movie in movies if wanted(movie)]
+# The merged list is kept for a while for autocomplete, which Discord
+# calls on every keystroke and gives three seconds to answer.
+CACHE_SECONDS = 600
+_cache: dict = {"at": 0.0, "movies": []}
+_refreshing: set[asyncio.Task] = set()
+
+
+def _remember(movies: list[dict]) -> None:
+    _cache["at"] = time.monotonic()
+    _cache["movies"] = movies
+
+
+async def _refresh() -> None:
+    service = JellyfinService()
+
+    try:
+        movies, answered, _ = await load(service)
+
+        if answered:
+            _remember(movies)
+    except Exception as ex:
+        logger.warning("[Movies] Refreshing the movie list failed: %s", ex)
+    finally:
+        await service.close()
+
+
+def cached() -> list[dict]:
+    """
+    The last merged list, at once; starts a refresh in the background
+    when it is older than CACHE_SECONDS. Empty until the first load.
+    """
+    if time.monotonic() - _cache["at"] >= CACHE_SECONDS and not _refreshing:
+        task = asyncio.create_task(_refresh())
+        _refreshing.add(task)
+        task.add_done_callback(_refreshing.discard)
+
+    return _cache["movies"]
 
 
 async def load(service: JellyfinService) -> tuple[list[dict], list[str], list[str]]:
@@ -126,4 +167,9 @@ async def load(service: JellyfinService) -> tuple[list[dict], list[str], list[st
         else:
             failed.append(server.name)
 
-    return combine(per_server), [name for name, _, _ in per_server], failed
+    movies = combine(per_server)
+
+    if per_server:
+        _remember(movies)
+
+    return movies, [name for name, _, _ in per_server], failed

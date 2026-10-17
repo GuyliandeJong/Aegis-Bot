@@ -499,6 +499,19 @@ are listed in the log at startup.
 
 ### `.env`
 
+`.env.example` lists every setting with its default, grouped and
+commented. To sort an existing `.env` into that layout:
+
+```bash
+python3 scripts/tidy_env.py
+```
+
+prints, by name only and never with values, which settings are set
+twice, unknown, required but empty, or equal to their default. With
+`--write` it creates `.env.tidy` (same values, template order, unset
+settings commented out with their default, unknown ones at the end),
+checks it means exactly the same as `.env`, and leaves `.env` alone.
+
 Required:
 
 ```text

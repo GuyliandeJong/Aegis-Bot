@@ -26,6 +26,10 @@ class JellyfinServer:
     # the other servers are copied into.
     primary: bool = False
 
+    # Jellyfin user whose watched state /jellyfin movies shows
+    # (JELLYFIN_<n>_USER). Empty: watched state is not shown.
+    user: str = ""
+
 
 class JellyfinDownloadError(Exception):
     """A download failed; the message is suitable for showing in Discord."""
@@ -69,6 +73,7 @@ class JellyfinService:
                     url=url,
                     api_key=api_key,
                     primary=index == 1,
+                    user=os.getenv(f"JELLYFIN_{index}_USER", "").strip(),
                 )
             )
 
@@ -933,6 +938,59 @@ class JellyfinService:
             },
             timeout=180,
         )
+
+    async def find_user_id(self, server_name: str, username: str) -> str | None:
+        """The id of a Jellyfin user by name, ignoring case."""
+        status, data = await self._request_json(server_name, "GET", "/Users", timeout=15)
+
+        if status != 200 or not isinstance(data, list):
+            return None
+
+        wanted = username.strip().casefold()
+
+        for user in data:
+            if isinstance(user, dict) and str(user.get("Name") or "").casefold() == wanted:
+                return str(user.get("Id") or "") or None
+
+        return None
+
+    async def list_movies_watched(self, server_name: str) -> tuple[list[dict], bool]:
+        """
+        Every movie on a server, and whether watched state is included.
+
+        With JELLYFIN_<n>_USER set, the list comes from that user's view
+        and each movie carries UserData.Played. Returns ([], False) when
+        the server did not answer.
+        """
+        server = self._get_server(server_name)
+
+        if server is None:
+            return [], False
+
+        user_id = None
+
+        if server.user:
+            user_id = await self.find_user_id(server_name, server.user)
+
+            if user_id is None:
+                logger.warning(
+                    "[Jellyfin] User '%s' not found on %s; watched state "
+                    "is not shown for it.",
+                    server.user,
+                    server.name,
+                )
+
+        params = {
+            "IncludeItemTypes": "Movie",
+            "Recursive": "true",
+            "IsMissing": "false",
+            "Fields": "ProductionYear,ProviderIds",
+            "EnableImages": "false",
+            "EnableUserData": "true" if user_id else "false",
+        }
+        path = f"/Users/{quote(user_id, safe='')}/Items" if user_id else "/Items"
+
+        return await self._get_items(server_name, path, params, timeout=180), user_id is not None
 
     async def search_remote_subtitles(
         self,

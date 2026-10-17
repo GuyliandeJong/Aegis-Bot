@@ -164,6 +164,18 @@ EXPECTED = {
         "still needs 30.00 GiB, but only 10.00 GiB",
         "enough space -> messages: 0",
     ],
+    "check_wan_recovery.py": [
+        "reported: ['WAN Connection Recovered'] | restarts: []",
+        "reported: ['WAN Connection Recovered', 'Restarted After Outage'] | restarts: ['restart newt']",
+        "message: After the internet outage of `10m 0s`: /  / Restarted `newt`.",
+        "90s, not alerted -> reported: ['Restarted After Outage'] | restarts: ['restart newt']",
+        "20s, below WAN_RECOVERY_MIN_OUTAGE -> restarts: []",
+        "no outage ==",
+        "one missing: Restart After Outage Failed | restarts: ['restart newt']",
+        "`missing`: No container named `missing`.",
+        "protected: Restart After Outage Failed | restarts: []",
+        "After outages: newt restarted 3×, failed 1×; missing failed 1×.",
+    ],
     "check_wol_permissions.py": [
         "reply='Wake-on-LAN Sent'",
         "reply='Computer Already Awake'",

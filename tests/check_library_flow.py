@@ -14,6 +14,8 @@ PORT = 18113
 for key in [k for k in os.environ if k.startswith("JELLYFIN_")]:
     del os.environ[key]
 os.environ.update({"JELLYFIN_1_URL": f"http://127.0.0.1:{PORT}/home", "JELLYFIN_1_API_KEY": "h", "JELLYFIN_1_NAME": "Home"})
+# Subtitle fetching has its own check (check_subtitles).
+os.environ["SUBTITLE_AUTO_DOWNLOAD"] = "false"
 
 from services.release_name import parse
 from services import library_followup as LF

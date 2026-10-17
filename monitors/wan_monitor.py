@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from config.settings import settings
 from monitors.base_monitor import BaseMonitor
 from monitors.state import state
-from services import activity_log
+from services import activity_log, wan_recovery
 from services.wan_service import WanService
 from utils.logger import logger
 
@@ -130,6 +130,14 @@ class WanMonitor(BaseMonitor):
                 activity_log.record(
                     "wan_outage",
                     seconds=int(downtime),
+                )
+
+            # Containers such as newt need a restart after an outage,
+            # also one too short to be reported; WAN_RECOVERY_RESTART.
+            if outage_since is not None:
+                wan_recovery.start(
+                    self.notification_service,
+                    (current_time - outage_since).total_seconds(),
                 )
 
             # Clear the outage timer.

@@ -376,17 +376,39 @@ class WeeklySummaryMonitor(BaseMonitor):
     @staticmethod
     def _outages(since: float) -> str:
         outages = activity_log.since(since, "wan_outage")
+        restarts = activity_log.since(since, "wan_restart")
 
-        if not outages:
-            return "No outages."
+        if outages:
+            durations = [int(o.get("seconds") or 0) for o in outages]
+            line = (
+                f"{len(outages)} outage{'s' if len(outages) != 1 else ''}, "
+                f"{format_compact_duration(sum(durations))} in total, "
+                f"longest {format_compact_duration(max(durations))}."
+            )
+        else:
+            line = "No outages."
 
-        durations = [int(o.get("seconds") or 0) for o in outages]
+        # Restarts after outages (WAN_RECOVERY_RESTART), per container.
+        if restarts:
+            counts = {}
 
-        return (
-            f"{len(outages)} outage{'s' if len(outages) != 1 else ''}, "
-            f"{format_compact_duration(sum(durations))} in total, "
-            f"longest {format_compact_duration(max(durations))}."
-        )
+            for entry in restarts:
+                name = entry.get("container") or "?"
+                ok, failed = counts.get(name, (0, 0))
+                counts[name] = (ok + 1, failed) if entry.get("ok") else (ok, failed + 1)
+
+            parts = []
+
+            for name, (ok, failed) in counts.items():
+                done = [f"restarted {ok}×"] if ok else []
+                done += [f"failed {failed}×"] if failed else []
+                text = f"{name} " + ", ".join(done)
+
+                parts.append(text)
+
+            line += "\nAfter outages: " + "; ".join(parts) + "."
+
+        return line
 
     @staticmethod
     def _alerts(since: float) -> str:

@@ -138,6 +138,18 @@ async def main():
         print("  next check, unchanged ->", len(notes.sent), "alert(s) in total")
         del os.environ["ESXI_DATASTORE_WARNING"]
 
+        print("\n== /esxi ==")
+        import commands.esxi as EC
+        sent = []
+        async def defer(**k): pass
+        async def send(*a, **k): sent.append(k["embed"])
+        interaction = types.SimpleNamespace(
+            user=types.SimpleNamespace(display_name="t", display_avatar=types.SimpleNamespace(url="https://cdn.example/a.png")),
+            response=types.SimpleNamespace(defer=defer), followup=types.SimpleNamespace(send=send))
+        VMS["vm-3"][1] = "poweredOff"
+        await EC.Esxi(None).esxi.callback(EC.Esxi(None), interaction)
+        print("  ", sent[-1].description, "|", sent[-1].fields[1].value.replace("\n", " / "))
+
         del os.environ["ESXI_HOST"]
         CALLS.clear(); await mon.check()
         print("  not configured -> requests:", CALLS)

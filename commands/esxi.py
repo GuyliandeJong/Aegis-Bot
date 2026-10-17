@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from monitors.esxi_monitor import EsxiMonitor
 from services import esxi_service
 from utils import theme
 from utils.embed_models import EmbedField
@@ -68,16 +69,25 @@ class Esxi(commands.Cog):
                 f"{format_bytes(d['free'])} free of {format_bytes(d['capacity'])}"
             )
 
+        # VMs in ESXI_IGNORE_VMS get no alerts; say so, so a stopped one
+        # does not look like a problem.
+        ignored = EsxiMonitor.ignored_vms()
         vms = [
             f"{POWER.get(v['power'], '❔')} {v['name']}"
+            + (" · not watched" if v["name"].lower() in ignored else "")
             for v in status["vms"]
         ]
         running = sum(1 for v in status["vms"] if v["power"] == "poweredOn")
+        not_watched = sum(1 for v in status["vms"] if v["name"].lower() in ignored)
+        summary = f"{running} of {len(vms)} virtual machines running"
+
+        if not_watched:
+            summary += f" · {not_watched} not watched (ESXI_IGNORE_VMS)"
 
         embed = create_embed(
             interaction=interaction,
             title="🖥️ ESXi",
-            description=f"{running} of {len(vms)} virtual machines running",
+            description=summary,
             color=theme.INFO_COLOR,
             fields=[
                 EmbedField("💾 Datastores", "\n".join(stores)[:1024] or "None", inline=False),

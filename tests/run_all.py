@@ -367,6 +367,7 @@ EXPECTED = {
         "recovered Datastore Recovered — media",
         "alerts: [('warning', 'ESXi Not Reachable'), ('recovered', 'ESXi Reachable Again')]",
         "not configured -> requests: []",
+        "2 of 3 virtual machines running · 1 not watched (ESXI_IGNORE_VMS) | 🟢 docker-host / 🟢 homeassistant / ⚫ Scratch · not watched",
     ],
     "check_expiry.py": [
         "expired; buttons disabled",

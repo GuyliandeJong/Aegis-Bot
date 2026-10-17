@@ -141,8 +141,27 @@ English).
   copied.
 
 Torrent search results say nothing about subtitles: Jackett provides
-only the release name, not the files inside. Fetching subtitles for the
-library is left to Jellyfin, for example with its Open Subtitles plugin.
+only the release name, not the files inside.
+
+Missing subtitles for movies in the primary library are fetched through
+Jellyfin's subtitle providers, so the Open Subtitles plugin must be
+installed and logged in on that server:
+
+- When a downloaded movie shows up ("Now in Jellyfin"), the bot first
+  asks Jellyfin to search its providers in `SUBTITLE_LANGUAGE` and
+  download the best result, and the message says what happened
+  ("Subtitles: English added from Open Subtitles.").
+- Once a day at `SUBTITLE_HOUR` (default 6), up to
+  `SUBTITLE_DAILY_LIMIT` movies already in the library get the same,
+  newest additions first. A movie without results is tried again after
+  30 days; a refused download (the provider's daily limit) ends the
+  run and is tried again the next day.
+- The best result is an exact match for the file first, then the
+  `SUBTITLE_HEARING_IMPAIRED` preference, then the most downloads.
+  Forced and machine-translated subtitles are never taken.
+- The weekly summary shows what was added.
+
+`SUBTITLE_AUTO_DOWNLOAD=false` turns this off. Series are not covered.
 
 The other server's API key must be allowed to download media.
 
@@ -501,6 +520,13 @@ JELLYFIN_SERIES_DIR=/media/Series
 
 # Preferred subtitle language: a name or code such as english, en, nl.
 SUBTITLE_LANGUAGE=english
+# Fetch missing movie subtitles through Jellyfin's Open Subtitles plugin.
+SUBTITLE_AUTO_DOWNLOAD=true
+# Movies tried in the daily run (0 turns it off), and its hour (container time).
+SUBTITLE_DAILY_LIMIT=10
+SUBTITLE_HOUR=6
+# Prefer subtitles for the hearing impaired.
+SUBTITLE_HEARING_IMPAIRED=false
 
 # Daily report of new seasons and episodes on the other servers.
 JELLYFIN_NEW_CONTENT_ALERTS=true

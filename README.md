@@ -234,12 +234,20 @@ state changes.
 | Hardware | Power supply and fan health through iDRAC | 60 s |
 | WAN | Internet connectivity and public IP changes | 60 s |
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
+| Subtitles | Missing movie subtitles, a few per run | Once a day |
 | Watchlist | Titles people are waiting for | Twice a day |
 | Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
+
+After an internet outage of at least `WAN_RECOVERY_MIN_OUTAGE` seconds
+(also one too short for a "WAN Connection Lost" alert), the containers
+in `WAN_RECOVERY_RESTART` are restarted through Portainer, for example
+`newt`, whose Pangolin tunnel does not come back by itself. The result
+is posted, and the weekly summary counts the restarts under Internet.
+These containers must not be in `PORTAINER_PROTECTED`.
 
 Filesystem and temperature alerts for the same component are at least
 `ALERT_COOLDOWN` seconds apart, so a value hovering on a threshold does
@@ -571,6 +579,14 @@ PORTAINER_ALLOWED_USER_IDS=
 PORTAINER_PROTECTED=
 # false for a self-signed certificate.
 PORTAINER_VERIFY_TLS=true
+
+# Restart these containers (comma separated) through Portainer after an
+# internet outage, e.g. newt for Pangolin. Empty: nothing is restarted.
+WAN_RECOVERY_RESTART=
+# Only after an outage of at least this many seconds, and wait this long
+# after the connection is back before restarting.
+WAN_RECOVERY_MIN_OUTAGE=60
+WAN_RECOVERY_DELAY=30
 
 # Used only by scripts/watchdog.sh on the server.
 WATCHDOG_WEBHOOK_URL=

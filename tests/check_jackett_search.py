@@ -10,8 +10,8 @@ from aiohttp import web
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 m = types.ModuleType("utils.logger"); m.logger = logging.getLogger("aegis"); sys.modules["utils.logger"] = m
 PORT = 18119
-os.environ.update({"JACKETT_URL": f"http://127.0.0.1:{PORT}", "JACKETT_API_KEY": "k",
-                   "JACKETT_INDEXERS": "rutracker-ru,thepiratebay,1337x"})
+os.environ.update({"JACKETT_URL": f"http://127.0.0.1:{PORT}", "JACKETT_API_KEY": "k"})
+os.environ.pop("JACKETT_INDEXERS", None)  # the default list is checked
 
 from services.jackett_service import JackettService
 
@@ -30,7 +30,7 @@ async def torznab(request):
     indexer, query = request.match_info["indexer"], request.query.get("q", "")
     QUERIES.append((indexer, query))
     items = ""
-    if indexer == "rutracker-ru" and "'" not in query and ":" not in query and "Belmont" in query:
+    if indexer == "rutracker" and "'" not in query and ":" not in query and "Belmont" in query:
         # rutracker writes the title with a curly apostrophe and only
         # matches words, so the query with punctuation finds nothing.
         items = item("Castlevania: Belmont’s Curse [P] [RUS + ENG + 9] (2026, Action) [Portable]", 1058)

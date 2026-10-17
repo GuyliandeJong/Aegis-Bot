@@ -611,6 +611,8 @@ WAN_RECOVERY_DELAY=30
 # Used only by scripts/watchdog.sh on the server.
 WATCHDOG_WEBHOOK_URL=
 
+# Jackett indexer IDs to search, comma separated. Empty: rutracker
+# (RuTracker.org, which needs an account in Jackett), thepiratebay, 1337x.
 JACKETT_INDEXERS=
 JACKETT_TIMEOUT=
 GPTWOL_TARGET_NAME=

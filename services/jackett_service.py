@@ -15,8 +15,11 @@ from utils.logger import logger
 class JackettService:
     """Search selected Jackett indexers and normalize their results."""
 
+    # Used when JACKETT_INDEXERS is not set. "rutracker" is
+    # RuTracker.org (semi-private; needs an account in Jackett), not
+    # "rutracker-ru", which is the unrelated public site rutracker.ru.
     DEFAULT_INDEXERS = (
-        "rutracker-ru",
+        "rutracker",
         "thepiratebay",
         "1337x",
     )

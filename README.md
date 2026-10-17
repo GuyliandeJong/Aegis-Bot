@@ -626,6 +626,19 @@ see `config/settings.example.py` for their names and defaults.
 ranked per category: preferred resolutions, codec scores and terms to
 avoid.
 
+It also holds two uploader lists for all categories. Jackett passes
+the uploader's name for RuTracker.org, The Pirate Bay and 1337x, but no
+reputation, so the lists are your own judgement:
+
+- `trusted_uploaders` (InsaneRamZes, FitGirl, DODI): `trusted_uploader_score`
+  (30) is added and the result shows ⭐ before the name.
+- `blocked_uploaders`: `blocked_uploader_score` (-100) is added, which
+  puts the release at the bottom.
+
+Names are matched without regard to capitals, on the uploader only: a
+group name such as "FitGirl Repack" in a title from someone else does
+not count. Search results show the uploader as "by name".
+
 ## Docker
 
 The container is named `aegis-bot`. The project folder is mounted at

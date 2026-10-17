@@ -56,6 +56,7 @@ def movies_embed(
     users: dict[str, str],
     failed: list[str],
     page: int,
+    notes: list[str] | None = None,
 ) -> tuple[discord.Embed, int, int]:
     """One page of the list. Returns (embed, page, total_pages)."""
     total_pages = max(1, math.ceil(len(shown) / PAGE_SIZE))
@@ -76,6 +77,9 @@ def movies_embed(
 
     for name in failed:
         lines.append(f"{theme.WARNING_EMOJI} {name} did not answer; its movies are missing.")
+
+    for note in notes or []:
+        lines.append(f"{theme.WARNING_EMOJI} {note}")
 
     lines.append("")
 
@@ -232,10 +236,29 @@ class JellyfinCog(commands.Cog):
             )
         }
 
+        # Say why a server shows no watched state, instead of leaving
+        # the ▫️ marks unexplained.
+        notes = []
+
+        for server in service.servers:
+            if server.name not in answered or server.name in users:
+                continue
+
+            if server.user:
+                notes.append(
+                    f"No Jellyfin user `{server.user}` on {server.name}; "
+                    "check its JELLYFIN_*_USER."
+                )
+            else:
+                notes.append(
+                    f"Watched state for {server.name} needs its "
+                    "JELLYFIN_*_USER in .env."
+                )
+
         def render(page_interaction, page):
             return movies_embed(
                 page_interaction, shown, len(movies), show, search,
-                answered, users, failed, page,
+                answered, users, failed, page, notes,
             )
 
         view = MoviesView(interaction.user.id, render)

@@ -104,6 +104,10 @@ async def main():
         i = await run()
         lines = body(i.sent[-1][1])
         print("  ", [l for l in lines if l.startswith("**Ronin")][0], "|", lines[-1], "|", i.sent[-1][1].footer.text)
+        print("   explained:", [l for l in lines if "JELLYFIN_*_USER" in l])
+        os.environ["JELLYFIN_2_USER"] = "nobody"
+        i = await run()
+        print("   wrong name:", [l for l in body(i.sent[-1][1]) if "JELLYFIN_*_USER" in l])
         os.environ["JELLYFIN_2_USER"] = "alex"
 
         print("\n== a server down ==")

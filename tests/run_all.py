@@ -75,6 +75,8 @@ EXPECTED = {
         "not_mine   ['Alien', 'Ronin']",
         "search 'ali': ['Alien'] | Matching `ali`, out of 6.",
         "**Ronin** (1998) — ▫️ Friend | ✅ watched · ⚪ not watched · ▫️ watched state not set up | All • Page 1/1 • Watched by Alex on Home",
+        "explained: ['⚠️ Watched state for Friend needs its JELLYFIN_*_USER in .env.']",
+        "wrong name: ['⚠️ No Jellyfin user `nobody` on Friend; check its JELLYFIN_*_USER.']",
         "⚠️ Friend did not answer; its movies are missing. | movies: **4** movies",
         "both down: No Jellyfin server answered: Home, Friend.",
         "page 1: Page 1/2 | buttons: [('◀ Previous', True), ('1 / 2', True), ('Next ▶', False)]",

@@ -1,6 +1,7 @@
 """Jackett Torznab search service."""
 
 import asyncio
+import html
 import os
 import re
 import xml.etree.ElementTree as element_tree
@@ -249,9 +250,13 @@ class JackettService:
             if cls.local_name(item) != "item":
                 continue
 
-            title = cls.child_text(
-                item,
-                "title",
+            # Some indexers (The Pirate Bay) send titles with HTML
+            # entities still in them, such as &rsquo; and &ndash;.
+            title = html.unescape(
+                cls.child_text(
+                    item,
+                    "title",
+                )
             )
 
             if not title:
@@ -495,6 +500,21 @@ class JackettService:
         )
 
     @staticmethod
+    def simplified_query(query):
+        """
+        The query without punctuation, for a second try.
+
+        Indexers such as rutracker match words literally: "Belmont's"
+        with a straight apostrophe does not find a title written
+        "Belmont’s", and a colon can break the search too. Possessive
+        's is dropped and other punctuation becomes a space; letters
+        in any script are kept.
+        """
+        text = re.sub(r"['’`´]s\b", "", str(query))
+        text = re.sub(r"[^\w]+", " ", text)
+        return " ".join(text.split())
+
+    @staticmethod
     def duplicate_key(result):
         """Build a stable key for cross-indexer duplicates."""
         info_hash = result.get("info_hash")
@@ -535,6 +555,41 @@ class JackettService:
             *tasks,
             return_exceptions=True,
         )
+
+        # An indexer that found nothing for the exact query gets one
+        # more try without punctuation, even when others found
+        # something: otherwise its releases never show up.
+        simplified = self.simplified_query(query)
+
+        if simplified and simplified != query.strip():
+            empty = [
+                position
+                for position, response in enumerate(responses)
+                if not isinstance(response, Exception) and not response
+            ]
+
+            if empty:
+                retries = await asyncio.gather(
+                    *(
+                        self.search_indexer(self.indexers[position], simplified)
+                        for position in empty
+                    ),
+                    return_exceptions=True,
+                )
+
+                for position, retry in zip(empty, retries):
+                    if isinstance(retry, Exception) or not retry:
+                        continue
+
+                    logger.info(
+                        "[JackettService] %s found %d result(s) for "
+                        "'%s' after nothing for '%s'.",
+                        self.indexers[position],
+                        len(retry),
+                        simplified,
+                        query,
+                    )
+                    responses[position] = retry
 
         results = []
         errors = {}

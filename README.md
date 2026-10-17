@@ -511,6 +511,9 @@ twice, unknown, required but empty, or equal to their default. With
 `--write` it creates `.env.tidy` (same values, template order, unset
 settings commented out with their default, unknown ones at the end),
 checks it means exactly the same as `.env`, and leaves `.env` alone.
+`--write --drop-defaults` also comments out settings equal to their
+default, unless the local `config/settings.py` has another default for
+them.
 
 Required:
 

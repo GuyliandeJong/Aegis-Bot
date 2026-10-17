@@ -179,6 +179,9 @@ EXPECTED = {
         "unset default commented: True | required marked: True",
         "unknown at the end: True | LF only: True",
         "order follows the template: ['DISCORD_TOKEN', 'GUILD_ID', 'CPU_WARNING', 'QBITTORRENT_PASSWORD', 'JELLYFIN_1_URL', 'PORTAINER_URL', 'OLD_SETTING']",
+        "2 settings equal to their default commented out.",
+        "commented out: ['CPU_WARNING', 'SEED_DAYS_TARGET'] | kept (settings.py differs): True | kept (not default): True",
+        "reported as kept: ['MEMORY_WARNING']",
     ],
     "check_torrent_controls.py": [
         "setting off, non-admin adds -> qBittorrent adds: 1 | Torrent Added",

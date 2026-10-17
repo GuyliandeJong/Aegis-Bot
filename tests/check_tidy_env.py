@@ -20,6 +20,8 @@ ENV.write_bytes(ORIGINAL.encode())
 
 
 def run(*extra):
+    if "--settings" not in extra:
+        extra = (*extra, "--settings", str(ROOT / "none.py"))
     result = subprocess.run([sys.executable, str(SCRIPT), "--env", str(ENV), "--template", str(TEMPLATE), *extra],
                             capture_output=True, text=True)
     return result.returncode, result.stdout + result.stderr
@@ -43,3 +45,15 @@ print("  unset default commented:", "# MEMORY_WARNING=80" in tidy, "| required m
 print("  unknown at the end:", tidy.rstrip().endswith("OLD_SETTING=keep me"), "| LF only:", "\r" not in tidy)
 order = [l.split("=")[0] for l in tidy.splitlines() if l and not l.startswith("#")]
 print("  order follows the template:", order)
+
+print("\n== drop defaults ==")
+SETTINGS = ROOT / "settings.py"
+ENV.write_text("CPU_WARNING=75\nMEMORY_WARNING=80\nFILESYSTEM_WARNING=90\nSEED_DAYS_TARGET=14\n")
+SETTINGS.write_text('X = os.getenv("CPU_WARNING", "75")\nY = os.getenv("MEMORY_WARNING", "70")\n')
+code, out = run("--write", "--drop-defaults", "--settings", str(SETTINGS))
+tidy = (ROOT / ".env.tidy").read_text()
+print("  exit:", code, "|", out.strip().splitlines()[-1].split(": ", 1)[1])
+print("  commented out:", [n for n in ("CPU_WARNING", "SEED_DAYS_TARGET") if f"# {n}=" in tidy],
+      "| kept (settings.py differs):", "MEMORY_WARNING=80" in tidy.splitlines(),
+      "| kept (not default):", "FILESYSTEM_WARNING=90" in tidy.splitlines())
+print("  reported as kept:", [l.strip() for l in out.splitlines()[out.splitlines().index(next(l for l in out.splitlines() if "has another one" in l)) + 1:][:1]])

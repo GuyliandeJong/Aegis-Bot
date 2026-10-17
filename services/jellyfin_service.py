@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import aiohttp
 
@@ -830,6 +831,154 @@ class JellyfinService:
                 item_id,
             )
             return False
+
+    # ------------------------------------------------------------
+    # Subtitles from the server's providers (OpenSubtitles plugin)
+    # ------------------------------------------------------------
+
+    async def _request_json(
+        self,
+        server_name: str,
+        method: str,
+        path: str,
+        timeout: float = 90,
+    ) -> tuple[int, object]:
+        """
+        One API call: (HTTP status, parsed JSON or None).
+
+        Returns (0, None) when the server could not be reached.
+        Provider searches go out to the internet, hence the longer
+        default timeout.
+        """
+        server = self._get_server(server_name)
+
+        if server is None:
+            return 0, None
+
+        await self.connect()
+
+        if self.session is None:
+            return 0, None
+
+        try:
+            async with self.session.request(
+                method,
+                f"{server.url}{path}",
+                headers={
+                    **self._auth_headers(server),
+                    "Accept": "application/json",
+                },
+                timeout=aiohttp.ClientTimeout(total=timeout),
+            ) as response:
+                body = await response.text()
+
+                if response.status >= 400:
+                    logger.warning(
+                        "%s Jellyfin %s %s returned HTTP %d: %s",
+                        server.name,
+                        method,
+                        path,
+                        response.status,
+                        body[:300],
+                    )
+
+                try:
+                    data = json.loads(body) if body.strip() else None
+                except ValueError:
+                    data = None
+
+                return response.status, data
+
+        except asyncio.CancelledError:
+            raise
+
+        except Exception:
+            logger.exception(
+                "Jellyfin %s %s failed on %s",
+                method,
+                path,
+                server.name,
+            )
+            return 0, None
+
+    async def get_item(self, server_name: str, item_id: str) -> dict | None:
+        """One item with its streams, as Jellyfin sees it now."""
+        items = await self._get_items(
+            server_name,
+            "/Items",
+            {
+                "Ids": item_id,
+                "Fields": "MediaStreams,ProductionYear,Path",
+                "EnableImages": "false",
+                "EnableUserData": "false",
+            },
+        )
+
+        return items[0] if items else None
+
+    async def list_movies(self, server_name: str) -> list[dict]:
+        """Every movie with its streams, newest addition first."""
+        return await self._get_items(
+            server_name,
+            "/Items",
+            {
+                "IncludeItemTypes": "Movie",
+                "Recursive": "true",
+                "IsMissing": "false",
+                "Fields": "MediaStreams,ProductionYear,Path,DateCreated",
+                "SortBy": "DateCreated",
+                "SortOrder": "Descending",
+                "EnableImages": "false",
+                "EnableUserData": "false",
+            },
+            timeout=180,
+        )
+
+    async def search_remote_subtitles(
+        self,
+        server_name: str,
+        item_id: str,
+        language: str,
+    ) -> list[dict] | None:
+        """
+        Ask the server's subtitle providers for one item and language.
+
+        Returns None when the search itself failed, [] when nothing
+        was found.
+        """
+        status, data = await self._request_json(
+            server_name,
+            "GET",
+            f"/Items/{quote(item_id, safe='')}/RemoteSearch/Subtitles/"
+            f"{quote(language, safe='')}",
+        )
+
+        if status != 200 or not isinstance(data, list):
+            return None
+
+        return [entry for entry in data if isinstance(entry, dict)]
+
+    async def download_remote_subtitle(
+        self,
+        server_name: str,
+        item_id: str,
+        subtitle_id: str,
+    ) -> bool:
+        """
+        Ask the server to download one search result next to the item.
+
+        Jellyfin answers 204 even when the provider refused (a daily
+        limit, for example), so True only means the request was
+        accepted; check the item's streams afterwards.
+        """
+        status, _ = await self._request_json(
+            server_name,
+            "POST",
+            f"/Items/{quote(item_id, safe='')}/RemoteSearch/Subtitles/"
+            f"{quote(subtitle_id, safe='')}",
+        )
+
+        return status in (200, 204)
 
     async def _get_items(
         self,

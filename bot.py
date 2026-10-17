@@ -19,6 +19,7 @@ from monitors.temperature_monitor import TemperatureMonitor
 from monitors.cpu_monitor import CPUMonitor
 from monitors.memory_monitor import MemoryMonitor
 from monitors.storage_monitor import StorageMonitor
+from monitors.subtitle_monitor import SubtitleMonitor
 from monitors.torrent_monitor import TorrentMonitor
 from monitors.torrent_health_monitor import TorrentHealthMonitor
 from services import startup_check
@@ -170,6 +171,9 @@ async def on_ready():
         )
         monitor_manager.register(
             EsxiMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            SubtitleMonitor(monitor_manager.notification_service)
         )
 
         monitor_task = asyncio.create_task(monitor_manager.run())

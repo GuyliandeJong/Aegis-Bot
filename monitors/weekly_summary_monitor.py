@@ -147,6 +147,7 @@ class WeeklySummaryMonitor(BaseMonitor):
             ("📥 Copied from Jellyfin", self._copies(since), False),
             ("🌐 Internet", self._outages(since), False),
             ("🗄️ Backup", self._backup(since), False),
+            ("💬 Subtitles", self._subtitles(since), False),
             ("🔔 Alerts", self._alerts(since), False),
         ]
 
@@ -339,6 +340,36 @@ class WeeklySummaryMonitor(BaseMonitor):
                 f"{changed} file{'s' if changed != 1 else ''} "
                 f"{'uploaded' if status.get('uploaded') else 'changed'}."
             )
+
+        return line
+
+    @staticmethod
+    def _subtitles(since: float) -> str:
+        entries = activity_log.since(since, "subtitles")
+
+        if not entries:
+            return "Nothing fetched."
+
+        added = list(dict.fromkeys(
+            e.get("title") or "?" for e in entries if e.get("result") == "added"
+        ))
+        none = sum(1 for e in entries if e.get("result") == "none")
+        refused = sum(1 for e in entries if e.get("result") == "refused")
+
+        parts = [f"{len(added)} added"]
+
+        if none:
+            parts.append(f"{none} not found")
+
+        if refused:
+            parts.append(f"{refused} refused (daily limit)")
+
+        line = ", ".join(parts) + "."
+
+        if added:
+            shown = ", ".join(added[:5])
+            more = f" and {len(added) - 5} more" if len(added) > 5 else ""
+            line += f"\n{shown}{more}"
 
         return line
 

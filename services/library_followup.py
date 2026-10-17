@@ -11,6 +11,7 @@ import time
 from services.jellyfin_compare import episode_numbers
 from services.jellyfin_service import JellyfinService
 from services.release_name import parse
+from services import subtitle_fetch
 from services.torrent_requesters import mention_for
 from utils.logger import logger
 
@@ -95,6 +96,25 @@ async def in_library(service: JellyfinService, category: str, release: dict) -> 
     return None
 
 
+async def _subtitles(service, server_name, category, match, release) -> str | None:
+    """
+    For a movie, fetch a missing subtitle before announcing it, and
+    return the line to add to the message. Never fails the follow-up.
+    """
+    if category != "Movies" or not subtitle_fetch.enabled() or not match.get("item_id"):
+        return None
+
+    try:
+        outcome = await subtitle_fetch.fetch(service, server_name, match["item_id"])
+        subtitle_fetch.remember(match["item_id"], describe(release), outcome)
+        return subtitle_fetch.describe(outcome)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("[LibraryFollowup] Subtitle fetch for '%s' failed.", describe(release))
+        return None
+
+
 def describe(release: dict) -> str:
     text = release["title"]
 
@@ -142,12 +162,18 @@ async def follow_up(notification_service, torrent: dict) -> None:
                     primary.name,
                 )
 
+                description = (
+                    f"**{describe(release)}** is ready to watch on "
+                    f"**{primary.name}**."
+                )
+                subtitles = await _subtitles(service, primary.name, category, match, release)
+
+                if subtitles:
+                    description += f"\n\n{subtitles}"
+
                 await notification_service.success(
                     title="Now in Jellyfin",
-                    description=(
-                        f"**{describe(release)}** is ready to watch on "
-                        f"**{primary.name}**."
-                    ),
+                    description=description,
                     content=mention_for(torrent.get("hash")),
                 )
                 return

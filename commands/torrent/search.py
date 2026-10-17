@@ -47,10 +47,16 @@ class TorrentSearchSelect(discord.ui.Select):
                 95,
             )
 
+            uploader = result.get("uploader")
             description = (
-                f"{result['indexer']} · "
+                f"{search_view.torrent_cog._source_name(result['indexer'])} · "
                 f"score {result['score']} · "
                 f"{result['seeders']} seeders"
+                + (
+                    f" · {'⭐ ' if result.get('trusted') else ''}{uploader}"
+                    if uploader
+                    else ""
+                )
             )
 
             options.append(
@@ -951,6 +957,30 @@ class TorrentSearchMixin:
         if size == 0:
             score -= 5
 
+        # Your own judgement of uploaders (torrent_preferences.json).
+        # Matched on the uploader's name only, not on group names in
+        # the title, which anyone can put there.
+        uploader = str(result.get("uploader") or "").strip().casefold()
+        result["trusted"] = False
+
+        if uploader:
+            trusted = {
+                str(name).strip().casefold()
+                for name in category_preferences.get("trusted_uploaders", [])
+            }
+            blocked = {
+                str(name).strip().casefold()
+                for name in category_preferences.get("blocked_uploaders", [])
+            }
+
+            if uploader in blocked:
+                score += int(category_preferences.get("blocked_uploader_score", -100))
+                reasons.insert(0, "blocked uploader")
+            elif uploader in trusted:
+                score += int(category_preferences.get("trusted_uploader_score", 30))
+                reasons.insert(0, "trusted uploader")
+                result["trusted"] = True
+
         result["score"] = score
 
         result["score_reason"] = (
@@ -966,7 +996,8 @@ class TorrentSearchMixin:
     def _source_name(indexer):
         """Turn a Jackett indexer ID into a readable label."""
         names = {
-            "rutracker-ru": "RuTracker",
+            "rutracker": "RuTracker.org",
+            "rutracker-ru": "RuTracker.RU",
             "thepiratebay": "The Pirate Bay",
             "1337x": "1337x",
         }
@@ -1017,7 +1048,14 @@ class TorrentSearchMixin:
                 name=f"{position}. {title}",
                 value=(
                     f"`Score {result['score']}` · "
-                    f"{source}\n"
+                    f"{source}"
+                    + (
+                        f" · {'⭐ ' if result.get('trusted') else 'by '}"
+                        f"{discord.utils.escape_markdown(result['uploader'])}"
+                        if result.get("uploader")
+                        else ""
+                    )
+                    + "\n"
                     f"🌱 {result['seeders']} seeders · "
                     f"📦 {self._format_bytes(result['size'])}\n"
                     f"_{result['score_reason']}_"
@@ -1344,6 +1382,15 @@ class TorrentSearchMixin:
                 ),
             )
         )
+
+        # Uploader lists apply to every category.
+        category_preferences = {
+            **category_preferences,
+            "trusted_uploaders": preferences.get("trusted_uploaders", []),
+            "blocked_uploaders": preferences.get("blocked_uploaders", []),
+            "trusted_uploader_score": preferences.get("trusted_uploader_score", 30),
+            "blocked_uploader_score": preferences.get("blocked_uploader_score", -100),
+        }
 
         ranked_results = [
             self._score_result(

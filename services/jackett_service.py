@@ -324,6 +324,12 @@ class JackettService:
                             "infohash"
                         )
                     ).lower(),
+                    "uploader": cls.uploader(
+                        cls.child_text(
+                            item,
+                            "description",
+                        )
+                    ),
                 }
             )
 
@@ -501,6 +507,22 @@ class JackettService:
             body,
             indexer,
         )
+
+    @staticmethod
+    def uploader(description):
+        """
+        The uploader's name from a Jackett description.
+
+        RuTracker.org, The Pirate Bay and 1337x put it there as
+        "Uploader: name", sometimes followed by <br> and more text.
+        Jackett passes no reputation, only the name.
+        """
+        match = re.search(
+            r"Uploader:\s*([^<\r\n]+)",
+            html.unescape(str(description or "")),
+        )
+
+        return match.group(1).strip() if match else ""
 
     @staticmethod
     def simplified_query(query):

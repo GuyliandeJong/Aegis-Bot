@@ -1,4 +1,12 @@
 {
+    "trusted_uploaders": [
+        "InsaneRamZes",
+        "FitGirl",
+        "DODI"
+    ],
+    "blocked_uploaders": [],
+    "trusted_uploader_score": 30,
+    "blocked_uploader_score": -100,
     "categories": {
         "Movies": {
             "preferred_resolutions": [

@@ -254,12 +254,20 @@ state changes.
 | WAN | Internet connectivity and public IP changes | 60 s |
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
+| Containers | Crashed, unhealthy and restarting Docker containers, through Portainer | 60 s |
 | Watchlist | Titles people are waiting for | Twice a day |
 | Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
+
+The container monitor alerts once when a container crashes (exits
+with another code than a normal stop: 0, 137 or 143), turns unhealthy
+or is being restarted by Docker, and once when it is fine again. Stops
+by you, by `/container stop` or by the backup give no alert. It needs
+the Portainer settings; `CONTAINER_ALERTS_IGNORE` leaves containers
+out, and `CONTAINER_ALERTS=false` turns it off.
 
 After an internet outage of at least `WAN_RECOVERY_MIN_OUTAGE` seconds
 (also one too short for a "WAN Connection Lost" alert), the containers

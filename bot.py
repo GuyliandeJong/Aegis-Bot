@@ -17,6 +17,7 @@ from monitors.watchlist_monitor import WatchlistMonitor
 from monitors.weekly_summary_monitor import WeeklySummaryMonitor
 from monitors.temperature_monitor import TemperatureMonitor
 from monitors.cpu_monitor import CPUMonitor
+from monitors.container_monitor import ContainerMonitor
 from monitors.memory_monitor import MemoryMonitor
 from monitors.storage_monitor import StorageMonitor
 from monitors.subtitle_monitor import SubtitleMonitor
@@ -174,6 +175,9 @@ async def on_ready():
         )
         monitor_manager.register(
             SubtitleMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            ContainerMonitor(monitor_manager.notification_service)
         )
 
         monitor_task = asyncio.create_task(monitor_manager.run())

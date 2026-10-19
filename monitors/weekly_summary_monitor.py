@@ -164,6 +164,9 @@ class WeeklySummaryMonitor(BaseMonitor):
             for name, value, inline in fields
         ]
 
+    # Changes smaller than this are shown as "unchanged".
+    DISK_CHANGE_MIN = 100 * 1024 ** 2
+
     async def _disks(self) -> str:
         try:
             current = await FilesystemService().get_used_bytes()
@@ -188,8 +191,13 @@ class WeeklySummaryMonitor(BaseMonitor):
 
             if mount in previous:
                 change = used - int(previous[mount])
-                sign = "+" if change >= 0 else "−"
-                line += f", {sign}{format_bytes(abs(change))} this week"
+
+                # A few KiB or MiB of logs and caches is not news.
+                if abs(change) < self.DISK_CHANGE_MIN:
+                    line += ", unchanged this week"
+                else:
+                    sign = "+" if change >= 0 else "−"
+                    line += f", {sign}{format_bytes(abs(change))} this week"
 
             lines.append(line)
 
@@ -350,8 +358,7 @@ class WeeklySummaryMonitor(BaseMonitor):
 
         return line
 
-    @staticmethod
-    def _subtitles(since: float) -> str:
+    def _subtitles(self, since: float) -> str:
         entries = activity_log.since(since, "subtitles")
 
         if not entries:
@@ -371,14 +378,17 @@ class WeeklySummaryMonitor(BaseMonitor):
         if refused:
             parts.append(f"{refused} refused (daily limit)")
 
-        line = ", ".join(parts) + "."
+        total = ", ".join(parts) + "."
 
-        if added:
-            shown = ", ".join(added[:5])
-            more = f" and {len(added) - 5} more" if len(added) > 5 else ""
-            line += f"\n{shown}{more}"
+        if not added:
+            return total
 
-        return line
+        # Like the torrent list: everything, in the thread when too long.
+        return self._list_field(
+            "💬 Subtitles added",
+            total,
+            [f"• {title}" for title in added],
+        )
 
     @staticmethod
     def _outages(since: float) -> str:
@@ -437,11 +447,23 @@ class WeeklySummaryMonitor(BaseMonitor):
             if counts.get(level)
         ]
 
-        titles = [
-            a.get("title")
-            for a in alerts
+        # The same alert repeating (a temperature hovering around its
+        # threshold) is listed once with a count, most recent first.
+        counts_by_title: dict[str, int] = {}
+
+        for alert in alerts:
+            if alert.get("level") in {"critical", "warning"}:
+                title = str(alert.get("title"))[:40]
+                counts_by_title[title] = counts_by_title.get(title, 0) + 1
+
+        latest = list(dict.fromkeys(
+            str(a.get("title"))[:40]
+            for a in reversed(alerts)
             if a.get("level") in {"critical", "warning"}
-        ]
-        recent = ", ".join(str(t)[:40] for t in titles[-5:])
+        ))[:5]
+        recent = ", ".join(
+            f"{title} ×{counts_by_title[title]}" if counts_by_title[title] > 1 else title
+            for title in latest
+        )
 
         return f"{', '.join(parts)}. Latest: {recent}"

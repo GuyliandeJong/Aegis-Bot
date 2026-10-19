@@ -163,8 +163,13 @@ async def main():
         del os.environ["SUBTITLE_DAILY_LIMIT"]
 
         print("\n== weekly summary ==")
-        print("  ", WS.WeeklySummaryMonitor._subtitles(time.time() - 3600).replace("\n", " / "))
-        print("   empty week:", WS.WeeklySummaryMonitor._subtitles(time.time() + 3600))
+        summary = WS.WeeklySummaryMonitor(Notes()); summary.overflow = []
+        print("  ", summary._subtitles(time.time() - 3600).replace("\n", " / "))
+        print("   empty week:", summary._subtitles(time.time() + 3600))
+        for n in range(60):
+            activity_log.record("subtitles", result="added", title=f"A Fairly Long Movie Title Number {n:02d} (2020)")
+        long = summary._subtitles(time.time() - 3600)
+        print("   60 more:", long.split("\n")[1], "| thread list:", summary.overflow[0][0], len(summary.overflow[0][1]))
     finally:
         await service.close()
         await runner.cleanup()

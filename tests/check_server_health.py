@@ -108,7 +108,7 @@ async def weekly():
     activity_log.record("jellyfin_copy", title="Gravity Falls — Season 2", server="Friend", files=20, bytes=30 * 1024 ** 3)
     activity_log.record("wan_outage", seconds=125)
     activity_log.record("wan_outage", seconds=600)
-    for level, title in (("warning", "High Temperature — CPU1"), ("recovered", "Temperature Recovered — CPU1"), ("critical", "Power supply Failure — PS2"), ("success", "Torrent Completed")):
+    for level, title in (("warning", "High Temperature — CPU1"), ("warning", "High Temperature — CPU1"), ("recovered", "Temperature Recovered — CPU1"), ("critical", "Power supply Failure — PS2"), ("success", "Torrent Completed")):
         activity_log.record("alert", level=level, title=title)
 
     await mon.check(); print("Sunday 09:00 -> summaries:", len(notes.sent))
@@ -118,9 +118,11 @@ async def weekly():
     for name, value, _ in notes.sent[-1][3]:
         print(f"  {name}: " + value.replace("\n", " / "))
     used["/"] = (52 * 1024 ** 3, 100 * 1024 ** 3)
+    used["/mnt/data"] = (used["/mnt/data"][0] + 24 * 1024, used["/mnt/data"][1])  # 24 KiB of logs
     clock["now"] = datetime(2026, 10, 18, 10, 30)
     await mon.check()
     print("next Sunday disks:", notes.sent[-1][3][0][1].splitlines()[0])
+    print("tiny change:", notes.sent[-1][3][0][1].splitlines()[1])
     print("next Sunday copies:", notes.sent[-1][3][2][1])
 
     # A busy week: too many titles for the field.

@@ -9,7 +9,7 @@ from monitors.base_monitor import BaseMonitor
 from services import activity_log
 from services.filesystem_service import FilesystemService
 from services.qbittorrent_service import QBittorrentService
-from services.release_name import parse
+from services.release_name import music_title, parse, pc_title
 from utils.formatting import format_bytes, format_compact_duration
 from utils.logger import logger
 
@@ -19,11 +19,18 @@ DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sun
 WEEK = 7 * 24 * 60 * 60
 
 
-def readable_title(name) -> str:
+def readable_title(name, category=None) -> str:
     """
     "Inception.2010.1080p.BluRay.x265" becomes "Inception (2010)",
-    "Fallout.S02E03.1080p" becomes "Fallout — S02E03".
+    "Fallout.S02E03.1080p" becomes "Fallout — S02E03"; PC and Music
+    torrents get their own cleanup (services/release_name.py).
     """
+    if category == "PC":
+        return pc_title(name)[:90]
+
+    if category == "Music":
+        return music_title(name)[:90]
+
     release = parse(name)
     title = release["title"] or str(name or "Unknown")
 
@@ -215,7 +222,7 @@ class WeeklySummaryMonitor(BaseMonitor):
         size = sum(int(torrent.get("size") or 0) for torrent in done)
 
         lines = [
-            f"• {readable_title(t.get('name'))} · "
+            f"• {readable_title(t.get('name'), t.get('category'))} · "
             f"{format_bytes(t.get('size'))}"
             for t in done
         ]

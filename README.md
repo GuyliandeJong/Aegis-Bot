@@ -254,6 +254,7 @@ state changes.
 | WAN | Internet connectivity and public IP changes | 60 s |
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
+| Backup | Last successful backup older than `BACKUP_MAX_AGE_DAYS` (8) | Hourly |
 | Watchlist | Titles people are waiting for | Twice a day |
 | Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
@@ -410,6 +411,11 @@ BACKUP_KEEP_LOCAL=4
 BACKUP_REMOTE=proton:Backups/home
 BACKUP_KEEP_REMOTE=8
 ```
+
+The bot also watches `data/backup_status.json`: when the last
+successful backup is older than `BACKUP_MAX_AGE_DAYS` (default 8) it
+posts "No Recent Backup", saying whether the last run failed or no run
+happened (a broken cron job), and "Backup Succeeded Again" afterwards.
 
 To restore, join the parts and unpack them at the root; the archive
 holds full paths:

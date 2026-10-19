@@ -22,6 +22,7 @@ from monitors.storage_monitor import StorageMonitor
 from monitors.subtitle_monitor import SubtitleMonitor
 from monitors.torrent_monitor import TorrentMonitor
 from monitors.torrent_health_monitor import TorrentHealthMonitor
+from monitors.vpn_monitor import VpnMonitor
 from services import startup_check
 from services.qbittorrent_service import QBittorrentService
 from services.torrent_action_tracker import (
@@ -174,6 +175,9 @@ async def on_ready():
         )
         monitor_manager.register(
             SubtitleMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            VpnMonitor(monitor_manager.notification_service)
         )
 
         monitor_task = asyncio.create_task(monitor_manager.run())

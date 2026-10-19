@@ -2,6 +2,7 @@
 
 import discord
 
+from monitors.vpn_monitor import VpnMonitor
 from services.qbittorrent_service import QBittorrentService
 from utils import theme
 from utils.embed_models import EmbedField
@@ -104,6 +105,24 @@ class TorrentStatusMixin:
                 True,
             ),
         ]
+
+        # Only the verdict is shown, never the addresses themselves.
+        if VpnMonitor.enabled():
+            vpn = VpnMonitor.verdict(
+                transfer,
+                await VpnMonitor.home_ip(),
+            )
+
+            fields.append(
+                EmbedField(
+                    "VPN",
+                    {
+                        "ok": "OK",
+                        "leak": f"{theme.WARNING_EMOJI} Not behind VPN",
+                    }.get(vpn, "Unknown"),
+                    True,
+                )
+            )
 
         embed = create_embed(
             interaction=interaction,

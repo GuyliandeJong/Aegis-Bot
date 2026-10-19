@@ -162,7 +162,10 @@ installed and logged in on that server:
   Forced and machine-translated subtitles are never taken.
 - The weekly summary shows what was added.
 
-`SUBTITLE_AUTO_DOWNLOAD=false` turns this off. Series are not covered.
+Series episodes get the same with `SUBTITLE_SERIES` (default on): a
+single downloaded episode right away, season packs and existing
+episodes in the daily run, which they share with movies.
+`SUBTITLE_AUTO_DOWNLOAD=false` turns all of it off.
 
 The other server's API key must be allowed to download media.
 

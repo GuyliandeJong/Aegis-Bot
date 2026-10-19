@@ -11,6 +11,7 @@ from monitors.filesystem_monitor import FilesystemMonitor
 from monitors.hardware_monitor import HardwareMonitor
 from monitors.heartbeat_monitor import HeartbeatMonitor
 from monitors.jellyfin_new_content_monitor import JellyfinNewContentMonitor
+from monitors.maintenance_monitor import MaintenanceMonitor
 from monitors.monitor_manager import MonitorManager
 from monitors.wan_monitor import WanMonitor
 from monitors.watchlist_monitor import WatchlistMonitor
@@ -174,6 +175,9 @@ async def on_ready():
         )
         monitor_manager.register(
             SubtitleMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            MaintenanceMonitor(monitor_manager.notification_service)
         )
 
         monitor_task = asyncio.create_task(monitor_manager.run())

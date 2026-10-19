@@ -38,6 +38,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_jellyfin_extras.py` | Episode comparison, matching series between libraries, quality and the better-copy note, the daily new-content alert and its picker, the download queue | Two local fake Jellyfin servers, fake channel and clock |
 | `check_restart.py` | Buttons marked expired after a restart, the shared torrent list, pruning removed torrents, GiB sizes, the startup service check | Fake channel, local fake qBittorrent, Jackett and Jellyfin |
 | `check_requesters_links.py` | Who is mentioned per torrent, and Google share links | Local fake Google and Wikidata |
+| `check_vpn.py` | The VPN check: leak alert with masked addresses, the disconnected warning and recoveries, qBittorrent before 5.1, the `/torrent status` VPN field | Local fake qBittorrent, stubbed WAN IP |
 
 `isolate.py` points the bot's state files at a temporary folder, so a
 check never writes to `/app/data`; checks import it after the project

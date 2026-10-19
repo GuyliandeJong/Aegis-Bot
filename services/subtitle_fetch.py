@@ -21,6 +21,9 @@ Used in two places:
                                0 turns the daily run off)
     SUBTITLE_HEARING_IMPAIRED  prefer hearing-impaired subtitles
                                (default false)
+    SUBTITLE_SERIES            also series episodes (default true): a
+                               single downloaded episode right away,
+                               the rest in the daily run
 """
 
 import asyncio
@@ -57,6 +60,10 @@ def daily_limit() -> int:
         return max(0, int(os.getenv("SUBTITLE_DAILY_LIMIT", "10")))
     except ValueError:
         return 10
+
+
+def series() -> bool:
+    return _flag("SUBTITLE_SERIES", "true")
 
 
 def hearing_impaired() -> bool:
@@ -230,6 +237,11 @@ def _tried_recently(state: dict, item_id: str, now: float) -> bool:
 
 
 def _title(item: dict) -> str:
+    if item.get("Type") == "Episode" or item.get("SeriesName"):
+        season, number = item.get("ParentIndexNumber"), item.get("IndexNumber")
+        code = f"S{season:02d}E{number:02d}" if isinstance(season, int) and isinstance(number, int) else str(item.get("Name") or "")
+        return f"{item.get('SeriesName') or 'Unknown series'} — {code}"
+
     name = str(item.get("Name") or "Unknown")
     year = item.get("ProductionYear")
     return f"{name} ({year})" if year else name
@@ -242,8 +254,9 @@ def _title(item: dict) -> str:
 
 async def backfill(service: JellyfinService, limit: int) -> dict:
     """
-    Try up to `limit` movies of the primary library that lack a
-    subtitle in SUBTITLE_LANGUAGE, newest additions first.
+    Try up to `limit` movies (and, with SUBTITLE_SERIES, episodes) of
+    the primary library that lack a subtitle in SUBTITLE_LANGUAGE,
+    newest additions first; movies and episodes share the limit.
 
     Stops early when a download is refused: the provider's daily limit
     is then reached and further tries would only waste requests.
@@ -256,6 +269,11 @@ async def backfill(service: JellyfinService, limit: int) -> dict:
         return counts
 
     movies = await service.list_movies(primary.name)
+
+    if series():
+        movies += await service.list_movies(primary.name, "Episode")
+        # ISO dates sort as text; newest first across both kinds.
+        movies.sort(key=lambda item: str(item.get("DateCreated") or ""), reverse=True)
     state = _load()
     now = time.time()
 

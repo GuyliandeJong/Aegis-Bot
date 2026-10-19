@@ -98,15 +98,46 @@ async def in_library(service: JellyfinService, category: str, release: dict) -> 
 
 async def _subtitles(service, server_name, category, match, release) -> str | None:
     """
-    For a movie, fetch a missing subtitle before announcing it, and
-    return the line to add to the message. Never fails the follow-up.
+    For a movie or a single episode, fetch a missing subtitle before
+    announcing it, and return the line to add to the message. Season
+    packs are left to the daily run, which spreads the provider's daily
+    limit. Never fails the follow-up.
     """
-    if category != "Movies" or not subtitle_fetch.enabled() or not match.get("item_id"):
+    if not subtitle_fetch.enabled() or not match.get("item_id"):
         return None
 
+    item_id = match["item_id"]
+
     try:
-        outcome = await subtitle_fetch.fetch(service, server_name, match["item_id"])
-        subtitle_fetch.remember(match["item_id"], describe(release), outcome)
+        if category == "Series":
+            if not subtitle_fetch.series() or release["episode"] is None:
+                return None
+
+            episodes = await service.get_series_episodes(server_name, item_id)
+            item_id = next(
+                (
+                    str(episode.get("Id"))
+                    for episode in episodes
+                    if episode.get("ParentIndexNumber") == release["season"]
+                    and release["episode"] in episode_numbers(episode)
+                ),
+                None,
+            )
+
+            if item_id is None:
+                return None
+        elif category != "Movies":
+            return None
+
+        outcome = await subtitle_fetch.fetch(service, server_name, item_id)
+
+        # Same form as the daily run, for one consistent summary list.
+        label = (
+            f"{release['title']} — S{release['season']:02d}E{release['episode']:02d}"
+            if category == "Series"
+            else describe(release)
+        )
+        subtitle_fetch.remember(item_id, label, outcome)
         return subtitle_fetch.describe(outcome)
     except asyncio.CancelledError:
         raise

@@ -921,13 +921,16 @@ class JellyfinService:
 
         return items[0] if items else None
 
-    async def list_movies(self, server_name: str) -> list[dict]:
-        """Every movie with its streams, newest addition first."""
+    async def list_movies(self, server_name: str, item_type: str = "Movie") -> list[dict]:
+        """
+        Every movie (or, with item_type="Episode", every episode) with
+        its streams, newest addition first.
+        """
         return await self._get_items(
             server_name,
             "/Items",
             {
-                "IncludeItemTypes": "Movie",
+                "IncludeItemTypes": item_type,
                 "Recursive": "true",
                 "IsMissing": "false",
                 "Fields": "MediaStreams,ProductionYear,Path,DateCreated",

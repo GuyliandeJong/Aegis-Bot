@@ -29,6 +29,8 @@ SM.SubtitleMonitor.STATE_FILE = isolate.DATA / "subtitle_monitor_state.json"
 
 # id: name, year, subtitle languages present (None = not scanned yet), search results
 MOVIES = {}
+# id: series, season, episode, subtitle languages present, search results
+EPISODES = {}
 REQUESTS = []
 FLAGS = {"quota": False, "search_down": False}
 
@@ -48,9 +50,23 @@ def reset():
         "m5": ["Heat", 1995, [], [{"Id": "heat", "ProviderName": "Open Subtitles", "DownloadCount": 50}]],
         "m6": ["Ronin", 1998, [], [{"Id": "ronin", "ProviderName": "Open Subtitles", "DownloadCount": 50}]],
     })
+    EPISODES.clear()
+    EPISODES.update({
+        "e1": ["Fallout", 2, 3, [], [{"Id": "fallout-s02e03", "ProviderName": "Open Subtitles", "DownloadCount": 40}]],
+        "e2": ["Fallout", 2, 4, ["eng"], []],
+    })
+
+
+def episode(episode_id):
+    series_name, season, number, subs, _ = EPISODES[episode_id]
+    return {"Id": episode_id, "Type": "Episode", "Name": f"Episode {number}", "SeriesName": series_name,
+            "ParentIndexNumber": season, "IndexNumber": number,
+            "MediaStreams": [{"Type": "Subtitle", "Language": lang, "IsExternal": True, "IsTextSubtitleStream": True, "Index": 2} for lang in subs]}
 
 
 def item(movie_id):
+    if movie_id in EPISODES:
+        return episode(movie_id)
     name, year, subs, _ = MOVIES[movie_id]
     out = {"Id": movie_id, "Name": name, "ProductionYear": year, "Type": "Movie"}
     if subs is not None:
@@ -62,8 +78,14 @@ def item(movie_id):
 async def items(request):
     REQUESTS.append(("GET", "/Items", dict(request.query)))
     if request.query.get("Ids"):
-        return web.json_response({"Items": [item(i) for i in request.query["Ids"].split(",") if i in MOVIES]})
+        return web.json_response({"Items": [item(i) for i in request.query["Ids"].split(",") if i in MOVIES or i in EPISODES]})
+    if request.query.get("IncludeItemTypes") == "Episode":
+        return web.json_response({"Items": [episode(i) for i in EPISODES]})
     return web.json_response({"Items": [item(i) for i in MOVIES]})
+
+
+async def show_episodes(request):
+    return web.json_response({"Items": [episode(i) for i in EPISODES]})
 
 
 async def search(request):
@@ -71,6 +93,8 @@ async def search(request):
     REQUESTS.append(("GET", f"search {movie} {language}", {}))
     if FLAGS["search_down"]:
         return web.Response(status=500, text="provider error")
+    if movie in EPISODES:
+        return web.json_response(EPISODES[movie][4])
     return web.json_response(MOVIES[movie][3] if movie in MOVIES else [])
 
 
@@ -78,7 +102,7 @@ async def download(request):
     movie, sub = request.match_info["id"], request.match_info["sub"]
     REQUESTS.append(("POST", f"download {movie} {sub}", {}))
     if not FLAGS["quota"]:
-        MOVIES[movie][2].append("eng")
+        (EPISODES[movie][3] if movie in EPISODES else MOVIES[movie][2]).append("eng")
     return web.Response(status=204)  # Jellyfin answers 204 either way
 
 
@@ -94,7 +118,8 @@ def downloads(): return [r[1] for r in REQUESTS if r[1].startswith("download")]
 async def main():
     app = web.Application()
     app.add_routes([web.get("/Items", items), web.get("/Items/{id}/RemoteSearch/Subtitles/{language}", search),
-                    web.post("/Items/{id}/RemoteSearch/Subtitles/{sub}", download)])
+                    web.post("/Items/{id}/RemoteSearch/Subtitles/{sub}", download),
+                    web.get("/Shows/{id}/Episodes", show_episodes)])
     runner = web.AppRunner(app); await runner.setup(); await web.TCPSite(runner, "127.0.0.1", PORT).start()
     service = JellyfinService()
     try:
@@ -128,7 +153,12 @@ async def main():
         reset()
         line = await LF._subtitles(service, "Home", "Movies", {"item_id": "m1"}, {"title": "Arrival", "year": 2016, "season": None, "episode": None})
         print("  movie:", line)
-        print("  series:", await LF._subtitles(service, "Home", "Series", {"item_id": "m1"}, {"title": "x", "year": None, "season": 1, "episode": 1}))
+        print("  episode:", await LF._subtitles(service, "Home", "Series", {"item_id": "s1"}, {"title": "Fallout", "year": None, "season": 2, "episode": 3}),
+              "| searched:", [x for x in searches() if "e1" in x])
+        print("  season pack:", await LF._subtitles(service, "Home", "Series", {"item_id": "s1"}, {"title": "Fallout", "year": None, "season": 2, "episode": None}))
+        os.environ["SUBTITLE_SERIES"] = "false"
+        print("  SUBTITLE_SERIES=false:", await LF._subtitles(service, "Home", "Series", {"item_id": "s1"}, {"title": "Fallout", "year": None, "season": 2, "episode": 3}))
+        del os.environ["SUBTITLE_SERIES"]
         os.environ["SUBTITLE_AUTO_DOWNLOAD"] = "false"
         print("  turned off:", await LF._subtitles(service, "Home", "Movies", {"item_id": "m3"}, {"title": "x", "year": None, "season": None, "episode": None}))
         del os.environ["SUBTITLE_AUTO_DOWNLOAD"]
@@ -142,6 +172,7 @@ async def main():
         print("  next day:", {k: v for k, v in counts.items() if v}, "| tried:", [s.split()[1] for s in searches()])
         REQUESTS.clear()
         counts = await SF.backfill(service, 10)
+        print("  episode title in the log and summary:", [e["title"] for e in activity_log.since(0, "subtitles") if "Fallout" in str(e.get("title"))][-1:])
         print("  'nothing found' waits", SF.RETRY_DAYS, "days; tried:", [s.split()[1] for s in searches()], "| skipped unscanned m4:", "search m4 eng" not in searches())
         reset(); REQUESTS.clear(); SF.STATE_FILE.unlink(missing_ok=True); FLAGS["quota"] = True
         counts = await SF.backfill(service, 10)

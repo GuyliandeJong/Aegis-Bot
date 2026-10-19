@@ -3,6 +3,8 @@
 watched state.
 
     /jellyfin movies <title>
+    /jellyfin playing          what is being played on your server now
+                               (administrators)
 
 The title has autocomplete from all servers, with the watched marks.
 Watched state is that of JELLYFIN_<n>_USER on each server. The reply
@@ -107,6 +109,74 @@ def movies_embed(
 
     embed.set_footer(text=" • ".join(footer))
     return embed, page, total_pages
+
+
+def _is_admin(user) -> bool:
+    permissions = getattr(user, "guild_permissions", None)
+    return bool(permissions and permissions.administrator)
+
+
+def _clock(seconds: int, hours_format: bool) -> str:
+    """h:mm for anything an hour or longer, m:ss for shorter, so the
+    position and the runtime always read the same way."""
+    seconds = max(0, seconds)
+
+    if hours_format:
+        return f"{seconds // 3600}:{seconds % 3600 // 60:02d}"
+
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+# Jellyfin's transcode reasons, as people would say them.
+REASONS = {
+    "ContainerNotSupported": "container",
+    "VideoCodecNotSupported": "video codec",
+    "AudioCodecNotSupported": "audio codec",
+    "SubtitleCodecNotSupported": "subtitles burned in",
+    "AudioIsExternal": "external audio",
+    "SecondaryAudioNotSupported": "second audio track",
+    "VideoResolutionNotSupported": "resolution",
+    "VideoBitrateNotSupported": "video bitrate",
+    "AudioBitrateNotSupported": "audio bitrate",
+    "ContainerBitrateExceedsLimit": "bitrate limit",
+    "VideoRangeTypeNotSupported": "HDR",
+    "AudioChannelsNotSupported": "audio channels",
+}
+
+
+def playing_lines(session: dict) -> str:
+    """Two lines for one stream: what and who, then progress and how."""
+    icon = "⏸️" if session["paused"] else "▶️"
+    where = " on ".join(part for part in (session["user"], session["device"] or session["client"]) if part)
+    head = f"{icon} **{discord.utils.escape_markdown(session['title'])}** — {discord.utils.escape_markdown(where)}"
+
+    parts = []
+
+    if session["runtime"]:
+        percent = min(100, round(session["position"] / session["runtime"] * 100))
+        filled = round(percent / 10)
+        parts.append(
+            f"{'▰' * filled}{'▱' * (10 - filled)} {percent}% · "
+            f"{_clock(session['position'], session['runtime'] >= 3600)} of "
+            f"{_clock(session['runtime'], session['runtime'] >= 3600)}"
+        )
+
+    if session["method"] == "Transcode":
+        text = "Transcoding"
+
+        if session["height"]:
+            text += f" to {session['height']}p"
+
+        reasons = [REASONS.get(r, r) for r in session["reasons"]]
+
+        if reasons:
+            text += f" ({', '.join(reasons)})"
+
+        parts.append(text)
+    elif session["method"]:
+        parts.append({"DirectPlay": "Direct play", "DirectStream": "Direct stream"}.get(session["method"], session["method"]))
+
+    return head + ("\n" + " · ".join(parts) if parts else "")
 
 
 class MoviesView(ExpiringView):
@@ -257,6 +327,50 @@ class JellyfinCog(commands.Cog):
         view.interaction = interaction
         view.message = message
 
+
+    @jellyfin.command(
+        name="playing",
+        description="What is being played on your Jellyfin server right now.",
+    )
+    async def playing(self, interaction: discord.Interaction):
+        if not _is_admin(interaction.user):
+            await interaction.response.send_message(
+                "Only administrators can see who is watching what.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        service = JellyfinService()
+        primary = service.primary_server()
+
+        if primary is None:
+            await interaction.followup.send("No Jellyfin server is configured.", ephemeral=True)
+            return
+
+        try:
+            sessions = await service.now_playing(primary.name)
+        finally:
+            await service.close()
+
+        if sessions is None:
+            await interaction.followup.send(f"{primary.name} did not answer.", ephemeral=True)
+            return
+
+        transcoding = sum(1 for s in sessions if s["method"] == "Transcode")
+        summary = (
+            f"**{len(sessions)}** stream{'s' if len(sessions) != 1 else ''}"
+            + (f" · **{transcoding}** transcoding" if transcoding else "")
+            if sessions
+            else "Nothing is playing right now."
+        )
+
+        embed = create_embed(
+            interaction=interaction,
+            title=f"{MOVIE_EMOJI} Jellyfin — Now Playing on {primary.name}",
+            description="\n\n".join([summary] + [playing_lines(s) for s in sessions])[:4000],
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @movies.autocomplete("title")
     async def movie_titles(

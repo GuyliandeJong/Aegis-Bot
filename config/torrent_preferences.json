@@ -7,6 +7,9 @@
     "blocked_uploaders": [],
     "trusted_uploader_score": 30,
     "blocked_uploader_score": -100,
+    "uploader_categories": [
+        "PC"
+    ],
     "categories": {
         "Movies": {
             "preferred_resolutions": [

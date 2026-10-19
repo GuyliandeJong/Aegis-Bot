@@ -1383,11 +1383,16 @@ class TorrentSearchMixin:
             )
         )
 
-        # Uploader lists apply to every category.
+        # Uploader lists only count for the categories in
+        # uploader_categories (default PC: software you run yourself).
+        # The uploader's name is shown everywhere.
+        uploader_categories = preferences.get("uploader_categories", ["PC"])
+        applies = category in uploader_categories
+
         category_preferences = {
             **category_preferences,
-            "trusted_uploaders": preferences.get("trusted_uploaders", []),
-            "blocked_uploaders": preferences.get("blocked_uploaders", []),
+            "trusted_uploaders": preferences.get("trusted_uploaders", []) if applies else [],
+            "blocked_uploaders": preferences.get("blocked_uploaders", []) if applies else [],
             "trusted_uploader_score": preferences.get("trusted_uploader_score", 30),
             "blocked_uploader_score": preferences.get("blocked_uploader_score", -100),
         }

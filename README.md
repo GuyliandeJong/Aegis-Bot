@@ -642,7 +642,8 @@ see `config/settings.example.py` for their names and defaults.
 ranked per category: preferred resolutions, codec scores and terms to
 avoid.
 
-It also holds two uploader lists for all categories. Jackett passes
+It also holds two uploader lists, which count for the categories in
+`uploader_categories` (default `["PC"]`: software you run yourself). Jackett passes
 the uploader's name for RuTracker.org, The Pirate Bay and 1337x, but no
 reputation, so the lists are your own judgement:
 

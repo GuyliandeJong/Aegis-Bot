@@ -91,6 +91,9 @@ async def main():
         options = SM.TorrentSearchSelect(view).options
         print("  dropdown:", options[0].description, "|", options[-1].description)
 
+        ranked, _, _, _ = await cog._find_torrents("Castlevania: Belmont's Curse", "Movies")
+        print("  Movies category: trusted=", any(r["trusted"] for r in ranked), "| names still shown:", sorted({r["uploader"] for r in ranked if r["uploader"]}))
+
         print("\n== blocked uploader ==")
         custom = json.loads(PREFS.read_text()); custom["blocked_uploaders"] = ["faker99"]
         temporary = Path(tempfile.mkdtemp()) / "prefs.json"; temporary.write_text(json.dumps(custom))

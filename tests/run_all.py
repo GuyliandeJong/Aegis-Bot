@@ -59,6 +59,7 @@ EXPECTED = {
         "field: `Score 135` · 1337x · ⭐ FitGirl | ['`Score 105` · RuTracker.org · by omg\\\\_gods']",
         "dropdown: 1337x · score 135 · 2297 seeders · ⭐ FitGirl | The Pirate Bay · score 85 · 6 seeders",
         "faker99: 5 blocked uploader, title match, 900 seeders | last: True",
+        "Movies category: trusted= False | names still shown: ['FitGirl', 'InsaneRamZes', 'faker99', 'omg_gods']",
     ],
     "check_jellyfin_extras.py": [
         "season 2: complete=False episodes=['t5', 't6']",

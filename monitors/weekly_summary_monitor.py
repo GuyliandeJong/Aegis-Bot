@@ -167,6 +167,45 @@ class WeeklySummaryMonitor(BaseMonitor):
     # Changes smaller than this are shown as "unchanged".
     DISK_CHANGE_MIN = 100 * 1024 ** 2
 
+    # Weekly snapshots kept per disk, and how far ahead an estimate is
+    # still worth showing.
+    FORECAST_POINTS = 5
+    FORECAST_MAX_WEEKS = 52
+
+    @classmethod
+    def _forecast(cls, points: list, used: int, total: int) -> str | None:
+        """
+        "full in about 9 weeks", from the average growth over the kept
+        weeks (at least two), or None when the disk is not filling up
+        or would last longer than FORECAST_MAX_WEEKS.
+        """
+        if not total or len(points) < 3:
+            return None
+
+        (start, first), (end, last) = points[0], points[-1]
+        weeks = (end - start) / (7 * 86400)
+
+        if weeks <= 0:
+            return None
+
+        growth = (last - first) / weeks
+
+        if growth < cls.DISK_CHANGE_MIN:
+            return None
+
+        left = (total - used) / growth
+
+        if left > cls.FORECAST_MAX_WEEKS:
+            return None
+
+        if left < 1:
+            return "full within a week at this rate"
+
+        if left < 9:
+            return f"full in about {round(left)} week{'s' if round(left) != 1 else ''} at this rate"
+
+        return f"full in about {round(left / 4.35)} months at this rate"
+
     async def _disks(self) -> str:
         try:
             current = await FilesystemService().get_used_bytes()
@@ -178,6 +217,17 @@ class WeeklySummaryMonitor(BaseMonitor):
         self.state["disks"] = {
             mount: used for mount, (used, _total) in current.items()
         }
+
+        # A few weeks of usage per disk, for the "full in" estimate.
+        now = self._now().timestamp()
+        history = self.state.get("disk_history") or {}
+
+        for mount, (used, _total) in current.items():
+            points = [p for p in history.get(mount, []) if isinstance(p, list) and len(p) == 2]
+            points.append([now, used])
+            history[mount] = points[-self.FORECAST_POINTS:]
+
+        self.state["disk_history"] = {m: p for m, p in history.items() if m in current}
 
         lines = []
 
@@ -198,6 +248,11 @@ class WeeklySummaryMonitor(BaseMonitor):
                 else:
                     sign = "+" if change >= 0 else "−"
                     line += f", {sign}{format_bytes(abs(change))} this week"
+
+            forecast = self._forecast(self.state["disk_history"].get(mount, []), used, total)
+
+            if forecast:
+                line += f" · {forecast}"
 
             lines.append(line)
 

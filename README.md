@@ -255,7 +255,7 @@ state changes.
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
 | Watchlist | Titles people are waiting for | Twice a day |
-| Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
+| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |

@@ -847,9 +847,11 @@ class JellyfinService:
         method: str,
         path: str,
         timeout: float = 90,
+        payload: dict | None = None,
     ) -> tuple[int, object]:
         """
-        One API call: (HTTP status, parsed JSON or None).
+        One API call: (HTTP status, parsed JSON or None). A payload,
+        when given, is sent as the JSON body.
 
         Returns (0, None) when the server could not be reached.
         Provider searches go out to the internet, hence the longer
@@ -874,6 +876,7 @@ class JellyfinService:
                     "Accept": "application/json",
                 },
                 timeout=aiohttp.ClientTimeout(total=timeout),
+                json=payload,
             ) as response:
                 body = await response.text()
 
@@ -1040,6 +1043,25 @@ class JellyfinService:
         )
 
         return status in (200, 204)
+
+    async def playback_query(self, server_name: str, sql: str) -> tuple[int, object]:
+        """
+        Run an SQL query on the Playback Reporting plugin's
+        PlaybackActivity table: (HTTP status, response).
+
+        The plugin answers {"colums": [...], "results": [[...]],
+        "message": "..."} (its spelling, "colums"); every cell is a
+        string, and "message" is empty unless the query failed or
+        returned nothing. With ReplaceUserId a column named UserId
+        holds user names instead. 404 means the plugin is not installed.
+        """
+        return await self._request_json(
+            server_name,
+            "POST",
+            "/user_usage_stats/submit_custom_query",
+            timeout=60,
+            payload={"CustomQueryString": sql, "ReplaceUserId": True},
+        )
 
     async def _get_items(
         self,

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from monitors.base_monitor import BaseMonitor
-from services import activity_log
+from services import activity_log, watch_stats
 from services.filesystem_service import FilesystemService
 from services.qbittorrent_service import QBittorrentService
 from services.release_name import music_title, parse, pc_title
@@ -49,15 +49,17 @@ def readable_title(name, category=None) -> str:
 class WeeklySummaryMonitor(BaseMonitor):
     """
     Posts a weekly summary in the alert channel: disk growth, torrents
-    completed, titles copied from other Jellyfin servers, and alerts.
+    completed, titles copied from other Jellyfin servers, what was
+    watched on the primary Jellyfin server, and alerts.
 
     Disk usage is compared with the snapshot taken at the previous
     summary, so the first summary only records it.
 
     .env:
-        WEEKLY_SUMMARY       true (default) or false
-        WEEKLY_SUMMARY_DAY   monday..sunday (default sunday)
-        WEEKLY_SUMMARY_HOUR  0-23 (default 10, container time)
+        WEEKLY_SUMMARY              true (default) or false
+        WEEKLY_SUMMARY_DAY          monday..sunday (default sunday)
+        WEEKLY_SUMMARY_HOUR         0-23 (default 10, container time)
+        WEEKLY_SUMMARY_WATCH_STATS  true (default) or false
     """
 
     STATE_FILE = Path("/app/data/weekly_summary_state.json")
@@ -155,8 +157,15 @@ class WeeklySummaryMonitor(BaseMonitor):
             ("🌐 Internet", self._outages(since), False),
             ("🗄️ Backup", self._backup(since), False),
             ("💬 Subtitles", self._subtitles(since), False),
-            ("🔔 Alerts", self._alerts(since), False),
         ]
+
+        # Left out when turned off or no Jellyfin server is configured.
+        watched = await self._watched(since)
+
+        if watched is not None:
+            fields.append(("🍿 Watched this week", watched, False))
+
+        fields.append(("🔔 Alerts", self._alerts(since), False))
 
         # Discord refuses a field value over 1024 characters.
         return [
@@ -389,6 +398,14 @@ class WeeklySummaryMonitor(BaseMonitor):
             total,
             [f"• {title}" for title in added],
         )
+
+    @staticmethod
+    async def _watched(since: float) -> str | None:
+        try:
+            return await watch_stats.field(since)
+        except Exception as ex:
+            logger.warning("[WeeklySummary] Watch statistics unavailable: %s", ex)
+            return "Not available."
 
     @staticmethod
     def _outages(since: float) -> str:

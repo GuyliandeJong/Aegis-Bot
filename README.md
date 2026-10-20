@@ -364,7 +364,7 @@ stopped on purpose should not be in that list.
 
 ```text
 # name=host:port, comma separated; the port defaults to 25565.
-MINECRAFT_SERVERS=Survival=192.0.2.20:25565,Creative=192.0.2.20:25566
+MINECRAFT_SERVERS=Survival=mc-survival:25565,Creative=mc-creative:25565
 MINECRAFT_JOIN_ALERTS=false
 # Servers that alert when they stop answering, comma separated names.
 MINECRAFT_WATCH=

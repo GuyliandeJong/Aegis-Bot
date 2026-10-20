@@ -322,6 +322,32 @@ Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
 (default 10). Hard disks do not report this.
 
+### Fluxer
+
+Alerts can also be posted to a [Fluxer](https://fluxer.app) channel.
+This is alerts only: the commands, buttons and dropdowns stay on
+Discord until Fluxer supports slash commands and interactions. Discord
+remains the main channel.
+
+In Fluxer, create a webhook for the channel (channel settings,
+Webhooks) and put its URL in `.env`:
+
+```text
+FLUXER_WEBHOOK_URL=https://<api>/v1/webhooks/<id>/<token>
+```
+
+Every alert, recovery and weekly summary in the Discord alert channel
+then also appears in Fluxer as an embed with the same title, text,
+color and fields. Discord timestamps are written out in UTC
+("2026-10-19 04:00 UTC"), mentions as names, and nobody is pinged
+there. Lists the weekly summary puts in a Discord thread, buttons and
+the Jellyfin download pickers are not mirrored.
+
+Posting to Fluxer runs in the background with a 10-second limit, so a
+slow or broken Fluxer never delays a Discord alert. Failures are
+logged as `[Fluxer] Could not mirror alert`, at most once per five
+minutes. Empty `FLUXER_WEBHOOK_URL` (the default) turns it off.
+
 ### ESXi
 
 When ESXi is configured, the bot checks the host every five minutes
@@ -548,6 +574,8 @@ Optional:
 # Mentioned for torrents that were not added through the bot.
 DISCORD_USER_ID=
 
+# Fluxer webhook URL; every alert is also posted there. Empty: off.
+FLUXER_WEBHOOK_URL=
 # Jellyfin servers, numbered from 1. Server 1 is the primary library.
 JELLYFIN_1_URL=
 JELLYFIN_1_API_KEY=
@@ -705,7 +733,7 @@ The same output is kept in `data/logs/aegis.log`.
 bot.py                 Entry point: loads commands, starts monitors
 commands/              One file per slash command
 commands/torrent/      The /torrent group, its views and the Jellyfin download
-services/              Clients for qBittorrent, Jackett, Jellyfin, GPTWOL, Portainer, Redfish data
+services/              Clients for qBittorrent, Jackett, Jellyfin, GPTWOL, Portainer, Redfish data, the Fluxer webhook
 monitors/              Background checks and their persisted state
 models/                Small data classes returned by services
 redfish/               HTTP client for the iDRAC Redfish API

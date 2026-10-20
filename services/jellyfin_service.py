@@ -8,8 +8,9 @@ import os
 import re
 import shutil
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlencode
 
 import aiohttp
 
@@ -941,6 +942,107 @@ class JellyfinService:
             },
             timeout=180,
         )
+
+    @staticmethod
+    def date_created(item: dict) -> float | None:
+        """
+        An item's DateCreated as a Unix time, or None.
+
+        Jellyfin writes UTC with seven decimals ("2026-10-15T12:34:56.1234567Z");
+        the decimals are dropped, a time without zone is taken as UTC.
+        """
+        value = str(item.get("DateCreated") or "").strip()
+
+        if not value:
+            return None
+
+        value = re.sub(r"\.\d+", "", value).replace("Z", "+00:00")
+
+        try:
+            moment = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+
+        return moment.timestamp()
+
+    # Paging for list_added_since(): items per request, and a ceiling
+    # so a freshly imported library does not mean hundreds of requests.
+    ADDED_PAGE = 200
+    ADDED_MAX = 2000
+
+    async def list_added_since(
+        self,
+        server_name: str,
+        since: float,
+    ) -> list[dict] | None:
+        """
+        Movies and episodes added to a server since a Unix time, newest
+        first. None when the server did not answer.
+
+        /Items has no filter on the date an item was added (only
+        minDateLastSaved, which also moves when metadata is refreshed),
+        so the list is sorted by DateCreated and read page by page until
+        an older item appears. SeriesName, ParentIndexNumber, IndexNumber
+        and ProductionYear are always in the answer; DateCreated only
+        when asked for in Fields.
+        """
+        added: list[dict] = []
+        start = 0
+
+        while start < self.ADDED_MAX:
+            query = urlencode(
+                {
+                    "IncludeItemTypes": "Movie,Episode",
+                    "Recursive": "true",
+                    "IsMissing": "false",
+                    "Fields": "DateCreated",
+                    "SortBy": "DateCreated",
+                    "SortOrder": "Descending",
+                    "StartIndex": start,
+                    "Limit": self.ADDED_PAGE,
+                    "EnableImages": "false",
+                    "EnableUserData": "false",
+                    "EnableTotalRecordCount": "false",
+                }
+            )
+
+            status, data = await self._request_json(
+                server_name, "GET", f"/Items?{query}", timeout=30
+            )
+
+            if status != 200 or not isinstance(data, dict):
+                return None
+
+            page = [
+                item for item in data.get("Items") or [] if isinstance(item, dict)
+            ]
+
+            for item in page:
+                created = self.date_created(item)
+
+                if created is None:
+                    continue
+
+                if created < since:
+                    return added
+
+                added.append(item)
+
+            if len(page) < self.ADDED_PAGE:
+                return added
+
+            start += self.ADDED_PAGE
+
+        logger.warning(
+            "[Jellyfin] More than %d items added to %s; the list stops there.",
+            self.ADDED_MAX,
+            server_name,
+        )
+
+        return added
 
     async def find_user_id(self, server_name: str, username: str) -> str | None:
         """The id of a Jellyfin user by name, ignoring case."""

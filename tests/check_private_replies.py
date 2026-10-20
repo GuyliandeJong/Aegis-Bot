@@ -1,11 +1,11 @@
-"""/wan, /server, /idrac and /network answer only the person who ran them: every reply call passes ephemeral=True."""
+"""/wan, /server, /idrac, /network, /esxi and /minecraft answer only the person who ran them: every reply call passes ephemeral=True."""
 import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REPLIES = {"defer", "send_message", "send"}
 
-for name in ("wan", "server", "idrac", "network", "esxi"):
+for name in ("wan", "server", "idrac", "network", "esxi", "minecraft"):
     tree = ast.parse((ROOT / "commands" / f"{name}.py").read_text(encoding="utf-8"))
     calls = []
     for node in ast.walk(tree):

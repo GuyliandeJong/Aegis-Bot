@@ -251,6 +251,7 @@ state changes.
 | Temperature | iDRAC temperature sensors | 60 s |
 | Storage | RAID controller, virtual disks and physical drives | 60 s |
 | Hardware | Power supply and fan health through iDRAC | 60 s |
+| Event log | New entries in iDRAC's System Event Log | 5 min |
 | WAN | Internet connectivity and public IP changes | 60 s |
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
@@ -299,6 +300,21 @@ fans: a failing power supply or rail shows there. This shows what iDRAC reports:
 
 ```bash
 docker exec aegis-bot python scripts/redfish_power_check.py
+```
+
+The event log monitor reads iDRAC's System Event Log (SEL) every five
+minutes. The first check only records what is already there; after that
+each new Critical entry is posted as critical and each new Warning
+entry as a warning, with iDRAC's message, the sensor type and the time.
+New entries from one check are grouped into one alert per severity
+(at most ten lines, then "and N more"). Informational (OK) entries are
+left out unless `IDRAC_EVENT_LOG_ALL=true`. If iDRAC has no such log
+(HTTP 404), that is logged once and the monitor stops until the next
+restart. The Lifecycle log is not watched.
+
+```text
+IDRAC_EVENT_LOG=true         # false turns it off
+IDRAC_EVENT_LOG_ALL=false    # true: also post OK entries as info
 ```
 
 The weekly summary is posted in the alert channel:
@@ -604,6 +620,10 @@ ESXI_IGNORE_VMS=
 
 # Warn when an SSD has this percentage of its rated life left, or less.
 SSD_LIFE_WARNING=10
+
+# iDRAC System Event Log alerts; ALL also posts OK entries.
+IDRAC_EVENT_LOG=true
+IDRAC_EVENT_LOG_ALL=false
 
 # Container management through Portainer (/container). The address must
 # be reachable from inside the bot's container. Create the key under

@@ -255,7 +255,7 @@ state changes.
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
 | Watchlist | Titles people are waiting for | Twice a day |
-| Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
+| Weekly summary | Disk growth, completed torrents, Jellyfin copies, what was watched, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |
@@ -307,6 +307,7 @@ The weekly summary is posted in the alert channel:
 WEEKLY_SUMMARY=true          # false turns it off
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10       # container time
+WEEKLY_SUMMARY_WATCH_STATS=true  # false leaves out "Watched this week"
 ```
 
 Disk growth is measured from one summary to the next, so the first
@@ -317,6 +318,19 @@ bot opens a thread under it with the complete list; it needs the
 "Create Public Threads" permission in the alert channel for that, and
 otherwise posts the list below the summary. The summary also counts internet
 outages (number, total and longest) confirmed by the WAN monitor.
+
+"🍿 Watched this week" shows what was watched on the primary Jellyfin
+server (`JELLYFIN_1_*`): total hours, hours for the five busiest users,
+the five most watched titles (episodes counted towards their series)
+and the share of plays that were transcoded. Jellyfin keeps no viewing
+history itself, so this needs the **Playback Reporting** plugin
+(Dashboard → Plugins → Catalog → Playback Reporting, then restart
+Jellyfin). It only records plays from the moment it is installed.
+Without it the field says "Needs the Playback Reporting plugin on
+<server>". Music is left out, and so are users excluded in the
+plugin's own settings. The bot reads the plugin's data with its SQL
+query endpoint, which needs the API key in `JELLYFIN_1_API_KEY` (API
+keys have administrator rights).
 
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
@@ -593,6 +607,7 @@ JELLYFIN_REFRESH_ON_COMPLETE=true
 WEEKLY_SUMMARY=true
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10
+WEEKLY_SUMMARY_WATCH_STATS=true
 
 # ESXi host (optional). Use a user with the read-only role.
 ESXI_HOST=

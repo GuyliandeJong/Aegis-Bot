@@ -364,6 +364,32 @@ class PortainerService:
 
         return body.decode("utf-8", "replace")
 
+    async def logs_since(self, container_id: str, since: float) -> str:
+        """
+        A container's output since a Unix time, every line prefixed with
+        Docker's timestamp ("2026-10-18T03:00:12.123456789Z ").
+        """
+        details = await self.inspect(container_id)
+
+        status, body = await self._request(
+            "GET",
+            f"/containers/{container_id}/logs",
+            params={
+                "stdout": "1",
+                "stderr": "1",
+                "since": str(int(since)),
+                "timestamps": "1",
+            },
+        )
+
+        if status != 200:
+            raise PortainerError(self._api_message(status, body))
+
+        if not details["tty"]:
+            body = demultiplex(body)
+
+        return body.decode("utf-8", "replace")
+
     # ------------------------------------------------------------
     # Changing
     # ------------------------------------------------------------

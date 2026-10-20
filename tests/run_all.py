@@ -424,6 +424,25 @@ EXPECTED = {
         "added by partner (222)          -> mentions <@222>",
         "mentions ['<@222>', '<@333>', '<@111>']",
     ],
+    "check_watch_stats.py": [
+        "| 9.8 h in 10 plays.",
+        "| Per user: Alex 4.7 h, Bob 2.6 h, Anna 2.3 h, Carl 0.2 h, Dana 0.1 h",
+        "| • Heat · 2.8 h",
+        "| • Fallout · 1.8 h",
+        "| • The Office (US) · 0.4 h",
+        "| Transcoded: 2 of 9 plays (22%).",
+        "asked: home only | MediaBrowser Token=\"h\" | ReplaceUserId: True",
+        "FROM PlaybackActivity WHERE DateCreated >= '2026-10-11 10:00:00' AND ItemType NOT IN ('Audio', 'AudioBook') AND UserId NOT IN (SELECT UserId FROM UserList)",
+        "Fallout | Odd name | Mission - Impossible",
+        "Transcoded line: False",
+        "Nothing watched.",
+        "'💬 Subtitles', '🍿 Watched this week', '🔔 Alerts']",
+        "turned off, watched field present: False",
+        "Per user: Removed user 0.0 h",
+        "Needs the Playback Reporting plugin on Home.",
+        "Home did not answer.",
+        "no Jellyfin configured: None",
+    ],
 }
 
 FAILURE_MARKERS = (

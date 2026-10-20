@@ -37,6 +37,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_private_replies.py` | `/wan`, `/server`, `/idrac` and `/network` reply only to the person who ran them | Reads the source; runs nothing |
 | `check_jellyfin_extras.py` | Episode comparison, matching series between libraries, quality and the better-copy note, the daily new-content alert and its picker, the download queue | Two local fake Jellyfin servers, fake channel and clock |
 | `check_restart.py` | Buttons marked expired after a restart, the shared torrent list, pruning removed torrents, GiB sizes, the startup service check | Fake channel, local fake qBittorrent, Jackett and Jellyfin |
+| `check_seed_cleanup.py` | The weekly "seeded enough" suggestion: schedule, list and overflow, administrators only, removal keeping files, dismiss, timeout and restart note | Local fake qBittorrent, fake channel and interactions |
 | `check_requesters_links.py` | Who is mentioned per torrent, and Google share links | Local fake Google and Wikidata |
 
 `isolate.py` points the bot's state files at a temporary folder, so a

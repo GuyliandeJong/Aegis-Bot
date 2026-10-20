@@ -208,6 +208,22 @@ SEED_RATIO_TARGET=2     # a ratio counted as seeded enough
 SEED_DAYS_TARGET=14     # or this many days of seeding
 ```
 
+Once a week the bot posts the torrents that reached a target in the
+alert channel: how many, their total size and the list (the first
+ones, when they do not all fit). **Remove these torrents (keep files)**
+removes them from qBittorrent and leaves the files on disk, so the
+library keeps them; **Dismiss** closes the suggestion. Only
+administrators can press either, and the message then says what
+happened ("Removed 5 torrents, 120.00 GiB still on disk."). The
+buttons work for two days. Nothing is posted when no torrent reached
+a target.
+
+```text
+CLEANUP_REMINDER=true        # false turns it off
+CLEANUP_REMINDER_DAY=saturday
+CLEANUP_REMINDER_HOUR=11     # container time
+```
+
 qBittorrent's own share limits (Options > BitTorrent) can stop or
 remove torrents automatically; the bot only shows and removes on
 request.
@@ -256,6 +272,7 @@ state changes.
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
 | Watchlist | Titles people are waiting for | Twice a day |
 | Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
+| Seed cleanup | Suggests removing torrents that are seeded enough | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |
@@ -582,6 +599,10 @@ JELLYFIN_NEW_CONTENT_HOUR=10
 # What /torrent cleanup counts as seeded enough.
 SEED_RATIO_TARGET=2
 SEED_DAYS_TARGET=14
+# Weekly suggestion to remove torrents that are seeded enough.
+CLEANUP_REMINDER=true
+CLEANUP_REMINDER_DAY=saturday
+CLEANUP_REMINDER_HOUR=11
 
 # true: torrents from non-administrators wait for an administrator's approval.
 REQUEST_APPROVAL=false

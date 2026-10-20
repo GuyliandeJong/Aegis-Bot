@@ -27,11 +27,14 @@ class NotificationService:
         fields: list[tuple[str, str, bool]] | None = None,
         content: str | None = None,
         level: str = "info",
+        view: discord.ui.View | None = None,
     ):
         """
         Send a formatted notification to the configured alert channel.
 
         Returns the sent message, or None when the channel is missing.
+        A caller passing a `view` must assign the returned message to
+        `view.message` (see utils/open_messages.py).
         """
 
         channel = self.bot.get_channel(
@@ -70,6 +73,7 @@ class NotificationService:
             allowed_mentions=discord.AllowedMentions(
                 users=True
             ),
+            view=view,
         )
 
         logger.info(
@@ -88,8 +92,9 @@ class NotificationService:
         *,
         fields: list[tuple[str, str, bool]] | None = None,
         content: str | None = None,
+        view: discord.ui.View | None = None,
     ):
-        """Send an informational notification."""
+        """Send an informational notification, optionally with buttons."""
 
         return await self._send(
             title=title,
@@ -98,6 +103,7 @@ class NotificationService:
             fields=fields,
             content=content,
             level="info",
+            view=view,
         )
 
     async def warning(

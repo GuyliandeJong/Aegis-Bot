@@ -7,6 +7,8 @@ import os
 import discord
 
 from services.qbittorrent_service import QBittorrentService
+from utils import theme
+from utils.embeds import create_embed
 from utils.formatting import format_bytes, format_compact_duration
 from utils.logger import logger
 from utils.open_messages import ExpiringView
@@ -62,6 +64,15 @@ def finished_torrents(torrents: list[dict]) -> list[dict]:
     )
 
     return finished
+
+
+def seeded_enough(torrents: list[dict]) -> list[dict]:
+    """
+    The finished torrents that reached a seeding target, highest ratio
+    first: the ones `/torrent cleanup` marks ✅. The weekly cleanup
+    suggestion (`monitors/seed_cleanup_monitor.py`) offers these.
+    """
+    return [t for t in finished_torrents(torrents) if t["done"]]
 
 
 PAGE_SIZE = 25
@@ -337,6 +348,190 @@ class _ConfirmFilesView(ExpiringView):
     async def _back(self, interaction: discord.Interaction):
         self.stop()
         await self.parent._show(interaction)
+
+
+def _torrents_word(count: int) -> str:
+    return f"{count} torrent{'s' if count != 1 else ''}"
+
+
+class SeedCleanupView(ExpiringView):
+    """
+    The buttons under the weekly cleanup suggestion in the alert channel.
+
+    "Remove these torrents (keep files)" removes the suggested torrents
+    from qBittorrent and leaves their files on disk; "Dismiss" only
+    closes the suggestion. Either way the message is edited to say what
+    happened. Only server administrators may press them.
+    """
+
+    # The next suggestion comes a week later; two days is long enough
+    # to see this one.
+    TIMEOUT = 2 * 24 * 60 * 60
+
+    restart_note = (
+        "The bot restarted, so these buttons no longer work. "
+        "Use `/torrent cleanup` to remove these torrents."
+    )
+
+    def __init__(self, torrents: list[dict]):
+        super().__init__(timeout=self.TIMEOUT)
+
+        self.torrents = [t for t in torrents if t.get("hash")]
+
+        remove = discord.ui.Button(
+            label="Remove these torrents (keep files)",
+            style=discord.ButtonStyle.primary,
+        )
+        remove.callback = self._remove
+        self.add_item(remove)
+
+        dismiss = discord.ui.Button(
+            label="Dismiss",
+            style=discord.ButtonStyle.secondary,
+        )
+        dismiss.callback = self._dismiss
+        self.add_item(dismiss)
+
+    async def interaction_check(self, interaction: discord.Interaction):
+        permissions = getattr(interaction.user, "guild_permissions", None)
+
+        if permissions is not None and permissions.administrator:
+            return True
+
+        await interaction.response.send_message(
+            "Only a server administrator can use these buttons.",
+            ephemeral=True,
+        )
+        return False
+
+    async def _dismiss(self, interaction: discord.Interaction):
+        self.stop()
+
+        await interaction.response.edit_message(
+            content=None,
+            embed=create_embed(
+                interaction,
+                title="Cleanup suggestion dismissed",
+                description=(
+                    f"{_torrents_word(len(self.torrents))} left in "
+                    "qBittorrent. `/torrent cleanup` shows them again."
+                ),
+                color=theme.NEUTRAL_COLOR,
+            ),
+            view=None,
+        )
+
+    async def _remove(self, interaction: discord.Interaction):
+        self.stop()
+
+        await interaction.response.edit_message(
+            content=f"Removing {_torrents_word(len(self.torrents))}…",
+            view=None,
+        )
+
+        service = QBittorrentService()
+        removed, failed = [], []
+        gone = 0
+
+        try:
+            # Read the list again: some may have been removed since
+            # the suggestion was posted.
+            current = {
+                str(t.get("hash"))
+                for t in await service.get_torrents()
+            }
+
+            for torrent in self.torrents:
+                torrent_hash = str(torrent.get("hash"))
+                name = str(torrent.get("name"))
+
+                if torrent_hash not in current:
+                    gone += 1
+                    continue
+
+                try:
+                    await service.delete_torrent(
+                        torrent_hash,
+                        delete_files=False,
+                    )
+                    removed.append(torrent)
+                except Exception as ex:
+                    logger.warning(
+                        "[Cleanup] Could not remove %s: %s",
+                        name,
+                        ex,
+                    )
+                    failed.append(name)
+
+        except Exception as ex:
+            logger.exception("[Cleanup] Could not list torrents: %s", ex)
+            await interaction.edit_original_response(
+                content=None,
+                embed=create_embed(
+                    interaction,
+                    title="Cleanup failed",
+                    description=(
+                        "Unable to read the torrent list from "
+                        "qBittorrent; nothing was removed. Use "
+                        "`/torrent cleanup` to try again."
+                    ),
+                    color=theme.ERROR_COLOR,
+                ),
+            )
+            return
+
+        finally:
+            await service.close()
+
+        logger.info(
+            "[Cleanup] %s removed %d suggested torrent(s), files kept.",
+            interaction.user,
+            len(removed),
+        )
+
+        size = sum(int(t.get("size") or 0) for t in removed)
+        text = (
+            f"Removed {_torrents_word(len(removed))}, "
+            f"{format_bytes(size)} still on disk."
+        )
+
+        if gone:
+            text += (
+                f"\n{_torrents_word(gone)} had already been removed "
+                "from qBittorrent."
+            )
+
+        if failed:
+            text += f"\nCould not remove: {', '.join(failed)}"[:1500]
+
+        await interaction.edit_original_response(
+            content=None,
+            embed=create_embed(
+                interaction,
+                title="Cleanup done",
+                description=text,
+                color=(
+                    theme.WARNING_COLOR
+                    if failed
+                    else theme.SUCCESS_COLOR
+                ),
+            ),
+        )
+
+    async def on_timeout(self):
+        if self.message is None:
+            return
+
+        try:
+            await self.message.edit(
+                content=(
+                    "This suggestion expired. Use `/torrent cleanup` "
+                    "to remove these torrents."
+                ),
+                view=None,
+            )
+        except discord.HTTPException:
+            pass
 
 
 class TorrentCleanupMixin:

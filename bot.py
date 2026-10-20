@@ -12,6 +12,7 @@ from monitors.hardware_monitor import HardwareMonitor
 from monitors.heartbeat_monitor import HeartbeatMonitor
 from monitors.jellyfin_new_content_monitor import JellyfinNewContentMonitor
 from monitors.monitor_manager import MonitorManager
+from monitors.seed_cleanup_monitor import SeedCleanupMonitor
 from monitors.wan_monitor import WanMonitor
 from monitors.watchlist_monitor import WatchlistMonitor
 from monitors.weekly_summary_monitor import WeeklySummaryMonitor
@@ -165,6 +166,9 @@ async def on_ready():
         )
         monitor_manager.register(
             WeeklySummaryMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            SeedCleanupMonitor(monitor_manager.notification_service)
         )
         monitor_manager.register(
             HeartbeatMonitor(monitor_manager.notification_service)

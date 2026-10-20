@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import types
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 
@@ -14,7 +15,7 @@ PORT = 18114
 os.environ.update({"ESXI_HOST": f"127.0.0.1:{PORT}", "ESXI_USERNAME": "monitor", "ESXI_PASSWORD": "p<&>w", "ESXI_IGNORE_VMS": "Scratch"})
 # Inside the bot's container the real .env is loaded; the levels from
 # there must not change what this check expects (85 / 95).
-for name in ("ESXI_DATASTORE_WARNING", "ESXI_DATASTORE_CRITICAL"):
+for name in ("ESXI_DATASTORE_WARNING", "ESXI_DATASTORE_CRITICAL", "ESXI_SNAPSHOT_DAYS"):
     os.environ.pop(name, None)
 
 import services.esxi_service as ES
@@ -29,6 +30,10 @@ ES.EsxiService.__init__ = init
 GIB = 1024 ** 3
 DATASTORES = {"datastore-1": ["datastore1", 500 * GIB, 300 * GIB, True], "datastore-2": ["media", 4000 * GIB, 1000 * GIB, True]}
 VMS = {"vm-1": ["docker-host", "poweredOn"], "vm-2": ["homeassistant", "poweredOn"], "vm-3": ["Scratch", "poweredOn"]}
+# Snapshot trees per VM: (name, age in days, children). Younger than
+# ESXI_SNAPSHOT_DAYS (7), so the alerts below are not affected;
+# tests/check_esxi_snapshots.py covers the snapshot alerts.
+SNAPSHOTS = {"vm-1": [("before-upgrade", 3, [("after-upgrade", 1, [])])]}
 CALLS = []
 LOGINS = []
 
@@ -41,6 +46,19 @@ def envelope(body):
 
 def prop(name, value, kind):
     return f'<propSet><name>{name}</name><val xsi:type="{kind}">{value}</val></propSet>'
+
+
+def snapshot_tree(ref, trees):
+    """VirtualMachineSnapshotTree elements as the host sends them: arrays as repeated elements."""
+    out = ""
+    for i, (name, days, children) in enumerate(trees):
+        created = (datetime.now(timezone.utc) - timedelta(days=days, minutes=5)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        out += (f'<rootSnapshotList><snapshot type="VirtualMachineSnapshot">{ref}-snapshot-{name}</snapshot><vm type="VirtualMachine">{ref}</vm>'
+                f'<name>{name}</name><description></description><id>{i + 1}</id><createTime>{created}</createTime>'
+                f'<state>poweredOff</state><quiesced>false</quiesced>'
+                + snapshot_tree(ref, children).replace("rootSnapshotList>", "childSnapshotList>")
+                + '<replaySupported>false</replaySupported></rootSnapshotList>')
+    return out
 
 
 async def sdk(request):
@@ -73,7 +91,11 @@ async def sdk(request):
         else:
             for ref, (name, power) in VMS.items():
                 objects += (f'<objects><obj type="VirtualMachine">{ref}</obj>' + prop("name", name, "xsd:string")
-                            + prop("runtime.powerState", power, "VirtualMachinePowerState") + "</objects>")
+                            + prop("runtime.powerState", power, "VirtualMachinePowerState")
+                            # The property is left out for a VM without snapshots.
+                            + (prop("snapshot", f'<currentSnapshot type="VirtualMachineSnapshot">{ref}-snapshot-last</currentSnapshot>'
+                                    + snapshot_tree(ref, SNAPSHOTS[ref]), "VirtualMachineSnapshotInfo") if ref in SNAPSHOTS else "")
+                            + "</objects>")
         out = f'<RetrievePropertiesExResponse xmlns="urn:vim25"><returnval>{objects}</returnval></RetrievePropertiesExResponse>'
     elif action in ("DestroyView", "Logout"):
         out = f'<{action}Response xmlns="urn:vim25"></{action}Response>'
@@ -99,6 +121,7 @@ async def main():
             print(f"  datastore {d['name']:10} capacity={d['capacity'] // GIB} GiB free={d['free'] // GIB} GiB accessible={d['accessible']}")
         for v in status["vms"]:
             print(f"  vm {v['name']:14} {v['power']}")
+            print(f"     snapshots: {[s['name'] for s in v['snapshots']]}")
         print("  calls:", CALLS)
         print("  password sent escaped:", "<password>p&lt;&amp;&gt;w</password>" in LOGINS[0])
 
@@ -149,6 +172,7 @@ async def main():
         VMS["vm-3"][1] = "poweredOff"
         await EC.Esxi(None).esxi.callback(EC.Esxi(None), interaction)
         print("  ", sent[-1].description, "|", sent[-1].fields[1].value.replace("\n", " / "))
+        print("  ", sent[-1].fields[2].name, "|", sent[-1].fields[2].value.replace("\n", " / "))
 
         del os.environ["ESXI_HOST"]
         CALLS.clear(); await mon.check()

@@ -22,7 +22,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/cpu`, `/memory`, `/filesystems`, `/network` | Live readings from the host | Everyone |
 | `/storage`, `/temperature`, `/idrac` | RAID, sensors and iDRAC details through Redfish | Everyone |
 | `/server` | Server model, service tag, BIOS and OS through Redfish | Administrators |
-| `/esxi` | ESXi datastores (usage) and virtual machines (running or not) | Administrators |
+| `/esxi` | ESXi datastores (usage), virtual machines (running or not) and their snapshots | Administrators |
 | `/wan` | Public IP address | Administrators |
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
 | `/jellyfin movies` | Looks up a movie on all Jellyfin servers, with watched state; the title has autocomplete | Everyone (private reply) |
@@ -257,7 +257,7 @@ state changes.
 | Watchlist | Titles people are waiting for | Twice a day |
 | Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
-| ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
+| ESXi | Datastore usage, virtual machines stopping, old snapshots, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 
@@ -334,12 +334,21 @@ over a level when the bot first sees it is reported once. `/esxi` shows
 the same information. Create a separate ESXi user with the read-only role for
 the bot; it needs nothing more.
 
+A virtual machine with a snapshot older than `ESXI_SNAPSHOT_DAYS`
+(default 7) gets an "Old Snapshot" warning naming the snapshots and
+their age, repeated once a day while it stays, and one "Snapshot
+Removed" when it is gone. `0` turns this off. `/esxi` lists every VM
+with snapshots ("📸 2 snapshots, oldest 12 days", then each name and
+age); ⚠️ marks one over the limit.
+
 ```text
 ESXI_HOST=
 ESXI_USERNAME=
 ESXI_PASSWORD=
 ESXI_DATASTORE_WARNING=85
 ESXI_DATASTORE_CRITICAL=95
+# Days before a snapshot counts as old; 0 = no snapshot warnings.
+ESXI_SNAPSHOT_DAYS=7
 # Virtual machines not to watch, comma separated.
 ESXI_IGNORE_VMS=
 ```
@@ -600,6 +609,7 @@ ESXI_USERNAME=
 ESXI_PASSWORD=
 ESXI_DATASTORE_WARNING=85
 ESXI_DATASTORE_CRITICAL=95
+ESXI_SNAPSHOT_DAYS=7
 ESXI_IGNORE_VMS=
 
 # Warn when an SSD has this percentage of its rated life left, or less.

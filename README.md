@@ -255,7 +255,7 @@ state changes.
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
 | Watchlist | Titles people are waiting for | Twice a day |
-| Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts | Once a week |
+| Weekly summary | Disk growth, completed torrents, Jellyfin copies, alerts, container updates | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Torrent | Completed downloads | 10 s |
@@ -307,6 +307,7 @@ The weekly summary is posted in the alert channel:
 WEEKLY_SUMMARY=true          # false turns it off
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10       # container time
+WATCHTOWER_CONTAINER=watchtower
 ```
 
 Disk growth is measured from one summary to the next, so the first
@@ -317,6 +318,15 @@ bot opens a thread under it with the complete list; it needs the
 "Create Public Threads" permission in the alert channel for that, and
 otherwise posts the list below the summary. The summary also counts internet
 outages (number, total and longest) confirmed by the WAN monitor.
+
+The last field, "Container updates", lists the containers Watchtower
+updated that week, with their image and date, read from the log of the
+container named `WATCHTOWER_CONTAINER` through Portainer. It needs the
+Portainer settings of `/container` and shows "Not available." without
+them or when that container does not exist. A container Watchtower
+restarted only because a linked container was updated is marked as
+such. Docker keeps the log only as long as the container exists, so
+updates from before Watchtower itself was recreated are not counted.
 
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
@@ -593,6 +603,8 @@ JELLYFIN_REFRESH_ON_COMPLETE=true
 WEEKLY_SUMMARY=true
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10
+# Watchtower's container, whose log lists the week's container updates.
+WATCHTOWER_CONTAINER=watchtower
 
 # ESXi host (optional). Use a user with the read-only role.
 ESXI_HOST=

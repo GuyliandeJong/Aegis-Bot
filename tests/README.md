@@ -32,6 +32,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_backup.py` | `scripts/backup.sh`: archive contents and excludes, stopping and restarting containers, local and remote retention, failures, the status file; the summary's Backup line | Fake `docker`, `rclone` and `curl`, real `tar` on temporary folders |
 | `check_discord_http.py` | The download button through discord.py's request code | Local fake Discord API |
 | `check_seasons_subtitles.py` | Missing seasons and episodes, reusing an existing season folder, subtitle reporting, separate subtitle files | Two local fake Jellyfin servers |
+| `check_container_updates.py` | The weekly summary's Container updates field: Watchtower's log (logfmt, pretty, json), matching images to containers, linked restarts, the week's window, overflow to the thread, missing Portainer or Watchtower | Local fake Portainer with a framed log stream |
 | `check_esxi.py` | ESXi over the vSphere SOAP API: login, datastores, VMs, logout; datastore and VM alerts; host not reachable | Local fake ESXi `/sdk` |
 | `check_expiry.py` | Messages disabling their buttons after the timeout | Local fake Discord API |
 | `check_private_replies.py` | `/wan`, `/server`, `/idrac` and `/network` reply only to the person who ran them | Reads the source; runs nothing |

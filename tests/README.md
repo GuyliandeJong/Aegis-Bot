@@ -34,6 +34,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_seasons_subtitles.py` | Missing seasons and episodes, reusing an existing season folder, subtitle reporting, separate subtitle files | Two local fake Jellyfin servers |
 | `check_esxi.py` | ESXi over the vSphere SOAP API: login, datastores, VMs, logout; datastore and VM alerts; host not reachable | Local fake ESXi `/sdk` |
 | `check_expiry.py` | Messages disabling their buttons after the timeout | Local fake Discord API |
+| `check_help.py` | `/help`: which commands an administrator, a member and a `/container` user see, the grouping, one command in detail, autocomplete, embed limits on a large tree | Fake command tree of real discord.py objects |
 | `check_private_replies.py` | `/wan`, `/server`, `/idrac` and `/network` reply only to the person who ran them | Reads the source; runs nothing |
 | `check_jellyfin_extras.py` | Episode comparison, matching series between libraries, quality and the better-copy note, the daily new-content alert and its picker, the download queue | Two local fake Jellyfin servers, fake channel and clock |
 | `check_restart.py` | Buttons marked expired after a restart, the shared torrent list, pruning removed torrents, GiB sizes, the startup service check | Fake channel, local fake qBittorrent, Jackett and Jellyfin |

@@ -93,5 +93,17 @@ class RedfishClient:
         """Get chassis thermal information."""
         return await self.get("/Chassis/System.Embedded.1/Thermal")
 
+    async def get_log_entries(self, log_service: str, skip: int = 0) -> dict:
+        """
+        Get one page of an iDRAC log service's entries, e.g. "Sel"
+        (System Event Log) or "Lclog" (Lifecycle log).
+        """
+        endpoint = f"/Managers/iDRAC.Embedded.1/LogServices/{log_service}/Entries"
+
+        if skip:
+            endpoint += f"?$skip={skip}"
+
+        return await self.get(endpoint)
+
     async def close(self):
         await self.session.close()

@@ -1,6 +1,7 @@
 """Power supply and fan health from iDRAC's Redfish API."""
 
 import asyncio
+from datetime import datetime, timezone
 
 from redfish.client import RedfishClient
 
@@ -130,6 +131,59 @@ def power_draw(power: dict) -> float | None:
     return None
 
 
+def _timestamp(value) -> datetime | None:
+    """A Redfish date-time as an aware datetime; no zone means UTC."""
+    if not isinstance(value, str) or not value:
+        return None
+
+    try:
+        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+
+    return moment
+
+
+def log_entries(members: list) -> list[dict]:
+    """
+    Readable log entries from the Members of a LogEntry collection.
+
+    Each is {id, created (aware datetime), severity ("OK", "Warning"
+    or "Critical"), message, sensor}. Entries without a readable
+    Created time are left out, because newness is judged by it.
+    """
+    result = []
+
+    for member in members or []:
+        if not isinstance(member, dict):
+            continue
+
+        created = _timestamp(member.get("Created"))
+
+        if created is None:
+            continue
+
+        # Anything that is not one of the three DMTF values counts as
+        # informational rather than as a problem.
+        severity = {
+            "warning": "Warning",
+            "critical": "Critical",
+        }.get(str(member.get("Severity") or "").lower(), "OK")
+
+        result.append({
+            "id": str(member.get("Id") or ""),
+            "created": created,
+            "severity": severity,
+            "message": " ".join(str(member.get("Message") or "").split()),
+            "sensor": str(member.get("SensorType") or ""),
+        })
+
+    return result
+
+
 class HardwareService:
     async def get_hardware_health(self) -> dict:
         """
@@ -154,3 +208,33 @@ class HardwareService:
             },
             "power_watts": power_draw(power),
         }
+
+    # Pages of the event log read per check. iDRAC answers 50 entries a
+    # page; the System Event Log is much smaller than that limit.
+    MAX_LOG_PAGES = 20
+
+    async def get_event_log(self, log_service: str = "Sel") -> list[dict]:
+        """
+        Every entry of an iDRAC log service (default the System Event
+        Log), following Members@odata.nextLink. Raises
+        aiohttp.ClientResponseError when iDRAC refuses, e.g. 404 when
+        the log does not exist.
+        """
+        client = RedfishClient()
+        members = []
+
+        try:
+            for _ in range(self.MAX_LOG_PAGES):
+                page = await client.get_log_entries(
+                    log_service,
+                    skip=len(members),
+                )
+                batch = page.get("Members") or []
+                members.extend(batch)
+
+                if not batch or not page.get("Members@odata.nextLink"):
+                    break
+        finally:
+            await client.close()
+
+        return log_entries(members)

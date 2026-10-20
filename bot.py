@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from config.settings import settings
 from monitors.esxi_monitor import EsxiMonitor
+from monitors.event_log_monitor import EventLogMonitor
 from monitors.filesystem_monitor import FilesystemMonitor
 from monitors.hardware_monitor import HardwareMonitor
 from monitors.heartbeat_monitor import HeartbeatMonitor
@@ -150,6 +151,9 @@ async def on_ready():
         )
         monitor_manager.register(
             HardwareMonitor(monitor_manager.notification_service)
+        )
+        monitor_manager.register(
+            EventLogMonitor(monitor_manager.notification_service)
         )
         monitor_manager.register(
             TorrentMonitor(monitor_manager.notification_service)

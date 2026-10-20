@@ -1,7 +1,7 @@
 import discord
 
 from config.settings import settings
-from services import activity_log
+from services import activity_log, fluxer_webhook
 from utils import theme
 from utils.logger import logger
 
@@ -32,7 +32,19 @@ class NotificationService:
         Send a formatted notification to the configured alert channel.
 
         Returns the sent message, or None when the channel is missing.
+
+        When FLUXER_WEBHOOK_URL is set, the same alert is also posted to
+        Fluxer in the background; that never delays or breaks this one.
         """
+
+        # Scheduled first, so Fluxer also gets alerts Discord misses.
+        fluxer_webhook.start(
+            title,
+            description,
+            color,
+            fields,
+            bot=self.bot,
+        )
 
         channel = self.bot.get_channel(
             settings.ALERT_CHANNEL_ID

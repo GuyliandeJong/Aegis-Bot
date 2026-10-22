@@ -1,7 +1,7 @@
 import discord
 
 from config.settings import settings
-from services import activity_log
+from services import activity_log, maintenance
 from utils import theme
 from utils.logger import logger
 
@@ -18,7 +18,7 @@ class NotificationService:
     def __init__(self, bot):
         self.bot = bot
 
-    async def _send(
+    async def _post(
         self,
         title: str,
         description: str,
@@ -26,10 +26,9 @@ class NotificationService:
         *,
         fields: list[tuple[str, str, bool]] | None = None,
         content: str | None = None,
-        level: str = "info",
     ):
         """
-        Send a formatted notification to the configured alert channel.
+        Post an embed in the configured alert channel.
 
         Returns the sent message, or None when the channel is missing.
         """
@@ -64,13 +63,69 @@ class NotificationService:
             text="Aegis-Bot"
         )
 
-        message = await channel.send(
+        return await channel.send(
             content=content,
             embed=embed,
             allowed_mentions=discord.AllowedMentions(
                 users=True
             ),
         )
+
+    async def _send(
+        self,
+        title: str,
+        description: str,
+        color: discord.Color,
+        *,
+        fields: list[tuple[str, str, bool]] | None = None,
+        content: str | None = None,
+        level: str = "info",
+        exempt: bool = False,
+    ):
+        """
+        Send a formatted notification to the configured alert channel.
+
+        During maintenance, levels in maintenance.MUTED_LEVELS are not
+        posted (unless `exempt`) but still recorded in the activity
+        log, so the weekly summary stays complete. Critical alerts are
+        posted with "(during maintenance)" added to the title.
+
+        Returns the sent message, or None when the channel is missing
+        or the alert was muted.
+        """
+
+        # Report an expired maintenance before this alert, so the
+        # alert is not muted by a maintenance that already ran out.
+        await self.end_maintenance_if_expired()
+
+        if maintenance.active():
+            if level in maintenance.MUTED_LEVELS and not exempt:
+                maintenance.mute(level, title)
+                activity_log.record("alert", level=level, title=title)
+
+                logger.info(
+                    "[NotificationService] Muted during maintenance: %s",
+                    title,
+                )
+                return
+
+            if level == "critical":
+                shown_title = f"{title} (during maintenance)"
+            else:
+                shown_title = title
+        else:
+            shown_title = title
+
+        message = await self._post(
+            title=shown_title,
+            description=description,
+            color=color,
+            fields=fields,
+            content=content,
+        )
+
+        if message is None:
+            return
 
         logger.info(
             "[NotificationService] Sent notification: %s",
@@ -81,6 +136,127 @@ class NotificationService:
 
         return message
 
+    # ------------------------------------------------------------
+    # Maintenance mode
+    # ------------------------------------------------------------
+
+    async def start_maintenance(
+        self,
+        minutes: int,
+        reason: str,
+        user_id: int,
+    ) -> dict:
+        """Start or extend maintenance and say so in the alert channel."""
+
+        state, extended = maintenance.start(
+            minutes,
+            reason,
+            str(user_id),
+        )
+
+        until = state["until"]
+        description = (
+            f"<@{user_id}> {'extended' if extended else 'started'} "
+            f"maintenance until <t:{until}:t> (<t:{until}:R>).\n"
+            "Warnings, recoveries and info messages are muted until "
+            "then; critical alerts still come through."
+        )
+
+        if reason:
+            description += f"\n\n**Reason:** {reason}"
+
+        logger.info(
+            "[NotificationService] Maintenance %s by %s until %s.",
+            "extended" if extended else "started",
+            user_id,
+            until,
+        )
+
+        await self._post(
+            title="🛠️ Maintenance "
+            + ("Extended" if extended else "Started"),
+            description=description,
+            color=theme.PRIMARY_COLOR,
+        )
+
+        return state
+
+    async def end_maintenance(
+        self,
+        user_id: int | None = None,
+    ) -> dict | None:
+        """
+        End maintenance and post what was muted during it.
+
+        `user_id` is who ended it early; None means it expired.
+        Returns the ended state, or None when none was active.
+        """
+
+        state = maintenance.end()
+
+        if state is None:
+            return None
+
+        total, titles = maintenance.muted_summary(state)
+
+        if total:
+            description = (
+                f"Maintenance ended — {total} "
+                f"alert{'s' if total != 1 else ''} muted:\n{titles}"
+            )
+        else:
+            description = "Maintenance ended — no alerts were muted."
+
+        if user_id is not None:
+            ended = f"Ended early by <@{user_id}>."
+        else:
+            ended = f"Ran until <t:{state['until']}:t>."
+
+        fields = [
+            (
+                "Started",
+                f"<t:{state.get('started', state['until'])}:t> by "
+                f"<@{state.get('started_by', '?')}> · {ended}",
+                False,
+            )
+        ]
+
+        counts = state.get("counts") or {}
+
+        if counts:
+            fields.append((
+                "Muted per level",
+                " · ".join(
+                    f"{count} {level}"
+                    for level, count in sorted(
+                        counts.items(),
+                        key=lambda item: -item[1],
+                    )
+                ),
+                False,
+            ))
+
+        logger.info(
+            "[NotificationService] Maintenance ended (%s); %s alerts muted.",
+            "early" if user_id is not None else "expired",
+            total,
+        )
+
+        await self._post(
+            title="🛠️ Maintenance Ended",
+            description=description,
+            color=theme.SUCCESS_COLOR,
+            fields=fields,
+        )
+
+        return state
+
+    async def end_maintenance_if_expired(self) -> None:
+        """Post the end message once maintenance has run out."""
+
+        if maintenance.expired():
+            await self.end_maintenance()
+
     async def info(
         self,
         title: str,
@@ -88,8 +264,14 @@ class NotificationService:
         *,
         fields: list[tuple[str, str, bool]] | None = None,
         content: str | None = None,
+        exempt: bool = False,
     ):
-        """Send an informational notification."""
+        """
+        Send an informational notification.
+
+        `exempt` posts it during maintenance too, for scheduled
+        reports such as the weekly summary that are not alerts.
+        """
 
         return await self._send(
             title=title,
@@ -98,6 +280,7 @@ class NotificationService:
             fields=fields,
             content=content,
             level="info",
+            exempt=exempt,
         )
 
     async def warning(

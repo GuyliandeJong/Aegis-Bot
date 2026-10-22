@@ -23,6 +23,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/storage`, `/temperature`, `/idrac` | RAID, sensors and iDRAC details through Redfish | Everyone |
 | `/server` | Server model, service tag, BIOS and OS through Redfish | Administrators |
 | `/esxi` | ESXi datastores (usage) and virtual machines (running or not) | Administrators |
+| `/maintenance start`, `end`, `status` | Mutes all alerts except critical ones for 30 minutes to 24 hours, ends it early, shows what was muted | Administrators |
 | `/wan` | Public IP address | Administrators |
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
 | `/jellyfin playing` | What is being played on your own Jellyfin server now: who, on which device, progress, and whether it transcodes and why | Administrators (private reply) |
@@ -261,6 +262,7 @@ state changes.
 | Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
+| Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 
@@ -331,6 +333,25 @@ outages (number, total and longest) confirmed by the WAN monitor.
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
 (default 10). Hard disks do not report this.
+
+### Maintenance mode
+
+`/maintenance start` with a duration (30 minutes, 1, 2, 4, 8 or 24
+hours) and an optional reason mutes warnings, recoveries, info and
+success messages, for example while disks are swapped or the host is
+rebooted. Critical alerts still come through, with "(during
+maintenance)" in the title. Starting it posts who started it, until
+when and why in the alert channel; starting it again while it is on
+moves the end time and keeps what was muted so far.
+
+When it ends, after the chosen time or with `/maintenance end`, the bot
+posts one message: "Maintenance ended — N alerts muted:" with the muted
+titles grouped and counted, and the number per level.
+`/maintenance status` shows the same while it is on (private reply).
+
+The state is kept in `data/maintenance.json`, so a restart does not end
+maintenance. Muted alerts are still counted in the weekly summary, and
+the weekly summary itself is posted during maintenance too.
 
 ### ESXi
 

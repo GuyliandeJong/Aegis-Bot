@@ -133,12 +133,14 @@ class WeeklySummaryMonitor(BaseMonitor):
         self.state["since"] = now.timestamp()
         self.save_state()
 
+        # Not an alert, so it is posted during maintenance too.
         message = await self.notification_service.info(
             title="Weekly summary",
             description=(
                 f"Since <t:{int(since)}:D>."
             ),
             fields=fields,
+            exempt=True,
         )
 
         if self.overflow and message is not None:

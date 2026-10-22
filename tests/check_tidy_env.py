@@ -7,8 +7,55 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SCRIPT = HERE.parent / "scripts" / "tidy_env.py"
-TEMPLATE = HERE.parent / ".env.example"
 ROOT = Path(tempfile.mkdtemp(prefix="aegis-env-"))
+# A small template of its own, so this check does not change whenever
+# .env.example is reorganised.
+TEMPLATE = ROOT / ".env.example"
+TEMPLATE.write_text("""# Aegis-Bot settings
+
+# ------------------------------------------------------------
+# Discord
+# ------------------------------------------------------------
+
+# Bot token. (required)
+DISCORD_TOKEN=
+# Server ID. (required)
+GUILD_ID=
+
+# ------------------------------------------------------------
+# Thresholds
+# ------------------------------------------------------------
+
+FILESYSTEM_WARNING=85
+CPU_WARNING=75
+MEMORY_WARNING=80
+
+# ------------------------------------------------------------
+# iDRAC
+# ------------------------------------------------------------
+
+# Address. (required)
+IDRAC_HOST=
+
+# ------------------------------------------------------------
+# qBittorrent
+# ------------------------------------------------------------
+
+QBITTORRENT_PASSWORD=
+SEED_DAYS_TARGET=14
+
+# ------------------------------------------------------------
+# Jellyfin
+# ------------------------------------------------------------
+
+JELLYFIN_1_URL=
+
+# ------------------------------------------------------------
+# Portainer
+# ------------------------------------------------------------
+
+PORTAINER_URL=
+""")
 ENV = ROOT / ".env"
 SECRETS = ["s3cr3t-token-value", "hunter2-password", "9999-old-guild", "http://only-here:8096", "keep me"]
 ORIGINAL = (

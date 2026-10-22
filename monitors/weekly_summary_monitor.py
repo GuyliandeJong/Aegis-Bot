@@ -1,5 +1,6 @@
 """Once a week, one message about what happened."""
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -8,6 +9,7 @@ from pathlib import Path
 from monitors.base_monitor import BaseMonitor
 from services import activity_log
 from services.filesystem_service import FilesystemService
+from services.jellyfin_service import JellyfinService
 from services.qbittorrent_service import QBittorrentService
 from services.release_name import music_title, parse, pc_title
 from utils.formatting import format_bytes, format_compact_duration
@@ -49,7 +51,8 @@ def readable_title(name, category=None) -> str:
 class WeeklySummaryMonitor(BaseMonitor):
     """
     Posts a weekly summary in the alert channel: disk growth, torrents
-    completed, titles copied from other Jellyfin servers, and alerts.
+    completed, titles copied from other Jellyfin servers, what was added
+    to each Jellyfin server, and alerts.
 
     Disk usage is compared with the snapshot taken at the previous
     summary, so the first summary only records it.
@@ -58,11 +61,16 @@ class WeeklySummaryMonitor(BaseMonitor):
         WEEKLY_SUMMARY       true (default) or false
         WEEKLY_SUMMARY_DAY   monday..sunday (default sunday)
         WEEKLY_SUMMARY_HOUR  0-23 (default 10, container time)
+        WEEKLY_SUMMARY_NEW_CONTENT  true (default) or false: the
+                             "New in Jellyfin" field
     """
 
     STATE_FILE = Path("/app/data/weekly_summary_state.json")
 
     INTERVAL = 600
+
+    # The global 30 seconds is too short when a Jellyfin server is slow.
+    TIMEOUT = 300
 
     def __init__(self, notification_service):
         self.notification_service = notification_service
@@ -154,11 +162,15 @@ class WeeklySummaryMonitor(BaseMonitor):
             ("💾 Disks", await self._disks(), False),
             ("✅ Torrents completed", await self._torrents(since), False),
             ("📥 Copied from Jellyfin", self._copies(since), False),
+            ("🆕 New in Jellyfin", await self._new_in_jellyfin(since), False),
             ("🌐 Internet", self._outages(since), False),
             ("🗄️ Backup", self._backup(since), False),
             ("💬 Subtitles", self._subtitles(since), False),
             ("🔔 Alerts", self._alerts(since), False),
         ]
+
+        # A field that does not apply (no Jellyfin configured) is None.
+        fields = [field for field in fields if field[1] is not None]
 
         # Discord refuses a field value over 1024 characters.
         return [
@@ -320,6 +332,139 @@ class WeeklySummaryMonitor(BaseMonitor):
             f"{format_bytes(size)}",
             lines,
         )
+
+    @staticmethod
+    def new_content_enabled() -> bool:
+        value = os.getenv("WEEKLY_SUMMARY_NEW_CONTENT", "true")
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+
+    # One server may take this long, all pages together, before it
+    # counts as not answering.
+    JELLYFIN_TIMEOUT = 90
+
+    async def _new_in_jellyfin(self, since: float) -> str | None:
+        """
+        Movies and episodes added to each Jellyfin server this week.
+        None (no field) when it is turned off or no server is set up.
+        """
+        if not self.new_content_enabled():
+            return None
+
+        service = JellyfinService()
+
+        if not service.servers:
+            return None
+
+        async def added(server):
+            try:
+                return await asyncio.wait_for(
+                    service.list_added_since(server.name, since),
+                    timeout=self.JELLYFIN_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "[WeeklySummary] %s took too long listing new items.",
+                    server.name,
+                )
+                return None
+
+        try:
+            results = await asyncio.gather(
+                *(added(server) for server in service.servers)
+            )
+        finally:
+            await service.close()
+
+        # Server names only matter when there is more than one.
+        named = len(service.servers) > 1
+        totals = []
+        silent = []
+        lines = []
+
+        for server, items in zip(service.servers, results):
+            if items is None:
+                silent.append(server.name)
+                continue
+
+            movies, series, entries = self._group_added(items)
+
+            if not entries:
+                totals.append(f"{server.name}: nothing" if named else "Nothing added.")
+                continue
+
+            counts = []
+
+            if movies:
+                counts.append(f"{movies} movie{'s' if movies != 1 else ''}")
+
+            if series:
+                counts.append(f"{series} series")
+
+            totals.append(
+                f"{server.name}: {', '.join(counts)}" if named
+                else ", ".join(counts) + "."
+            )
+
+            if named:
+                lines.append(f"**{server.name}**")
+
+            lines += [f"• {entry}" for entry in entries]
+
+        total = " · ".join(totals)
+
+        if silent:
+            total = (total + "\n" if total else "") + "; ".join(
+                f"{name} did not answer" for name in silent
+            ) + "."
+
+        if not lines:
+            return total
+
+        return self._list_field("🆕 New in Jellyfin", total, lines)
+
+    @staticmethod
+    def _group_added(items: list[dict]) -> tuple[int, int, list[str]]:
+        """
+        (movies, series, lines) for one server: movies as "Title (Year)",
+        episodes per series and season, "Fallout — Season 2: 3 episodes"
+        or "Fallout — S02E03" for a single one.
+        """
+        movies = []
+        seasons: dict[tuple[str, int | None], list[dict]] = {}
+
+        for item in items:
+            if item.get("Type") == "Movie":
+                name = str(item.get("Name") or "Unknown title")
+                year = item.get("ProductionYear")
+                movies.append(f"{name} ({year})" if year else name)
+            elif item.get("Type") == "Episode":
+                series = str(item.get("SeriesName") or "Unknown series")
+                season = item.get("ParentIndexNumber")
+                season = season if isinstance(season, int) else None
+                seasons.setdefault((series, season), []).append(item)
+
+        lines = sorted(set(movies), key=str.casefold)
+
+        for (series, season), episodes in sorted(
+            seasons.items(),
+            key=lambda pair: (pair[0][0].casefold(), pair[0][1] if pair[0][1] is not None else -1),
+        ):
+            number = episodes[0].get("IndexNumber")
+
+            if len(episodes) == 1 and season is not None and isinstance(number, int):
+                lines.append(f"{series} — S{season:02d}E{number:02d}")
+                continue
+
+            count = f"{len(episodes)} episode{'s' if len(episodes) != 1 else ''}"
+
+            if season is None:
+                lines.append(f"{series}: {count}")
+            elif season == 0:
+                lines.append(f"{series} — Specials: {count}")
+            else:
+                lines.append(f"{series} — Season {season}: {count}")
+
+        return len(set(movies)), len({series for series, _ in seasons}), lines
 
     # A field value may hold 1024 characters.
     FIELD_LIMIT = 1024

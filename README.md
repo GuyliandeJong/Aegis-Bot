@@ -259,7 +259,7 @@ state changes.
 | Containers | Crashed, unhealthy and restarting Docker containers, through Portainer | 60 s |
 | Backup | Last successful backup older than `BACKUP_MAX_AGE_DAYS` (8) | Hourly |
 | Watchlist | Titles people are waiting for | Twice a day |
-| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, alerts | Once a week |
+| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
@@ -333,6 +333,7 @@ The weekly summary is posted in the alert channel:
 WEEKLY_SUMMARY=true          # false turns it off
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10       # container time
+WEEKLY_SUMMARY_NEW_CONTENT=true   # false leaves out "New in Jellyfin"
 ```
 
 Disk growth is measured from one summary to the next, so the first
@@ -341,7 +342,13 @@ listed in full, with readable titles ("Inception (2010)", "Fallout —
 S02E03") and their size. When a list does not fit in the summary, the
 bot opens a thread under it with the complete list; it needs the
 "Create Public Threads" permission in the alert channel for that, and
-otherwise posts the list below the summary. The summary also counts internet
+otherwise posts the list below the summary. "🆕 New in Jellyfin" lists
+the movies ("Arrival (2016)") and episodes ("Fallout — Season 2: 3
+episodes", or "Fallout — S02E03" for one) added to each configured
+Jellyfin server that week, by the date Jellyfin added them, with the
+counts per server on its first line ("Home: 4 movies, 2 series ·
+Friend: 10 movies"). A server that does not answer is named ("Friend
+did not answer"). The summary also counts internet
 outages (number, total and longest) confirmed by the WAN monitor.
 
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
@@ -643,6 +650,7 @@ JELLYFIN_REFRESH_ON_COMPLETE=true
 WEEKLY_SUMMARY=true
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10
+WEEKLY_SUMMARY_NEW_CONTENT=true
 
 # ESXi host (optional). Use a user with the read-only role.
 ESXI_HOST=

@@ -302,6 +302,18 @@ EXPECTED = {
         "failed       : upload to proton:Backups failed",
         "never run    : No backup has run yet.",
     ],
+    "check_backup_watch.py": [
+        "day   30: no BACKUP_PATHS                    -> []",
+        "day   14: day 14, the day-14 run is missing  -> []",
+        "day 15.2: 8 days since the last success      -> [('warning', 'No Recent Backup')]",
+        "says: No run has been recorded since. Check root's cron job",
+        "day   16: still none                         -> []",
+        "day 17.1: a backup succeeds                  -> [('recovered', 'Backup Succeeded Again')]",
+        "day 24.1: run fails                          -> []",
+        "says: The last run, <t:1802073600:f>, failed: upload to proton:Backups/home",
+        "last success kept: True | no repeat: True",
+        "BACKUP_MAX_AGE_DAYS=0 -> []",
+    ],
     "check_container.py": [
         "stranger: You are not allowed to use the container commands. | private: True | requests: 0",
         "autocomplete for stranger: []",

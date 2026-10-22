@@ -14,28 +14,39 @@ class Settings:
     Values are loaded from environment variables so they can be
     changed through the .env file without modifying application code.
 
-    This file is the template for config/settings.py. It contains no
-    addresses, names or credentials: anything specific to one
-    installation must be set in .env.
+    It contains no addresses, names or credentials: anything specific
+    to one installation is set in .env. Only the Discord values are
+    required; every other feature is a module that stays off until its
+    settings are set (see core/modules.py).
     """
 
     def __init__(self):
         # Names of required .env values that were not set. bot.py
-        # reports these at startup.
+        # refuses to start without them.
         self.MISSING: list[str] = []
+
+        # --------------------------------------------------------
+        # DISCORD
+        # --------------------------------------------------------
+
+        # The bot's token, from the Discord developer portal.
+        self.DISCORD_TOKEN = self._required("DISCORD_TOKEN")
+
+        # The server (guild) the slash commands are registered in.
+        self.GUILD_ID = self._required_id("GUILD_ID")
 
         # --------------------------------------------------------
         # iDRAC
         # --------------------------------------------------------
 
         # IP address or hostname of the Dell iDRAC interface.
-        self.IDRAC_HOST = self._required("IDRAC_HOST")
+        self.IDRAC_HOST = self._optional("IDRAC_HOST")
 
         # iDRAC login username.
-        self.IDRAC_USERNAME = self._required("IDRAC_USERNAME")
+        self.IDRAC_USERNAME = self._optional("IDRAC_USERNAME")
 
         # iDRAC login password.
-        self.IDRAC_PASSWORD = self._required("IDRAC_PASSWORD")
+        self.IDRAC_PASSWORD = self._optional("IDRAC_PASSWORD")
 
         # --------------------------------------------------------
         # FILESYSTEM MONITORING
@@ -208,9 +219,7 @@ class Settings:
         # --------------------------------------------------------
 
         # Discord channel where monitoring notifications are sent.
-        self.ALERT_CHANNEL_ID = int(
-            self._required("ALERT_CHANNEL_ID") or "0"
-        )
+        self.ALERT_CHANNEL_ID = self._required_id("ALERT_CHANNEL_ID")
 
         # Discord user mentioned in torrent notifications. Optional;
         # leave unset to send those notifications without a mention.
@@ -224,7 +233,7 @@ class Settings:
         # --------------------------------------------------------
 
         # IP address/hostname of the internal GPTWOL container.
-        self.GPTWOL_HOST = self._required("GPTWOL_HOST")
+        self.GPTWOL_HOST = self._optional("GPTWOL_HOST")
 
         # HTTP port exposed by GPTWOL.
         self.GPTWOL_PORT = int(
@@ -245,10 +254,10 @@ class Settings:
 
         # IP address GPTWOL uses to determine whether the computer
         # is currently awake.
-        self.GPTWOL_TARGET_IP = self._required("GPTWOL_TARGET_IP")
+        self.GPTWOL_TARGET_IP = self._optional("GPTWOL_TARGET_IP")
 
         # MAC address GPTWOL uses for Wake-on-LAN/Sleep-on-LAN.
-        self.GPTWOL_TARGET_MAC = self._required("GPTWOL_TARGET_MAC")
+        self.GPTWOL_TARGET_MAC = self._optional("GPTWOL_TARGET_MAC")
 
         # Status-check method configured in GPTWOL for this computer,
         # for example "arp" or "icmp".
@@ -262,7 +271,7 @@ class Settings:
         # --------------------------------------------------------
 
         # IP address/hostname of the qBittorrent WebUI.
-        self.QBITTORRENT_HOST = self._required("QBITTORRENT_HOST")
+        self.QBITTORRENT_HOST = self._optional("QBITTORRENT_HOST")
 
         # HTTP port of the qBittorrent WebUI.
         self.QBITTORRENT_PORT = int(
@@ -270,10 +279,10 @@ class Settings:
         )
 
         # qBittorrent WebUI login.
-        self.QBITTORRENT_USERNAME = self._required(
+        self.QBITTORRENT_USERNAME = self._optional(
             "QBITTORRENT_USERNAME"
         )
-        self.QBITTORRENT_PASSWORD = self._required(
+        self.QBITTORRENT_PASSWORD = self._optional(
             "QBITTORRENT_PASSWORD"
         )
 
@@ -286,11 +295,10 @@ class Settings:
 
     def _required(self, name: str) -> str:
         """
-        Return a value that has no sensible default.
+        Return a value the bot cannot run without.
 
-        A missing value is recorded instead of raising, so one missing
-        setting only breaks the feature that needs it rather than
-        preventing the whole bot from starting.
+        A missing value is recorded instead of raising, so bot.py can
+        name every missing value at once.
         """
         value = os.getenv(name, "").strip()
 
@@ -298,6 +306,21 @@ class Settings:
             self.MISSING.append(name)
 
         return value
+
+    def _required_id(self, name: str) -> int:
+        """A required Discord ID: digits only, recorded as missing otherwise."""
+        value = os.getenv(name, "").strip()
+
+        if not value.isdigit():
+            self.MISSING.append(name)
+            return 0
+
+        return int(value)
+
+    @staticmethod
+    def _optional(name: str) -> str:
+        """A module's setting; its module stays off while it is empty."""
+        return os.getenv(name, "").strip()
 
 
 # Create one shared Settings instance.

@@ -3,9 +3,6 @@
 .env.*
 !.env.example
 
-# Private application settings
-/config/settings.py
-
 # Python
 __pycache__/
 *.py[cod]

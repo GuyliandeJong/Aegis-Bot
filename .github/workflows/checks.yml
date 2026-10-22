@@ -1,0 +1,29 @@
+# Runs the checks in tests/ on every push and pull request.
+
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # run_all.py exits with 1 when any check fails.
+      - name: Run the checks
+        run: |
+          python -m compileall -q .
+          python tests/run_all.py

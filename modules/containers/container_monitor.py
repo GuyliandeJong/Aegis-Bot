@@ -2,8 +2,8 @@
 
 import json
 import os
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.containers.portainer_service import PortainerError, PortainerService
 from utils.logger import logger
@@ -58,7 +58,7 @@ class ContainerMonitor(BaseMonitor):
     Does nothing without the Portainer settings.
     """
 
-    STATE_FILE = Path("/app/data/container_monitor_state.json")
+    STATE_FILE = DATA_DIR / "container_monitor_state.json"
 
     INTERVAL = 60
     TIMEOUT = 45

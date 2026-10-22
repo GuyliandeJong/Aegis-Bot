@@ -12,6 +12,7 @@ output contains every line listed for it in EXPECTED below.
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 TESTS = Path(__file__).resolve().parent
@@ -758,12 +759,19 @@ FAILURE_MARKERS = (
 
 
 def run(name: str) -> tuple[bool, str, list[str]]:
+    # State files go to a fresh folder for every check, never a real one.
+    with tempfile.TemporaryDirectory(prefix="aegis-check-") as data:
+        return _run(name, data)
+
+
+def _run(name: str, data: str) -> tuple[bool, str, list[str]]:
     environment = dict(os.environ)
     environment["PYTHONPATH"] = os.pathsep.join(
         [str(ROOT), str(TESTS)]
     )
     environment["PYTHONIOENCODING"] = "utf-8"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["DATA_DIR"] = data
 
     try:
         result = subprocess.run(

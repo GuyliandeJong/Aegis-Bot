@@ -3,12 +3,12 @@
 import json
 import time
 import uuid
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from utils.logger import logger
 
 
-STATE_FILE = Path("/app/data/watchlist.json")
+STATE_FILE = DATA_DIR / "watchlist.json"
 
 # Per person, so one person cannot fill the list for everyone.
 MAX_PER_USER = 25

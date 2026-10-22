@@ -1,9 +1,9 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+from config.paths import DATA_DIR
 
 
-LOG_DIR = Path("/app/data/logs")
+LOG_DIR = DATA_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_FILE = LOG_DIR / "aegis.log"

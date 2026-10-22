@@ -1,7 +1,7 @@
 import json
 import time
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from modules.torrents.qbittorrent_service import QBittorrentService
 from modules.torrents.torrent_action_tracker import consume_expected_action
 from modules.torrents.torrent_requesters import mention_for
@@ -12,7 +12,7 @@ from utils.logger import logger
 class TorrentHealthMonitor:
     """Report useful background torrent changes, stalls, and errors."""
 
-    STATE_FILE = Path("/app/data/torrent_health_state.json")
+    STATE_FILE = DATA_DIR / "torrent_health_state.json"
     INTERVAL = 10
     STALL_DURATION = 10 * 60
     BOT_RESUME_SUPPRESSION = 90

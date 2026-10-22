@@ -1,8 +1,8 @@
 import json
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from utils.logger import logger
 
 
@@ -19,8 +19,8 @@ class MonitorState:
     """
 
     # Store monitoring state outside the application source directory.
-    # This location is backed by the persistent /app/data volume.
-    STATE_FILE = Path("/app/data/monitor_state.json")
+    # This location is backed by the persistent data volume.
+    STATE_FILE = DATA_DIR / "monitor_state.json"
 
     def __init__(self):
         # Each monitor has its own state dictionary.

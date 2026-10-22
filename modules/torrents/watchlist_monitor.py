@@ -3,10 +3,10 @@
 import asyncio
 import json
 import time
-from pathlib import Path
 
 import discord
 
+from config.paths import DATA_DIR
 from config.settings import settings
 from core.base_monitor import BaseMonitor
 from modules.torrents import watchlist
@@ -25,7 +25,7 @@ class WatchlistMonitor(BaseMonitor):
     and removed from the watchlist.
     """
 
-    STATE_FILE = Path("/app/data/watchlist_monitor_state.json")
+    STATE_FILE = DATA_DIR / "watchlist_monitor_state.json"
 
     INTERVAL = 600
     TIMEOUT = 1800

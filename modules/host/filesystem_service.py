@@ -1,5 +1,6 @@
 import psutil
 
+from config.paths import DATA_DIR
 from modules.host.models.filesystem import Filesystem
 from modules.host.models.filesystem_status import FilesystemStatus
 from utils.formatting import format_capacity
@@ -9,7 +10,7 @@ class FilesystemService:
     IMPORTANT_EXACT = {
         "/host",
         "/host/boot",
-        "/app/data",
+        str(DATA_DIR),
     }
 
     IMPORTANT_PREFIXES = (

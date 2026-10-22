@@ -1,14 +1,14 @@
 """Remembers which Discord user added each torrent."""
 
 import json
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from config.settings import settings
 from utils.logger import logger
 
 
 # Stored next to the other runtime state, on the persistent volume.
-STATE_FILE = Path("/app/data/torrent_requesters.json")
+STATE_FILE = DATA_DIR / "torrent_requesters.json"
 
 # Old entries are dropped once the file holds more than this many.
 MAX_ENTRIES = 1000

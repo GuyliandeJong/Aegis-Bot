@@ -3,8 +3,8 @@
 import json
 import os
 import time
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from utils.logger import logger
 
@@ -23,8 +23,8 @@ class BackupMonitor(BaseMonitor):
     Does nothing while BACKUP_PATHS is not set (no backup configured).
     """
 
-    STATUS_FILE = Path("/app/data/backup_status.json")
-    STATE_FILE = Path("/app/data/backup_monitor_state.json")
+    STATUS_FILE = DATA_DIR / "backup_status.json"
+    STATE_FILE = DATA_DIR / "backup_monitor_state.json"
 
     INTERVAL = 3600
     TIMEOUT = 30

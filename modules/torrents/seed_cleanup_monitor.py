@@ -3,8 +3,8 @@
 import json
 import os
 from datetime import datetime
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from modules.torrents.torrent.cleanup import (
     SeedCleanupView,
     seeded_enough,
@@ -31,7 +31,7 @@ class SeedCleanupMonitor(BaseMonitor):
         SEED_RATIO_TARGET, SEED_DAYS_TARGET as for /torrent cleanup
     """
 
-    STATE_FILE = Path("/app/data/seed_cleanup_state.json")
+    STATE_FILE = DATA_DIR / "seed_cleanup_state.json"
 
     INTERVAL = 600
 

@@ -14,14 +14,14 @@ a restart and are not recorded.
 
 import asyncio
 import json
-from pathlib import Path
 
 import discord
 
+from config.paths import DATA_DIR
 from utils.logger import logger
 
 
-STATE_FILE = Path("/app/data/open_messages.json")
+STATE_FILE = DATA_DIR / "open_messages.json"
 
 # Older entries are dropped once the file holds more than this many.
 MAX_ENTRIES = 200

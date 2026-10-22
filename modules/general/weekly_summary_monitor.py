@@ -5,8 +5,8 @@ import inspect
 import json
 import os
 from datetime import datetime
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from core import activity_log, modules
 from modules.jellyfin import watch_stats
@@ -73,7 +73,7 @@ class WeeklySummaryMonitor(BaseMonitor):
     (modules/containers/watchtower_updates.py, WATCHTOWER_CONTAINER).
     """
 
-    STATE_FILE = Path("/app/data/weekly_summary_state.json")
+    STATE_FILE = DATA_DIR / "weekly_summary_state.json"
 
     INTERVAL = 600
 
@@ -579,7 +579,7 @@ class WeeklySummaryMonitor(BaseMonitor):
                 await target.send(chunk)
 
     # Written by scripts/backup.sh, which runs on the server from cron.
-    BACKUP_STATUS = Path("/app/data/backup_status.json")
+    BACKUP_STATUS = DATA_DIR / "backup_status.json"
 
     @classmethod
     def _backup(cls, since: float) -> str:

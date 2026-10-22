@@ -2,8 +2,8 @@
 
 import json
 import os
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from config.settings import settings
 from core.base_monitor import BaseMonitor
 from core.state import state
@@ -37,7 +37,7 @@ class VpnMonitor(BaseMonitor):
                     qBittorrent is not configured.
     """
 
-    STATE_FILE = Path("/app/data/vpn_monitor_state.json")
+    STATE_FILE = DATA_DIR / "vpn_monitor_state.json"
 
     INTERVAL = 120
     TIMEOUT = 60

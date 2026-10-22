@@ -1,8 +1,8 @@
 """Alerts when a power supply or fan reports a problem."""
 
 import json
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.idrac.hardware_service import HardwareService
 from utils.logger import logger
@@ -20,7 +20,7 @@ class HardwareMonitor(BaseMonitor):
     as missing.
     """
 
-    STATE_FILE = Path("/app/data/hardware_monitor_state.json")
+    STATE_FILE = DATA_DIR / "hardware_monitor_state.json"
 
     def __init__(self, notification_service):
         self.service = HardwareService()

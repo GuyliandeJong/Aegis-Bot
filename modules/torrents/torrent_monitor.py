@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.jellyfin import library_followup
 from modules.torrents.qbittorrent_service import QBittorrentService
@@ -12,9 +12,7 @@ from utils.logger import logger
 class TorrentMonitor(BaseMonitor):
     """Detect completed torrents and retain completion statistics."""
 
-    STATE_FILE = Path(
-        "/app/data/torrent_monitor_state.json"
-    )
+    STATE_FILE = DATA_DIR / "torrent_monitor_state.json"
 
     # Torrent monitoring needs finer sampling than the general
     # 60-second system-monitor interval so speed peaks can be captured.

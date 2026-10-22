@@ -3,7 +3,8 @@
 import json
 import math
 import re
-from pathlib import Path
+
+from config.paths import user_file
 
 import discord
 
@@ -329,9 +330,9 @@ class TorrentSearchView(ExpiringView):
 class TorrentSearchMixin:
     """Mixin providing scored Jackett searches."""
 
-    PREFERENCES_FILE = Path(
-        "/app/config/torrent_preferences.json"
-    )
+    # data/torrent_preferences.json when present, otherwise the default
+    # in config/.
+    PREFERENCES_FILE = user_file("torrent_preferences.json")
 
     MAX_RESULTS = 25
     DISPLAY_RESULTS = 10

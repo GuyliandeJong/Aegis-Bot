@@ -2,8 +2,8 @@
 
 import math
 import time
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from utils.logger import logger
 
 
@@ -17,7 +17,7 @@ class HeartbeatMonitor:
     from inside the bot could not be sent.
     """
 
-    FILE = Path("/app/data/heartbeat")
+    FILE = DATA_DIR / "heartbeat"
 
     INTERVAL = 60
 

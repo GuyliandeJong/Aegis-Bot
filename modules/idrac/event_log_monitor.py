@@ -3,10 +3,10 @@
 import json
 import os
 from datetime import datetime
-from pathlib import Path
 
 import aiohttp
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.idrac.hardware_service import HardwareService
 from utils.logger import logger
@@ -34,7 +34,7 @@ class EventLogMonitor(BaseMonitor):
     restart.
     """
 
-    STATE_FILE = Path("/app/data/event_log_monitor_state.json")
+    STATE_FILE = DATA_DIR / "event_log_monitor_state.json"
 
     INTERVAL = 300
     TIMEOUT = 180

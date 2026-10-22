@@ -4,8 +4,8 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.uptime import uptime_service
 from utils.formatting import format_compact_duration
@@ -34,7 +34,7 @@ class UptimeMonitor(BaseMonitor):
     when UPTIME_URLS is empty.
     """
 
-    STATE_FILE = Path("/app/data/uptime_monitor_state.json")
+    STATE_FILE = DATA_DIR / "uptime_monitor_state.json"
 
     INTERVAL = 300
     TIMEOUT = 60

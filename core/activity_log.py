@@ -8,12 +8,12 @@ time itself.
 
 import json
 import time
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from utils.logger import logger
 
 
-STATE_FILE = Path("/app/data/activity_log.json")
+STATE_FILE = DATA_DIR / "activity_log.json"
 
 # Entries older than this are dropped when the log is saved.
 KEEP_SECONDS = 60 * 24 * 60 * 60

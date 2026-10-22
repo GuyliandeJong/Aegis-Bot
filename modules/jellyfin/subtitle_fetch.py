@@ -30,14 +30,14 @@ import asyncio
 import json
 import os
 import time
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core import activity_log
 from modules.jellyfin.jellyfin_service import JellyfinService
 from utils.logger import logger
 
 
-STATE_FILE = Path("/app/data/subtitle_fetch.json")
+STATE_FILE = DATA_DIR / "subtitle_fetch.json"
 
 # After a download request, how long to wait for the file to appear.
 CONFIRM_CHECKS = 3

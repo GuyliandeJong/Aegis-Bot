@@ -6,10 +6,10 @@ of series the primary library already holds.
 import json
 import os
 from datetime import datetime
-from pathlib import Path
 
 import discord
 
+from config.paths import DATA_DIR
 from config.settings import settings
 from core.base_monitor import BaseMonitor
 from modules.jellyfin.jellyfin_compare import (
@@ -37,7 +37,7 @@ class JellyfinNewContentMonitor(BaseMonitor):
                                      (default 10, container time)
     """
 
-    STATE_FILE = Path("/app/data/jellyfin_new_content_state.json")
+    STATE_FILE = DATA_DIR / "jellyfin_new_content_state.json"
 
     # Checks every ten minutes whether today's run is due.
     INTERVAL = 600

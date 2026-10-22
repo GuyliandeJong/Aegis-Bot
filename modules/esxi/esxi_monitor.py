@@ -3,8 +3,8 @@
 import json
 import os
 import time
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.esxi import esxi_service
 from utils.formatting import format_bytes
@@ -41,7 +41,7 @@ class EsxiMonitor(BaseMonitor):
     missing.
     """
 
-    STATE_FILE = Path("/app/data/esxi_monitor_state.json")
+    STATE_FILE = DATA_DIR / "esxi_monitor_state.json"
 
     INTERVAL = 300
     TIMEOUT = 120

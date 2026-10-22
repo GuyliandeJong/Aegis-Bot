@@ -6,8 +6,8 @@ Jellyfin library, a few at a time.
 import json
 import os
 from datetime import datetime
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.jellyfin import subtitle_fetch
 from modules.jellyfin.jellyfin_service import JellyfinService
@@ -32,7 +32,7 @@ class SubtitleMonitor(BaseMonitor):
                                 when the Sunday backup stops Jellyfin)
     """
 
-    STATE_FILE = Path("/app/data/subtitle_monitor_state.json")
+    STATE_FILE = DATA_DIR / "subtitle_monitor_state.json"
 
     # Checks every ten minutes whether today's run is due.
     INTERVAL = 600

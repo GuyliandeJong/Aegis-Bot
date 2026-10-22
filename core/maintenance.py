@@ -11,12 +11,12 @@ service. This module does not talk to Discord itself.
 import json
 import time
 from collections import Counter
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from utils.logger import logger
 
 
-STATE_FILE = Path("/app/data/maintenance.json")
+STATE_FILE = DATA_DIR / "maintenance.json"
 
 # Levels muted during maintenance. Critical alerts always go through.
 MUTED_LEVELS = {"warning", "recovered", "info", "success"}

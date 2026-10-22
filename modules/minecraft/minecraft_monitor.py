@@ -2,8 +2,8 @@
 
 import json
 import os
-from pathlib import Path
 
+from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.minecraft import minecraft_service
 from utils.logger import logger
@@ -26,7 +26,7 @@ class MinecraftMonitor(BaseMonitor):
     Does nothing when MINECRAFT_SERVERS is empty.
     """
 
-    STATE_FILE = Path("/app/data/minecraft_monitor_state.json")
+    STATE_FILE = DATA_DIR / "minecraft_monitor_state.json"
 
     INTERVAL = 60
     TIMEOUT = 30

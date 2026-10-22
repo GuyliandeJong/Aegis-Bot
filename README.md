@@ -31,6 +31,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/jellyfin movies` | Looks up a movie on all Jellyfin servers, with watched state; the title has autocomplete | Everyone (private reply) |
 | `/container` | Lists, inspects and controls Docker containers through Portainer: `list`, `info`, `logs`, `start`, `stop`, `restart`, `kill`, `remove` | Only the users in `PORTAINER_ALLOWED_USER_IDS` |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone |
+| `/help` | Lists the commands you can use, by area; `/help <command>` shows one command's options (autocomplete) | Everyone (private reply) |
 
 `/wan`, `/server`, `/idrac`, `/network`, `/esxi` and `/minecraft` reply
 privately: only the person who ran the command sees the answer.
@@ -38,6 +39,13 @@ privately: only the person who ran the command sees the answer.
 "Administrators" is Discord's administrator permission, set as the
 command default. It can be changed per user or role in Discord under
 Server Settings > Integrations.
+
+`/help` builds its list from the commands the bot has loaded, so a new
+command shows up without changes. It leaves out what the person cannot
+run: administrator commands for members, `/container` for anyone not in
+`PORTAINER_ALLOWED_USER_IDS`, and `/torrent cleanup` for
+non-administrators. It goes by the command defaults and does not see
+changes made under Server Settings > Integrations.
 
 Inside `/torrent info`, removing a torrent is open to whoever requested
 it. Removing a torrent together with its files requires administrator

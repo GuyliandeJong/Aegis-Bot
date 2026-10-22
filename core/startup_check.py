@@ -4,78 +4,21 @@ Checks at startup that every service the bot depends on answers.
 Without this, a wrong password or a stopped container only shows up
 when someone runs a command that needs it. The result is logged, and
 anything unreachable is reported once in the alert channel.
+
+The checks come from the enabled modules: a module's startup_checks
+function returns {name: coroutine} (see core/modules.py).
 """
 
 import asyncio
-import os
 
 import aiohttp
 
-from config.settings import settings
-from modules.idrac.redfish_client import RedfishClient
-from modules.jellyfin.jellyfin_service import JellyfinService
-from modules.torrents.qbittorrent_service import QBittorrentService
+from core import modules
 from utils.logger import logger
 
 
 # Each service gets this long to answer.
 CHECK_TIMEOUT = 15
-
-
-async def _check_qbittorrent() -> None:
-    version = await QBittorrentService().get_version()
-
-    if not version:
-        raise RuntimeError("no version returned")
-
-
-async def _check_jackett() -> None:
-    base_url = os.getenv("JACKETT_URL", "").strip().rstrip("/")
-    api_key = os.getenv("JACKETT_API_KEY", "").strip()
-
-    if not base_url or not api_key:
-        raise RuntimeError("JACKETT_URL or JACKETT_API_KEY is not set")
-
-    # The capabilities request needs a valid API key but searches
-    # nothing.
-    url = f"{base_url}/api/v2.0/indexers/all/results/torznab/api"
-
-    async with aiohttp.ClientSession(
-        timeout=aiohttp.ClientTimeout(total=CHECK_TIMEOUT),
-    ) as session:
-        async with session.get(
-            url,
-            params={"apikey": api_key, "t": "caps"},
-        ) as response:
-            if response.status != 200:
-                raise RuntimeError(f"HTTP {response.status}")
-
-
-async def _check_jellyfin(server) -> None:
-    async with aiohttp.ClientSession(
-        timeout=aiohttp.ClientTimeout(total=CHECK_TIMEOUT),
-    ) as session:
-        async with session.get(
-            f"{server.url}/System/Info",
-            headers=JellyfinService._auth_headers(server),
-        ) as response:
-            if response.status == 401:
-                raise RuntimeError("the API key was refused")
-
-            if response.status != 200:
-                raise RuntimeError(f"HTTP {response.status}")
-
-
-async def _check_idrac() -> None:
-    if not getattr(settings, "IDRAC_HOST", ""):
-        raise RuntimeError("IDRAC_HOST is not set")
-
-    client = RedfishClient()
-
-    try:
-        await client.get_system()
-    finally:
-        await client.close()
 
 
 def _describe(ex: BaseException) -> str:
@@ -98,20 +41,30 @@ def _describe(ex: BaseException) -> str:
     return text[:200] if text else type(ex).__name__
 
 
-async def run(notification_service) -> list[tuple[str, str]]:
+def module_checks() -> dict:
+    """{name: coroutine} from every enabled module that has checks."""
+    checks = {}
+
+    for module in modules.discover():
+        if not module.startup_checks or not modules.enabled(module.name):
+            continue
+
+        try:
+            checks.update(modules.resolve(module.startup_checks)())
+        except Exception:
+            logger.exception("[StartupCheck] Checks of %s failed to start.", module.name)
+
+    return checks
+
+
+async def run(notification_service, checks: dict | None = None) -> list[tuple[str, str]]:
     """
     Check every service and return the failures as (name, reason).
 
     Failures are posted to the alert channel as one message.
     """
-    checks = {
-        "qBittorrent": _check_qbittorrent(),
-        "Jackett": _check_jackett(),
-        "iDRAC": _check_idrac(),
-    }
-
-    for server in JellyfinService().servers:
-        checks[server.name] = _check_jellyfin(server)
+    if checks is None:
+        checks = module_checks()
 
     results = await asyncio.gather(
         *(

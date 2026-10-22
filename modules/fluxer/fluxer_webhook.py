@@ -71,6 +71,13 @@ def enabled() -> bool:
     return bool(webhook_url())
 
 
+def install() -> None:
+    """Mirror every alert the notification service posts (module setup)."""
+    from core.notification_service import add_mirror
+
+    add_mirror(start)
+
+
 # <t:1760846400> or <t:1760846400:f>, Discord's timestamp markup.
 TIMESTAMP = re.compile(r"<t:(-?\d+)(?::([tTdDfFR]))?>")
 

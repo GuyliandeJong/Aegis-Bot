@@ -2,9 +2,21 @@ import discord
 
 from config.settings import settings
 from core import activity_log, maintenance
-from modules.fluxer import fluxer_webhook
 from utils import theme
 from utils.logger import logger
+
+
+# Functions that also get every posted alert, such as the Fluxer
+# module's webhook. Each is called as
+# mirror(title, description, color, fields, bot=bot) and must return at
+# once without raising.
+MIRRORS = []
+
+
+def add_mirror(mirror) -> None:
+    """Also send every alert to `mirror` (see MIRRORS)."""
+    if mirror not in MIRRORS:
+        MIRRORS.append(mirror)
 
 
 class NotificationService:
@@ -36,18 +48,15 @@ class NotificationService:
         A caller passing a `view` must assign the returned message to
         `view.message` (see utils/open_messages.py).
 
-        When FLUXER_WEBHOOK_URL is set, the same alert is also posted to
-        Fluxer in the background; that never delays or breaks this one.
+        Every function in MIRRORS gets the alert too, before Discord, so
+        a mirror also gets alerts Discord misses.
         """
 
-        # Scheduled first, so Fluxer also gets alerts Discord misses.
-        fluxer_webhook.start(
-            title,
-            description,
-            color,
-            fields,
-            bot=self.bot,
-        )
+        for mirror in MIRRORS:
+            try:
+                mirror(title, description, color, fields, bot=self.bot)
+            except Exception:
+                logger.exception("[NotificationService] Alert mirror failed.")
 
         channel = self.bot.get_channel(
             settings.ALERT_CHANNEL_ID

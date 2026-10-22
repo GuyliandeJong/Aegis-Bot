@@ -1,13 +1,14 @@
 """Once a week, one message about what happened."""
 
 import asyncio
+import inspect
 import json
 import os
 from datetime import datetime
 from pathlib import Path
 
 from core.base_monitor import BaseMonitor
-from core import activity_log
+from core import activity_log, modules
 from modules.jellyfin import watch_stats
 from modules.containers import watchtower_updates
 from modules.host.filesystem_service import FilesystemService
@@ -161,32 +162,40 @@ class WeeklySummaryMonitor(BaseMonitor):
         if self.overflow and message is not None:
             await self._post_full_lists(message, now)
 
+    # (module, heading, method), in the order of the message. A field
+    # is only built when its module runs; a method returning None (such
+    # as a field turned off in .env) leaves it out too. Routine
+    # container updates come last, after the alerts that need attention.
+    FIELDS = (
+        ("host", "💾 Disks", "_disks"),
+        ("torrents", "✅ Torrents completed", "_torrents"),
+        ("jellyfin", "📥 Copied from Jellyfin", "_copies"),
+        ("jellyfin", "🆕 New in Jellyfin", "_new_in_jellyfin"),
+        ("wan", "🌐 Internet", "_outages"),
+        ("backup", "🗄️ Backup", "_backup"),
+        ("jellyfin", "💬 Subtitles", "_subtitles"),
+        ("jellyfin", "🍿 Watched this week", "_watched"),
+        ("general", "🔔 Alerts", "_alerts"),
+        ("containers", "🔄 Container updates", "_container_updates"),
+    )
+
     async def build(self, since: float) -> list[tuple[str, str, bool]]:
         # Lists too long for their field, posted in a thread afterwards.
         self.overflow: list[tuple[str, list[str]]] = []
 
-        fields = [
-            ("💾 Disks", await self._disks(), False),
-            ("✅ Torrents completed", await self._torrents(since), False),
-            ("📥 Copied from Jellyfin", self._copies(since), False),
-            ("🆕 New in Jellyfin", await self._new_in_jellyfin(since), False),
-            ("🌐 Internet", self._outages(since), False),
-            ("🗄️ Backup", self._backup(since), False),
-            ("💬 Subtitles", self._subtitles(since), False),
-        ]
+        fields = []
 
-        # Left out when turned off or no Jellyfin server is configured.
-        watched = await self._watched(since)
+        for module, heading, method in self.FIELDS:
+            if not modules.enabled(module):
+                continue
 
-        if watched is not None:
-            fields.append(("🍿 Watched this week", watched, False))
+            value = getattr(self, method)(since)
 
-        fields.append(("🔔 Alerts", self._alerts(since), False))
-        # Routine maintenance, after the alerts that need attention.
-        fields.append(("🔄 Container updates", await self._container_updates(since), False))
+            if inspect.isawaitable(value):
+                value = await value
 
-        # A field that does not apply (no Jellyfin configured) is None.
-        fields = [field for field in fields if field[1] is not None]
+            if value is not None:
+                fields.append((heading, value, False))
 
         # Discord refuses a field value over 1024 characters.
         return [
@@ -236,7 +245,7 @@ class WeeklySummaryMonitor(BaseMonitor):
 
         return f"full in about {round(left / 4.35)} months at this rate"
 
-    async def _disks(self) -> str:
+    async def _disks(self, since: float | None = None) -> str:
         try:
             current = await FilesystemService().get_used_bytes()
         except Exception as ex:

@@ -18,6 +18,7 @@ import modules.fluxer.fluxer_webhook as FW
 from core.notification_service import NotificationService
 from utils import theme
 import isolate  # state files go to a temporary folder
+FW.install()  # what the fluxer module's setup does at startup
 
 TOKEN = "s3cr3t-T0ken"
 BASE = f"http://127.0.0.1:{PORT}/v1/webhooks/1501314428688998182"

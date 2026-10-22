@@ -30,6 +30,17 @@ LIBRARIES = {
 }
 USERS = {"home": [{"Name": "Alex", "Id": "u-home"}], "friend": [{"Name": "Friend", "Id": "x"}, {"Name": "Alex", "Id": "u-friend"}]}
 DOWN = set()
+SESSIONS = [
+    {"UserName": "alex", "Client": "Jellyfin Android TV", "DeviceName": "Living Room TV",
+     "NowPlayingItem": {"Type": "Movie", "Name": "Dune", "ProductionYear": 2021, "RunTimeTicks": 9300 * 10_000_000},
+     "PlayState": {"PositionTicks": 5520 * 10_000_000, "IsPaused": False, "PlayMethod": "DirectPlay"}},
+    {"UserName": "friend", "Client": "Jellyfin Web", "DeviceName": "Firefox",
+     "NowPlayingItem": {"Type": "Episode", "SeriesName": "Fallout", "ParentIndexNumber": 2, "IndexNumber": 3,
+                        "Name": "The Beginning", "RunTimeTicks": 3600 * 10_000_000},
+     "PlayState": {"PositionTicks": 600 * 10_000_000, "IsPaused": True, "PlayMethod": "Transcode"},
+     "TranscodingInfo": {"Height": 720, "Bitrate": 4000000, "TranscodeReasons": ["AudioCodecNotSupported", "SubtitleCodecNotSupported"]}},
+    {"UserName": "idle", "Client": "Jellyfin Web", "DeviceName": "Chrome"},
+]
 SEEN = []
 
 
@@ -49,7 +60,12 @@ def handler(server):
                 item["UserData"] = {"Played": played}
             out.append(item)
         return web.json_response({"Items": out})
-    return users, items
+    async def sessions(request):
+        if server in DOWN:
+            return web.Response(status=503)
+        SEEN.append((server, "sessions", request.query.get("activeWithinSeconds")))
+        return web.json_response(SESSIONS if server == "home" else [])
+    return users, items, sessions
 
 
 class Interaction:
@@ -82,8 +98,8 @@ def titles(i):
 async def main():
     app = web.Application()
     for server in ("home", "friend"):
-        users, items = handler(server)
-        app.add_routes([web.get(f"/{server}/Users", users), web.get(f"/{server}/Items", items),
+        users, items, sessions = handler(server)
+        app.add_routes([web.get(f"/{server}/Sessions", sessions), web.get(f"/{server}/Users", users), web.get(f"/{server}/Items", items),
                         web.get(f"/{server}/Users/{{user}}/Items", items)])
     runner = web.AppRunner(app); await runner.setup(); await web.TCPSite(runner, "127.0.0.1", PORT).start()
     try:
@@ -137,6 +153,25 @@ async def main():
         press = Interaction()
         await view.next_button.callback(press)
         print("  after Next:", press.sent[-1][1].footer.text.split(" • ")[0], "| Next disabled:", view.next_button.disabled)
+
+        print("\n== now playing ==")
+        cog = J.JellyfinCog()
+        admin = Interaction(); admin.user.guild_permissions = types.SimpleNamespace(administrator=True)
+        await cog.playing.callback(cog, admin)
+        embed = admin.sent[-1][1]
+        print("  title:", embed.title, "| private:", admin.sent[-1][3])
+        for line in embed.description.split("\n"):
+            print("  |", line)
+        print("  only your own server asked:", sorted({s for s, u, _ in SEEN if u == "sessions"}))
+        member = Interaction(); member.user.guild_permissions = types.SimpleNamespace(administrator=False)
+        await cog.playing.callback(cog, member)
+        print("  member:", member.sent[-1][0])
+        SESSIONS.clear(); quiet = Interaction(); quiet.user.guild_permissions = admin.user.guild_permissions
+        await cog.playing.callback(cog, quiet)
+        print("  nothing playing:", quiet.sent[-1][1].description)
+        DOWN.add("home"); down = Interaction(); down.user.guild_permissions = admin.user.guild_permissions
+        await cog.playing.callback(cog, down)
+        print("  server down:", down.sent[-1][0]); DOWN.clear()
 
         print("\n== matching ==")
         merged = ML.combine([("A", [{"Name": "Blade Runner", "ProductionYear": 1982, "ProviderIds": {}}], False),

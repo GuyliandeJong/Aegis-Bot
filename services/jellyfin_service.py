@@ -995,6 +995,63 @@ class JellyfinService:
 
         return await self._get_items(server_name, path, params, timeout=180), user_id is not None
 
+    async def now_playing(self, server_name: str) -> list[dict] | None:
+        """
+        What is being played on a server right now; None when the server
+        did not answer. Each entry: user, client, device, title, kind,
+        position and runtime in seconds, paused, method ("DirectPlay",
+        "DirectStream" or "Transcode") and, when transcoding, the
+        target resolution, bitrate and Jellyfin's reasons.
+        """
+        status, data = await self._request_json(
+            server_name, "GET", "/Sessions?activeWithinSeconds=960", timeout=15,
+        )
+
+        if status != 200 or not isinstance(data, list):
+            return None
+
+        playing = []
+
+        for session in data:
+            item = session.get("NowPlayingItem") if isinstance(session, dict) else None
+
+            if not isinstance(item, dict):
+                continue
+
+            state = session.get("PlayState") or {}
+            transcode = session.get("TranscodingInfo") or {}
+            kind = item.get("Type") or ""
+
+            if kind == "Episode":
+                season, number = item.get("ParentIndexNumber"), item.get("IndexNumber")
+                code = f" S{season:02d}E{number:02d}" if isinstance(season, int) and isinstance(number, int) else ""
+                title = f"{item.get('SeriesName') or ''}{code} — {item.get('Name') or ''}".strip(" —")
+            else:
+                year = item.get("ProductionYear")
+                title = f"{item.get('Name') or 'Unknown'}{f' ({year})' if year else ''}"
+
+            reasons = transcode.get("TranscodeReasons") or []
+
+            if isinstance(reasons, str):
+                reasons = [part.strip() for part in reasons.split(",") if part.strip()]
+
+            playing.append({
+                "user": session.get("UserName") or "Unknown user",
+                "client": session.get("Client") or "",
+                "device": session.get("DeviceName") or "",
+                "title": title,
+                "kind": kind,
+                "position": int(state.get("PositionTicks") or 0) // 10_000_000,
+                "runtime": int(item.get("RunTimeTicks") or 0) // 10_000_000,
+                "paused": bool(state.get("IsPaused")),
+                "method": state.get("PlayMethod") or "",
+                "height": transcode.get("Height"),
+                "bitrate": transcode.get("Bitrate"),
+                "reasons": reasons,
+            })
+
+        return playing
+
     async def search_remote_subtitles(
         self,
         server_name: str,

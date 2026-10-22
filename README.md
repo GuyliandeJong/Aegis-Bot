@@ -25,6 +25,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/esxi` | ESXi datastores (usage) and virtual machines (running or not) | Administrators |
 | `/wan` | Public IP address | Administrators |
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
+| `/jellyfin playing` | What is being played on your own Jellyfin server now: who, on which device, progress, and whether it transcodes and why | Administrators (private reply) |
 | `/jellyfin movies` | Looks up a movie on all Jellyfin servers, with watched state; the title has autocomplete | Everyone (private reply) |
 | `/container` | Lists, inspects and controls Docker containers through Portainer: `list`, `info`, `logs`, `start`, `stop`, `restart`, `kill`, `remove` | Only the users in `PORTAINER_ALLOWED_USER_IDS` |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone |

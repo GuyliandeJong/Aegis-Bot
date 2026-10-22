@@ -38,15 +38,15 @@ class FakeDT(datetime):
 
 
 # real MonitorState, but never touching /app/data
-src = open("monitors/state.py", encoding="utf-8").read().replace("state = MonitorState()", "")
+src = open("core/state.py", encoding="utf-8").read().replace("state = MonitorState()", "")
 ns = {}
 exec(compile(src, "state.py", "exec"), ns)
 ns["datetime"] = FakeDT
 MS = ns["MonitorState"]
 MS.load = lambda self: None
 MS.save = lambda self: None
-mod("monitors.state", state=MS())
-state = sys.modules["monitors.state"].state
+mod("core.state", state=MS())
+state = sys.modules["core.state"].state
 
 usage = {"v": 0.0}
 mem = types.SimpleNamespace(percent_used=0.0, used="1 GiB", available="2 GiB", total="3 GiB")
@@ -61,8 +61,8 @@ class MemoryService:
         mem.percent_used = usage["v"]; return types.SimpleNamespace(memory=mem)
 
 
-mod("services.cpu_service", CPUService=CPUService)
-mod("services.memory_service", MemoryService=MemoryService)
+mod("modules.host.cpu_service", CPUService=CPUService)
+mod("modules.host.memory_service", MemoryService=MemoryService)
 
 
 SEQ = [50]*3 + [85]*8 + [97]*4 + [92]*2 + [85]*5 + [60]*5 + [85]*2 + [60]*6 + [99]*4 + [50]*8
@@ -78,7 +78,7 @@ def run(cls, attr):
     return notes.sent, dict(getattr(state, attr))
 
 
-import monitors.cpu_monitor as new_cpu, monitors.memory_monitor as new_mem
+import modules.host.cpu_monitor as new_cpu, modules.host.memory_monitor as new_mem
 
 # The sequence above must produce exactly these notifications, in order.
 EXPECTED = ["High", "Critical", "High", "Normal", "Critical", "Recovered", "Normal"]
@@ -100,8 +100,8 @@ class FilesystemService:
         return types.SimpleNamespace(filesystems=[f])
 
 
-mod("services.filesystem_service", FilesystemService=FilesystemService)
-from monitors.filesystem_monitor import FilesystemMonitor
+mod("modules.host.filesystem_service", FilesystemService=FilesystemService)
+from modules.host.filesystem_monitor import FilesystemMonitor
 
 
 def fs_run(seq, minutes_per_step=1):
@@ -131,9 +131,9 @@ class TemperatureService:
         return types.SimpleNamespace(temperatures=[types.SimpleNamespace(name="CPU1 Temp", reading=temp["c"])])
 
 
-mod("services.temperature_service", TemperatureService=TemperatureService)
+mod("modules.idrac.temperature_service", TemperatureService=TemperatureService)
 mod("utils.status", temperature_status=lambda r: "Critical" if r >= 85 else "Warning" if r >= 70 else "OK")
-from monitors.temperature_monitor import TemperatureMonitor
+from modules.idrac.temperature_monitor import TemperatureMonitor
 
 
 def t_run(seq, initial=None, step=40):

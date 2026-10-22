@@ -17,12 +17,12 @@ for key in [k for k in os.environ if k.startswith(("JELLYFIN_", "SUBTITLE_"))]:
     del os.environ[key]
 os.environ.update({"JELLYFIN_1_URL": f"http://127.0.0.1:{PORT}", "JELLYFIN_1_API_KEY": "k", "JELLYFIN_1_NAME": "Home"})
 
-import services.subtitle_fetch as SF
-import services.library_followup as LF
-import monitors.subtitle_monitor as SM
-import monitors.weekly_summary_monitor as WS
-from services import activity_log
-from services.jellyfin_service import JellyfinService
+import modules.jellyfin.subtitle_fetch as SF
+import modules.jellyfin.library_followup as LF
+import modules.jellyfin.subtitle_monitor as SM
+import modules.general.weekly_summary_monitor as WS
+from core import activity_log
+from modules.jellyfin.jellyfin_service import JellyfinService
 import isolate  # state files go to a temporary folder
 SF.CONFIRM_DELAY = 0
 SM.SubtitleMonitor.STATE_FILE = isolate.DATA / "subtitle_monitor_state.json"

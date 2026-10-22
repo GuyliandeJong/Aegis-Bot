@@ -44,7 +44,7 @@ class Inter:
     async def edit_original_response(s, **k): s.sent.append(k.get('content'))
 
 
-import commands.wol as W
+import modules.wol.commands.wol as W
 calls = []
 
 
@@ -68,7 +68,7 @@ for status, fail in (("asleep", None), ("awake", None), ("asleep", "status"), ("
     print(f"  pc={status:6} fail={str(fail):6} -> gptwol calls={calls} reply={(r.title if hasattr(r, 'title') else r)!r}")
 
 # ---- delete-files permission
-import services.qbittorrent_service as QS
+import modules.torrents.qbittorrent_service as QS
 deleted = []
 
 
@@ -76,7 +76,7 @@ async def fake_delete(self, torrent_hash, delete_files=False): deleted.append((t
 
 
 QS.QBittorrentService.delete_torrent = fake_delete
-from commands.torrent.views.delete_view import TorrentDeleteConfirmationView as V1, TorrentDeleteFilesConfirmationView as V2
+from modules.torrents.torrent.views.delete_view import TorrentDeleteConfirmationView as V1, TorrentDeleteFilesConfirmationView as V2
 import isolate  # state files go to a temporary folder
 parent = types.SimpleNamespace(owner_id=1, torrent={"hash": "abc", "name": "T"}, message=None, stop=lambda: None)
 print("\ndelete buttons (user is the requester in every case)")

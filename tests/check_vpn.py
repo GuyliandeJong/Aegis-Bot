@@ -18,9 +18,9 @@ sys.modules["config.settings"] = c
 # Inside the bot's container the real .env is loaded.
 os.environ.pop("VPN_CHECK", None)
 
-from monitors.state import state
-import monitors.vpn_monitor as VM
-from services.qbittorrent_service import QBittorrentService
+from core.state import state
+import modules.torrents.vpn_monitor as VM
+from modules.torrents.qbittorrent_service import QBittorrentService
 import isolate  # state files go to a temporary folder
 VM.VpnMonitor.STATE_FILE = isolate.DATA / "vpn.json"
 
@@ -137,8 +137,8 @@ async def main():
         state.wan["ip"] = HOME
 
         print("\n== /torrent status ==")
-        from commands.torrent.formatting import TorrentFormattingMixin
-        from commands.torrent.status import TorrentStatusMixin
+        from modules.torrents.torrent.formatting import TorrentFormattingMixin
+        from modules.torrents.torrent.status import TorrentStatusMixin
 
         class Cog(TorrentStatusMixin, TorrentFormattingMixin):
             pass

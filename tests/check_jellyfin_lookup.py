@@ -27,8 +27,8 @@ def script(method, url, kw):
 
 
 HTTP.script = script
-from services.jellyfin_service import JellyfinService as J
-import commands.torrent.search as SM
+from modules.jellyfin.jellyfin_service import JellyfinService as J
+import modules.torrents.torrent.search as SM
 import isolate  # state files go to a temporary folder
 
 s = J()

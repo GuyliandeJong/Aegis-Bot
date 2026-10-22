@@ -18,8 +18,8 @@ os.environ.update({"ESXI_HOST": f"127.0.0.1:{PORT}", "ESXI_USERNAME": "monitor",
 for name in ("ESXI_DATASTORE_WARNING", "ESXI_DATASTORE_CRITICAL", "ESXI_SNAPSHOT_DAYS"):
     os.environ.pop(name, None)
 
-import services.esxi_service as ES
-import monitors.esxi_monitor as EM
+import modules.esxi.esxi_service as ES
+import modules.esxi.esxi_monitor as EM
 import isolate  # state files go to a temporary folder
 EM.EsxiMonitor.STATE_FILE = isolate.DATA / "esxi.json"
 
@@ -162,7 +162,7 @@ async def main():
         del os.environ["ESXI_DATASTORE_WARNING"]
 
         print("\n== /esxi ==")
-        import commands.esxi as EC
+        import modules.esxi.commands.esxi as EC
         sent = []
         async def defer(**k): pass
         async def send(*a, **k): sent.append(k["embed"])

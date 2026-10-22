@@ -16,14 +16,14 @@ for key in [k for k in os.environ if k.startswith("JELLYFIN_")]:
 os.environ.update({"SEED_RATIO_TARGET": "2", "SEED_DAYS_TARGET": "14"})
 
 import discord
-from services import watchlist as W
-import services.qbittorrent_service as QS
-import commands.torrent.search as SM
-import commands.torrent.add as AM
-import commands.torrent.cleanup as CL
-from commands.torrent.info import name_matches
-import commands.torrent.watchlist as WV
-import monitors.watchlist_monitor as WM
+from modules.torrents import watchlist as W
+import modules.torrents.qbittorrent_service as QS
+import modules.torrents.torrent.search as SM
+import modules.torrents.torrent.add as AM
+import modules.torrents.torrent.cleanup as CL
+from modules.torrents.torrent.info import name_matches
+import modules.torrents.torrent.watchlist as WV
+import modules.torrents.watchlist_monitor as WM
 import isolate  # state files go to a temporary folder
 W.STATE_FILE = isolate.DATA / "watchlist.json"
 WM.WatchlistMonitor.STATE_FILE = isolate.DATA / "watchlist_monitor.json"

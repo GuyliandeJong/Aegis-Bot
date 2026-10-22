@@ -24,11 +24,11 @@ os.environ.update({"JELLYFIN_1_URL": f"http://127.0.0.1:{PORT}/home", "JELLYFIN_
                    "JELLYFIN_SERIES_DIR": str(SERIES), "JELLYFIN_MOVIES_DIR": str(MOVIES), "JELLYFIN_NEW_CONTENT_HOUR": "10"})
 
 import discord
-from services import jellyfin_compare as JC
-from services.jellyfin_service import JellyfinService
-import commands.torrent.search as SM
-import commands.torrent.jellyfin_download as JD
-import monitors.jellyfin_new_content_monitor as NM
+from modules.jellyfin import jellyfin_compare as JC
+from modules.jellyfin.jellyfin_service import JellyfinService
+import modules.torrents.torrent.search as SM
+import modules.jellyfin.jellyfin_download as JD
+import modules.jellyfin.new_content_monitor as NM
 import isolate  # state files go to a temporary folder
 JD.JellyfinTransfer.UPDATE_INTERVAL = 0.05
 SM.TorrentSearchMixin.PREFERENCES_FILE = Path(__file__).resolve().parent.parent / "config" / "torrent_preferences.json"

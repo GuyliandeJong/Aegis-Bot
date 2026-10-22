@@ -19,9 +19,9 @@ sys.modules["config.settings"] = c
 for name in ("IDRAC_EVENT_LOG", "IDRAC_EVENT_LOG_ALL"):
     os.environ.pop(name, None)
 
-import redfish.client as RC
-import services.hardware_service as HS
-import monitors.event_log_monitor as EM
+import modules.idrac.redfish_client as RC
+import modules.idrac.hardware_service as HS
+import modules.idrac.event_log_monitor as EM
 import isolate  # state files go to a temporary folder
 EM.EventLogMonitor.STATE_FILE = isolate.DATA / "event_log.json"
 

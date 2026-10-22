@@ -241,7 +241,7 @@ print("\n== weekly summary line ==")
 m = types.ModuleType("utils.logger"); m.logger = types.SimpleNamespace(warning=print, error=print, info=print); sys.modules["utils.logger"] = m
 c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(); sys.modules["config.settings"] = c
 sys.path.insert(0, str(HERE.parent))
-import monitors.weekly_summary_monitor as WS
+import modules.general.weekly_summary_monitor as WS
 WS.WeeklySummaryMonitor.BACKUP_STATUS = PROJECT / "data" / "backup_status.json"
 now = time.time()
 print("  locally only :", WS.WeeklySummaryMonitor._backup(now - 3600).split(": ", 1)[1])

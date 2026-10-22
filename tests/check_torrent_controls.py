@@ -14,11 +14,11 @@ sys.modules["config.settings"] = c
 os.environ.pop("REQUEST_APPROVAL", None)
 
 import discord
-import services.qbittorrent_service as QS
-from services import torrent_requesters as TR
-from commands.torrent_command import Torrent
-import commands.torrent.add as AM
-from commands.torrent.approval import magnet_name
+import modules.torrents.qbittorrent_service as QS
+from modules.torrents import torrent_requesters as TR
+from modules.torrents.commands.torrent import Torrent
+import modules.torrents.torrent.add as AM
+from modules.torrents.torrent.approval import magnet_name
 import isolate  # state files go to a temporary folder
 AM.TorrentAddMixin.SPACE_CHECK_TRIES = 1
 

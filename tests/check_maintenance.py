@@ -10,10 +10,10 @@ logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(mes
 m = types.ModuleType("utils.logger"); m.logger = logging.getLogger("aegis"); sys.modules["utils.logger"] = m
 c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(ALERT_CHANNEL_ID=10); sys.modules["config.settings"] = c
 
-import services.activity_log as AL
-import services.maintenance as M
-from monitors.maintenance_monitor import MaintenanceMonitor
-from services.notification_service import NotificationService
+import core.activity_log as AL
+import core.maintenance as M
+from modules.general.maintenance_monitor import MaintenanceMonitor
+from core.notification_service import NotificationService
 import isolate  # state files go to a temporary folder
 
 

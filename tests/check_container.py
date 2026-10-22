@@ -16,8 +16,8 @@ os.environ.update({"PORTAINER_URL": f"http://127.0.0.1:{PORT}", "PORTAINER_API_K
                    "PORTAINER_ALLOWED_USER_IDS": f"{OWNER}", "PORTAINER_PROTECTED": "jellyfin", "HOSTNAME": "abcdef123456"})
 
 import discord
-import services.portainer_service as PS
-import commands.container as C
+import modules.containers.portainer_service as PS
+import modules.containers.commands.container as C
 import isolate  # state files go to a temporary folder
 
 # name: [id, image, state, status]

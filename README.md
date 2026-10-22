@@ -945,7 +945,7 @@ The same output is kept in `data/logs/aegis.log`.
 ```text
 bot.py                 Entry point: loads commands, starts monitors
 commands/              One file per slash command
-commands/torrent/      The /torrent group, its views and the Jellyfin download
+modules/torrents/torrent/      The /torrent group, its views and the Jellyfin download
 services/              Clients for qBittorrent, Jackett, Jellyfin, GPTWOL, Portainer, Redfish data, the Fluxer webhook
 monitors/              Background checks and their persisted state
 models/                Small data classes returned by services

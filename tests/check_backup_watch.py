@@ -10,7 +10,7 @@ c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(ALER
 os.environ.pop("BACKUP_MAX_AGE_DAYS", None)
 os.environ.pop("BACKUP_PATHS", None)
 
-import monitors.backup_monitor as BM
+import modules.backup.backup_monitor as BM
 import isolate  # state files go to a temporary folder
 BM.BackupMonitor.STATUS_FILE = isolate.DATA / "backup_status.json"
 BM.BackupMonitor.STATE_FILE = isolate.DATA / "backup_monitor.json"

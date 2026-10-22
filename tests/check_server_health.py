@@ -19,14 +19,14 @@ c.settings = types.SimpleNamespace(IDRAC_HOST="h", IDRAC_USERNAME="u", IDRAC_PAS
                                    QBITTORRENT_TIMEOUT=5, QBITTORRENT_USERNAME="u", QBITTORRENT_PASSWORD="p", ALERT_CHANNEL_ID=10)
 sys.modules["config.settings"] = c
 
-import services.hardware_service as HS
-import monitors.hardware_monitor as HM
-import monitors.weekly_summary_monitor as WS
-import monitors.heartbeat_monitor as HB
-from services import activity_log
-import services.qbittorrent_service as QS
-import services.filesystem_service as FS
-import commands.server as SV
+import modules.idrac.hardware_service as HS
+import modules.idrac.hardware_monitor as HM
+import modules.general.weekly_summary_monitor as WS
+import modules.general.heartbeat_monitor as HB
+from core import activity_log
+import modules.torrents.qbittorrent_service as QS
+import modules.host.filesystem_service as FS
+import modules.idrac.commands.server as SV
 import isolate  # state files go to a temporary folder
 GIB_ = 1024 ** 3
 HM.HardwareMonitor.STATE_FILE = isolate.DATA / "hardware.json"
@@ -170,7 +170,7 @@ async def weekly():
 
 def drives():
     print("\n== drive status ==")
-    from monitors.storage_monitor import StorageMonitor as SM
+    from modules.idrac.storage_monitor import StorageMonitor as SM
     for label, args in (("healthy HDD", ("OK", "Online", False, None)), ("SSD 64% left", ("OK", "Online", False, 64)),
                         ("SSD 9% left", ("OK", "Online", False, 9)), ("failure predicted", ("OK", "Online", True, 80))):
         print(f"  {label:18} -> {SM._get_drive_status(*args)}")

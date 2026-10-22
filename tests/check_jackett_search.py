@@ -19,9 +19,9 @@ from pathlib import Path
 
 c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(ALERT_CHANNEL_ID=10); sys.modules["config.settings"] = c
 import discord
-import commands.torrent.search as SM
-from commands.torrent.formatting import TorrentFormattingMixin
-from services.jackett_service import JackettService
+import modules.torrents.torrent.search as SM
+from modules.torrents.torrent.formatting import TorrentFormattingMixin
+from modules.torrents.jackett_service import JackettService
 PREFS = Path(__file__).resolve().parent.parent / "config" / "torrent_preferences.json"
 SM.TorrentSearchMixin.PREFERENCES_FILE = PREFS
 

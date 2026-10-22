@@ -23,7 +23,7 @@ import sys
 # Run from /app, so the bot's own modules are found.
 sys.path.insert(0, ".")
 
-from redfish.client import RedfishClient
+from modules.idrac.redfish_client import RedfishClient
 
 
 MAX_PAGES = 400

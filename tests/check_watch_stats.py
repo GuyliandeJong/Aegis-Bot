@@ -22,8 +22,8 @@ os.environ.update({
     "JELLYFIN_2_URL": f"http://127.0.0.1:{PORT}/friend", "JELLYFIN_2_API_KEY": "f", "JELLYFIN_2_NAME": "Friend",
 })
 
-from services import watch_stats as W
-import monitors.weekly_summary_monitor as WS
+from modules.jellyfin import watch_stats as W
+import modules.general.weekly_summary_monitor as WS
 import isolate  # state files go to a temporary folder
 
 WS.WeeklySummaryMonitor.STATE_FILE = isolate.DATA / "weekly.json"

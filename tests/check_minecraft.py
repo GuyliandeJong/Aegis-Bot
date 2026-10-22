@@ -17,8 +17,8 @@ os.environ.update({
 })
 os.environ.pop("MINECRAFT_JOIN_ALERTS", None)
 
-import services.minecraft_service as MS
-import monitors.minecraft_monitor as MM
+import modules.minecraft.minecraft_service as MS
+import modules.minecraft.minecraft_monitor as MM
 import isolate  # state files go to a temporary folder
 MM.MinecraftMonitor.STATE_FILE = isolate.DATA / "minecraft.json"
 
@@ -160,7 +160,7 @@ async def main():
         print("  MINECRAFT_WATCH empty, Creative down 3 checks ->", fresh.sent)
 
         print("\n== /minecraft ==")
-        import commands.minecraft as MC
+        import modules.minecraft.commands.minecraft as MC
         sent = []
         async def defer(**k): sent.append(("defer", k.get("ephemeral")))
         async def send(*a, **k): sent.append(k.get("embed") or a[0])

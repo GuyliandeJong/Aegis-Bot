@@ -24,10 +24,10 @@ os.environ.update({"JACKETT_URL": f"http://127.0.0.1:{PORT}/jackett", "JACKETT_A
 import discord
 from utils import open_messages as OM
 from utils.formatting import format_bytes
-from services.qbittorrent_service import QBittorrentService
-from services import startup_check
-from monitors.torrent_monitor import TorrentMonitor
-from monitors.torrent_health_monitor import TorrentHealthMonitor
+from modules.torrents.qbittorrent_service import QBittorrentService
+from core import startup_check
+from modules.torrents.torrent_monitor import TorrentMonitor
+from modules.torrents.torrent_health_monitor import TorrentHealthMonitor
 import isolate  # state files go to a temporary folder
 
 

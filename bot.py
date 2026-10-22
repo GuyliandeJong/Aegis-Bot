@@ -1,38 +1,39 @@
 import asyncio
 import os
+from pathlib import Path
 
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
 from config.settings import settings
-from monitors.esxi_monitor import EsxiMonitor
-from monitors.event_log_monitor import EventLogMonitor
-from monitors.filesystem_monitor import FilesystemMonitor
-from monitors.hardware_monitor import HardwareMonitor
-from monitors.heartbeat_monitor import HeartbeatMonitor
-from monitors.jellyfin_new_content_monitor import JellyfinNewContentMonitor
-from monitors.minecraft_monitor import MinecraftMonitor
-from monitors.monitor_manager import MonitorManager
-from monitors.seed_cleanup_monitor import SeedCleanupMonitor
-from monitors.wan_monitor import WanMonitor
-from monitors.watchlist_monitor import WatchlistMonitor
-from monitors.weekly_summary_monitor import WeeklySummaryMonitor
-from monitors.temperature_monitor import TemperatureMonitor
-from monitors.cpu_monitor import CPUMonitor
-from monitors.container_monitor import ContainerMonitor
-from monitors.memory_monitor import MemoryMonitor
-from monitors.storage_monitor import StorageMonitor
-from monitors.subtitle_monitor import SubtitleMonitor
-from monitors.torrent_monitor import TorrentMonitor
-from monitors.torrent_health_monitor import TorrentHealthMonitor
-from monitors.backup_monitor import BackupMonitor
-from monitors.maintenance_monitor import MaintenanceMonitor
-from monitors.vpn_monitor import VpnMonitor
-from monitors.uptime_monitor import UptimeMonitor
-from services import startup_check
-from services.qbittorrent_service import QBittorrentService
-from services.torrent_action_tracker import (
+from modules.esxi.esxi_monitor import EsxiMonitor
+from modules.idrac.event_log_monitor import EventLogMonitor
+from modules.host.filesystem_monitor import FilesystemMonitor
+from modules.idrac.hardware_monitor import HardwareMonitor
+from modules.general.heartbeat_monitor import HeartbeatMonitor
+from modules.jellyfin.new_content_monitor import JellyfinNewContentMonitor
+from modules.minecraft.minecraft_monitor import MinecraftMonitor
+from core.monitor_manager import MonitorManager
+from modules.torrents.seed_cleanup_monitor import SeedCleanupMonitor
+from modules.wan.wan_monitor import WanMonitor
+from modules.torrents.watchlist_monitor import WatchlistMonitor
+from modules.general.weekly_summary_monitor import WeeklySummaryMonitor
+from modules.idrac.temperature_monitor import TemperatureMonitor
+from modules.host.cpu_monitor import CPUMonitor
+from modules.containers.container_monitor import ContainerMonitor
+from modules.host.memory_monitor import MemoryMonitor
+from modules.idrac.storage_monitor import StorageMonitor
+from modules.jellyfin.subtitle_monitor import SubtitleMonitor
+from modules.torrents.torrent_monitor import TorrentMonitor
+from modules.torrents.torrent_health_monitor import TorrentHealthMonitor
+from modules.backup.backup_monitor import BackupMonitor
+from modules.general.maintenance_monitor import MaintenanceMonitor
+from modules.torrents.vpn_monitor import VpnMonitor
+from modules.uptime.uptime_monitor import UptimeMonitor
+from core import startup_check
+from modules.torrents.qbittorrent_service import QBittorrentService
+from modules.torrents.torrent_action_tracker import (
     install_qbittorrent_action_tracking,
 )
 from utils import open_messages
@@ -61,9 +62,10 @@ monitor_task = None
 
 async def load_extensions():
     """Load all Discord command extensions from the commands directory."""
-    for filename in sorted(os.listdir("./commands")):
-        if filename.endswith(".py") and filename != "__init__.py":
-            module = f"commands.{filename[:-3]}"
+    for path in sorted(Path("modules").glob("*/commands/*.py")):
+        if path.name != "__init__.py":
+            filename = path.name
+            module = ".".join(path.with_suffix("").parts)
 
             try:
                 await bot.load_extension(module)

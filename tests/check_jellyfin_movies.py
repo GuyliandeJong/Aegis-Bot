@@ -17,8 +17,8 @@ os.environ.update({
     "JELLYFIN_2_URL": f"http://127.0.0.1:{PORT}/friend", "JELLYFIN_2_API_KEY": "f", "JELLYFIN_2_NAME": "Friend", "JELLYFIN_2_USER": "alex",
 })
 
-import commands.jellyfin as J
-from services import movie_library as ML
+import modules.jellyfin.commands.jellyfin as J
+from modules.jellyfin import movie_library as ML
 import isolate  # state files go to a temporary folder
 
 # (name, year, tmdb, played)

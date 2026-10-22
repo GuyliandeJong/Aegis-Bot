@@ -16,7 +16,7 @@ for key in [k for k in os.environ if k.startswith(("PORTAINER_", "CONTAINER_ALER
 os.environ.update({"PORTAINER_URL": f"http://127.0.0.1:{PORT}", "PORTAINER_API_KEY": "k", "PORTAINER_ENDPOINT_ID": "1",
                    "CONTAINER_ALERTS_IGNORE": "ente-minio-init"})
 
-import monitors.container_monitor as CM
+import modules.containers.container_monitor as CM
 import isolate  # state files go to a temporary folder
 CM.ContainerMonitor.STATE_FILE = isolate.DATA / "container_monitor.json"
 

@@ -12,7 +12,7 @@ os.environ["PORTAINER_ALLOWED_USER_IDS"] = f"{ADMIN}, {CONTAINER_MEMBER}"
 
 import discord
 from discord import app_commands
-import commands.help as H
+import modules.general.commands.help as H
 import isolate  # state files go to a temporary folder
 
 

@@ -22,9 +22,9 @@ for name in ("CLEANUP_REMINDER", "CLEANUP_REMINDER_DAY", "CLEANUP_REMINDER_HOUR"
     os.environ.pop(name, None)
 
 import discord
-from services.qbittorrent_service import QBittorrentService
-from services.notification_service import NotificationService
-from monitors.seed_cleanup_monitor import SeedCleanupMonitor
+from modules.torrents.qbittorrent_service import QBittorrentService
+from core.notification_service import NotificationService
+from modules.torrents.seed_cleanup_monitor import SeedCleanupMonitor
 from utils import open_messages as OM
 import isolate  # state files go to a temporary folder
 SeedCleanupMonitor.STATE_FILE = isolate.DATA / "seed_cleanup.json"

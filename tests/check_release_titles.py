@@ -5,7 +5,7 @@ import types
 m = types.ModuleType("utils.logger"); m.logger = types.SimpleNamespace(warning=print, error=print, info=print); sys.modules["utils.logger"] = m
 c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(); sys.modules["config.settings"] = c
 
-from monitors.weekly_summary_monitor import readable_title
+from modules.general.weekly_summary_monitor import readable_title
 
 CASES = [
     ("PC", "Castlevania Belmonts Curse-InsaneRamZes"),

@@ -21,10 +21,10 @@ SERVERS = {"JELLYFIN_1_URL": f"http://127.0.0.1:{PORT}/home", "JELLYFIN_1_API_KE
            "JELLYFIN_2_URL": f"http://127.0.0.1:{PORT}/friend", "JELLYFIN_2_API_KEY": "f", "JELLYFIN_2_NAME": "Friend"}
 os.environ.update(SERVERS)
 
-import monitors.weekly_summary_monitor as WS
-import services.filesystem_service as FS
-import services.qbittorrent_service as QS
-from services.jellyfin_service import JellyfinService
+import modules.general.weekly_summary_monitor as WS
+import modules.host.filesystem_service as FS
+import modules.torrents.qbittorrent_service as QS
+from modules.jellyfin.jellyfin_service import JellyfinService
 import isolate  # state files go to a temporary folder
 WS.WeeklySummaryMonitor.STATE_FILE = isolate.DATA / "weekly.json"
 

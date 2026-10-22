@@ -20,12 +20,12 @@ for k in list(os.environ):
     if k.startswith("JELLYFIN_"): del os.environ[k]
 
 import discord
-import commands.torrent.search as SM
-import commands.torrent.add as AM
-import services.torrent_requesters as R
-import services.share_link_service as SL
-from commands.torrent.formatting import TorrentFormattingMixin
-from commands.torrent.constants import ALLOWED_CATEGORIES
+import modules.torrents.torrent.search as SM
+import modules.torrents.torrent.add as AM
+import modules.torrents.torrent_requesters as R
+import modules.torrents.share_link_service as SL
+from modules.torrents.torrent.formatting import TorrentFormattingMixin
+from modules.torrents.torrent.constants import ALLOWED_CATEGORIES
 import isolate  # state files go to a temporary folder
 
 R.STATE_FILE = Path(tempfile.mkdtemp()) / "requesters.json"
@@ -143,8 +143,8 @@ async def main():
     cog = Cog(); cog._build_info_embed = lambda *a, **k: discord.Embed(title="x")
     for uid, h in ((222, "AAA111"), (333, "BBB222")):
         FakeQB.HASH = h; await cog._add(Inter(uid=uid), category="Movies", magnet="magnet:?xt=urn:btih:x")
-    import monitors.torrent_monitor as TM
-    import monitors.torrent_health_monitor as THM
+    import modules.torrents.torrent_monitor as TM
+    import modules.torrents.torrent_health_monitor as THM
     sent = []
     class Notes:
         def __getattr__(s, level):

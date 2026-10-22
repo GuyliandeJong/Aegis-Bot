@@ -16,8 +16,8 @@ os.environ.update({"ESXI_HOST": f"127.0.0.1:{PORT}", "ESXI_USERNAME": "monitor",
 # The real .env inside the bot's container must not change the default (7 days).
 os.environ.pop("ESXI_SNAPSHOT_DAYS", None)
 
-import services.esxi_service as ES
-import monitors.esxi_monitor as EM
+import modules.esxi.esxi_service as ES
+import modules.esxi.esxi_monitor as EM
 import isolate  # state files go to a temporary folder
 EM.EsxiMonitor.STATE_FILE = isolate.DATA / "esxi-snapshots.json"
 
@@ -128,7 +128,7 @@ async def main():
 
         print("\n== /esxi ==")
         VMS["1"][1][0] = ("before-upgrade", iso(12), [])
-        import commands.esxi as EC
+        import modules.esxi.commands.esxi as EC
         sent = []
         async def defer(**k): pass
         async def send(*a, **k): sent.append(k["embed"])

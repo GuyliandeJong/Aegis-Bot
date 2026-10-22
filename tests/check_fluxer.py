@@ -14,8 +14,8 @@ c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(ALER
 PORT = 18185
 os.environ.pop("FLUXER_WEBHOOK_URL", None)
 
-import services.fluxer_webhook as FW
-from services.notification_service import NotificationService
+import modules.fluxer.fluxer_webhook as FW
+from core.notification_service import NotificationService
 from utils import theme
 import isolate  # state files go to a temporary folder
 

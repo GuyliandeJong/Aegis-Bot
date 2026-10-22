@@ -19,8 +19,8 @@ for name in ("UPTIME_URLS", "UPTIME_INTERVAL", "UPTIME_TIMEOUT", "UPTIME_CERT_DA
     os.environ.pop(name, None)  # the container's real .env must not change the defaults
 os.environ["UPTIME_TIMEOUT"] = "1"
 
-import services.uptime_service as US
-import monitors.uptime_monitor as UM
+import modules.uptime.uptime_service as US
+import modules.uptime.uptime_monitor as UM
 import isolate  # state files go to a temporary folder
 UM.UptimeMonitor.STATE_FILE = isolate.DATA / "uptime.json"
 

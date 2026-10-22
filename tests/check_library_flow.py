@@ -17,9 +17,9 @@ os.environ.update({"JELLYFIN_1_URL": f"http://127.0.0.1:{PORT}/home", "JELLYFIN_
 # Subtitle fetching has its own check (check_subtitles).
 os.environ["SUBTITLE_AUTO_DOWNLOAD"] = "false"
 
-from services.release_name import parse
-from services import library_followup as LF
-from services import torrent_requesters as TR
+from modules.torrents.release_name import parse
+from modules.jellyfin import library_followup as LF
+from modules.torrents import torrent_requesters as TR
 import isolate  # state files go to a temporary folder
 LF.CHECK_INTERVAL = 0.01
 LF.CHECKS = 4

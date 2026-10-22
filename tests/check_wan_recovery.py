@@ -18,10 +18,10 @@ for key in [k for k in os.environ if k.startswith(("PORTAINER_", "WAN_RECOVERY_"
 os.environ.update({"PORTAINER_URL": f"http://127.0.0.1:{PORT}", "PORTAINER_API_KEY": "k", "PORTAINER_ENDPOINT_ID": "1",
                    "WAN_RECOVERY_DELAY": "0"})
 
-import monitors.wan_monitor as WM
-import monitors.weekly_summary_monitor as WS
-import services.wan_recovery as WR
-from monitors.state import state
+import modules.wan.wan_monitor as WM
+import modules.general.weekly_summary_monitor as WS
+import modules.wan.wan_recovery as WR
+from core.state import state
 import isolate  # state files go to a temporary folder
 state.save = lambda: None
 

@@ -74,7 +74,7 @@ class FakeSession:
 
 
 sys.modules["aiohttp"].ClientSession = FakeSession
-from services.jellyfin_service import JellyfinService as J, JellyfinDownloadError
+from modules.jellyfin.jellyfin_service import JellyfinService as J, JellyfinDownloadError
 
 
 def tree():
@@ -111,8 +111,8 @@ print("leftover .part files       :", [f for f in tree() if f.endswith(".part")]
 
 # ---------------- Discord flow
 print("\n== discord flow ==")
-import commands.torrent.search as SM
-import commands.torrent.jellyfin_download as JD
+import modules.torrents.torrent.search as SM
+import modules.jellyfin.jellyfin_download as JD
 import isolate  # state files go to a temporary folder
 JD.JellyfinTransfer.UPDATE_INTERVAL = 0.05
 

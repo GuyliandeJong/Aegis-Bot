@@ -18,11 +18,11 @@ PORT = 18165
 for key in [k for k in os.environ if k.startswith(("PORTAINER_", "WATCHTOWER_"))]:
     del os.environ[key]
 
-import services.portainer_service as PS
-import services.watchtower_updates as WU
-import services.qbittorrent_service as QS
-import services.filesystem_service as FS
-import monitors.weekly_summary_monitor as WS
+import modules.containers.portainer_service as PS
+import modules.containers.watchtower_updates as WU
+import modules.torrents.qbittorrent_service as QS
+import modules.host.filesystem_service as FS
+import modules.general.weekly_summary_monitor as WS
 import isolate  # state files go to a temporary folder
 WS.WeeklySummaryMonitor.STATE_FILE = isolate.DATA / "weekly.json"
 

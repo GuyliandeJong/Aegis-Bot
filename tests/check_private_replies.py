@@ -6,7 +6,8 @@ ROOT = Path(__file__).resolve().parent.parent
 REPLIES = {"defer", "send_message", "send"}
 
 for name in ("wan", "server", "idrac", "network", "esxi", "minecraft"):
-    tree = ast.parse((ROOT / "commands" / f"{name}.py").read_text(encoding="utf-8"))
+    path = next(ROOT.glob(f"modules/*/commands/{name}.py"))
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     calls = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in REPLIES:

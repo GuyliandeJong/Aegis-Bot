@@ -63,10 +63,13 @@ AREA_EMOJI = {
 
 # Subcommands share their group's default permissions, so Discord shows
 # them to everyone. These check for administrator inside the command
-# itself (modules/torrents/torrent/cleanup.py) and are hidden from other members.
-# Keep this in step with the code when such a check is added or removed.
+# itself (modules/torrents/torrent/cleanup.py,
+# modules/jellyfin/commands/jellyfin.py) and are hidden from other
+# members. Keep this in step with the code when such a check is added
+# or removed.
 ADMIN_ONLY = {
     "torrent cleanup",
+    "jellyfin playing",
 }
 
 # Subcommands everyone may run, where one part is limited to

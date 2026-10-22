@@ -19,7 +19,7 @@ import isolate  # state files go to a temporary folder
 
 class Channel:
     def __init__(self): self.posts = []
-    async def send(self, content=None, embed=None, allowed_mentions=None):
+    async def send(self, content=None, embed=None, allowed_mentions=None, view=None):
         self.posts.append(embed)
         return embed
 

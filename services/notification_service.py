@@ -26,11 +26,14 @@ class NotificationService:
         *,
         fields: list[tuple[str, str, bool]] | None = None,
         content: str | None = None,
+        view: discord.ui.View | None = None,
     ):
         """
         Post an embed in the configured alert channel.
 
         Returns the sent message, or None when the channel is missing.
+        A caller passing a `view` must assign the returned message to
+        `view.message` (see utils/open_messages.py).
 
         When FLUXER_WEBHOOK_URL is set, the same alert is also posted to
         Fluxer in the background; that never delays or breaks this one.
@@ -81,6 +84,7 @@ class NotificationService:
             allowed_mentions=discord.AllowedMentions(
                 users=True
             ),
+            view=view,
         )
 
     async def _send(
@@ -93,6 +97,7 @@ class NotificationService:
         content: str | None = None,
         level: str = "info",
         exempt: bool = False,
+        view: discord.ui.View | None = None,
     ):
         """
         Send a formatted notification to the configured alert channel.
@@ -134,6 +139,7 @@ class NotificationService:
             color=color,
             fields=fields,
             content=content,
+            view=view,
         )
 
         if message is None:
@@ -277,9 +283,10 @@ class NotificationService:
         fields: list[tuple[str, str, bool]] | None = None,
         content: str | None = None,
         exempt: bool = False,
+        view: discord.ui.View | None = None,
     ):
         """
-        Send an informational notification.
+        Send an informational notification, optionally with buttons.
 
         `exempt` posts it during maintenance too, for scheduled
         reports such as the weekly summary that are not alerts.
@@ -293,6 +300,7 @@ class NotificationService:
             content=content,
             level="info",
             exempt=exempt,
+            view=view,
         )
 
     async def warning(

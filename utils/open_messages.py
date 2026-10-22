@@ -213,9 +213,14 @@ class ExpiringView(discord.ui.View):
     Assigning `view.message` records the message; when the view times
     out or is stopped, the record is removed again. Anything still
     recorded at startup was cut off by a restart.
+
+    A view not started by a command can set `restart_note` to say what
+    to do instead of "run the command again".
     """
 
     _message = None
+
+    restart_note = RESTART_NOTE
 
     @property
     def message(self):
@@ -232,7 +237,7 @@ class ExpiringView(discord.ui.View):
         if previous is not None:
             forget(previous, self._owner)
 
-        if not remember(message, owner=self._owner):
+        if not remember(message, note=self.restart_note, owner=self._owner):
             return
 
         try:

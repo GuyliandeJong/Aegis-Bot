@@ -36,6 +36,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_esxi.py` | ESXi over the vSphere SOAP API: login, datastores, VMs, logout; datastore and VM alerts; host not reachable | Local fake ESXi `/sdk` |
 | `check_maintenance.py` | Maintenance mode: muted levels, critical alerts passing, activity log, restart, expiry by the monitor and by the next alert, the end message, ending early | Fake channel |
 | `check_uptime.py` | Public service checks: 4xx is up, 5xx/timeout/refused/expired certificate is down, alert after two failures, back up with duration, certificate warning and critical once, renewal, restarts, feature off | Local HTTP and HTTPS servers with test certificates in `tests/certs/` (test CA, keys committed on purpose), moved clock |
+| `check_fluxer.py` | Alerts mirrored to a Fluxer webhook: off when not set, the embed per level, readable timestamps and mentions, limits, slow or failing Fluxer not delaying Discord, limited logging | Local fake Fluxer webhook |
 | `check_expiry.py` | Messages disabling their buttons after the timeout | Local fake Discord API |
 | `check_private_replies.py` | `/wan`, `/server`, `/idrac` and `/network` reply only to the person who ran them | Reads the source; runs nothing |
 | `check_jellyfin_extras.py` | Episode comparison, matching series between libraries, quality and the better-copy note, the daily new-content alert and its picker, the download queue | Two local fake Jellyfin servers, fake channel and clock |

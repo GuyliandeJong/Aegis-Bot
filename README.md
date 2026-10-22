@@ -269,7 +269,7 @@ state changes.
 | Containers | Crashed, unhealthy and restarting Docker containers, through Portainer | 60 s |
 | Backup | Last successful backup older than `BACKUP_MAX_AGE_DAYS` (8) | Hourly |
 | Watchlist | Titles people are waiting for | Twice a day |
-| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, what was watched, alerts | Once a week |
+| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, what was watched, alerts, container updates | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, old snapshots, host reachable | 5 min |
 | Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
@@ -362,6 +362,7 @@ WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10       # container time
 WEEKLY_SUMMARY_NEW_CONTENT=true   # false leaves out "New in Jellyfin"
 WEEKLY_SUMMARY_WATCH_STATS=true   # false leaves out "Watched this week"
+WATCHTOWER_CONTAINER=watchtower
 ```
 
 Disk growth is measured from one summary to the next, so the first
@@ -391,6 +392,15 @@ Without it the field says "Needs the Playback Reporting plugin on
 plugin's own settings. The bot reads the plugin's data with its SQL
 query endpoint, which needs the API key in `JELLYFIN_1_API_KEY` (API
 keys have administrator rights).
+
+The last field, "Container updates", lists the containers Watchtower
+updated that week, with their image and date, read from the log of the
+container named `WATCHTOWER_CONTAINER` through Portainer. It needs the
+Portainer settings of `/container` and shows "Not available." without
+them or when that container does not exist. A container Watchtower
+restarted only because a linked container was updated is marked as
+such. Docker keeps the log only as long as the container exists, so
+updates from before Watchtower itself was recreated are not counted.
 
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
@@ -782,6 +792,8 @@ WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10
 WEEKLY_SUMMARY_NEW_CONTENT=true
 WEEKLY_SUMMARY_WATCH_STATS=true
+# Watchtower's container, whose log lists the week's container updates.
+WATCHTOWER_CONTAINER=watchtower
 
 # ESXi host (optional). Use a user with the read-only role.
 ESXI_HOST=

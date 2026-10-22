@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from monitors.base_monitor import BaseMonitor
-from services import activity_log, watch_stats
+from services import activity_log, watch_stats, watchtower_updates
 from services.filesystem_service import FilesystemService
 from services.jellyfin_service import JellyfinService
 from services.qbittorrent_service import QBittorrentService
@@ -65,6 +65,9 @@ class WeeklySummaryMonitor(BaseMonitor):
         WEEKLY_SUMMARY_NEW_CONTENT  true (default) or false: the
                                     "New in Jellyfin" field
         WEEKLY_SUMMARY_WATCH_STATS  true (default) or false
+
+    Container updates are read from Watchtower's log through Portainer
+    (services/watchtower_updates.py, WATCHTOWER_CONTAINER).
     """
 
     STATE_FILE = Path("/app/data/weekly_summary_state.json")
@@ -177,6 +180,8 @@ class WeeklySummaryMonitor(BaseMonitor):
             fields.append(("🍿 Watched this week", watched, False))
 
         fields.append(("🔔 Alerts", self._alerts(since), False))
+        # Routine maintenance, after the alerts that need attention.
+        fields.append(("🔄 Container updates", await self._container_updates(since), False))
 
         # A field that does not apply (no Jellyfin configured) is None.
         fields = [field for field in fields if field[1] is not None]
@@ -319,6 +324,40 @@ class WeeklySummaryMonitor(BaseMonitor):
             f"{format_bytes(size)}",
             lines,
         )
+
+    async def _container_updates(self, since: float) -> str:
+        try:
+            updates = await watchtower_updates.updates_since(since)
+        except Exception as ex:
+            logger.warning("[WeeklySummary] Watchtower log unavailable: %s", ex)
+            return "Could not read Watchtower's log."
+
+        if updates is None:
+            return "Not available."
+
+        if not updates:
+            return "None."
+
+        lines = []
+
+        for update in updates:
+            name = update["name"]
+
+            if update["linked"]:
+                name += " (restarted with a linked container)"
+            elif update["image"]:
+                name += f" ({update['image']})"
+
+            lines.append(f"• {name} · <t:{int(update['time'])}:D>")
+
+        updated = sum(1 for u in updates if not u["linked"])
+        linked = len(updates) - updated
+        total = f"{updated} container{'s' if updated != 1 else ''} updated"
+
+        if linked:
+            total += f", {linked} restarted with them"
+
+        return self._list_field("🔄 Container updates", total, lines)
 
     def _copies(self, since: float) -> str:
         copies = activity_log.since(since, "jellyfin_copy")

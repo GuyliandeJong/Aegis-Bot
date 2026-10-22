@@ -1,0 +1,27 @@
+# Example for running Aegis-Bot from the published image.
+#
+#   1. Copy this file to docker-compose.yml and .env.example to .env.
+#   2. Fill in at least DISCORD_TOKEN, GUILD_ID and ALERT_CHANNEL_ID.
+#   3. docker compose up -d
+#
+# Features whose settings stay empty in .env are not used.
+
+services:
+  aegis-bot:
+    image: ghcr.io/guyliandejong/aegis-bot:latest
+    container_name: aegis-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Times in alerts, the weekly summary and schedules.
+      TZ: Europe/Amsterdam
+    volumes:
+      # State, logs and remembered messages. Keep this between updates.
+      - ./data:/app/data
+
+      # Read-only view of the host, for the disk usage checks.
+      # Remove it if you do not use them.
+      - /:/host:ro
+
+      # Read-write media folder, only for Jellyfin downloads.
+      # - /path/to/media:/media

@@ -9,3 +9,6 @@ __pycache__/
 *.pyc
 *.code-workspace
 tests/
+.claude/
+.github/
+docker-compose*.yml

@@ -24,6 +24,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/server` | Server model, service tag, BIOS and OS through Redfish | Administrators |
 | `/esxi` | ESXi datastores (usage), virtual machines (running or not) and their snapshots | Administrators |
 | `/maintenance start`, `end`, `status` | Mutes all alerts except critical ones for 30 minutes to 24 hours, ends it early, shows what was muted | Administrators |
+| `/minecraft` | Minecraft servers: online or not, version, players and latency | Everyone (private reply) |
 | `/wan` | Public IP address | Administrators |
 | `/wol` | Wakes the configured computer, or reports that it is already awake | Administrators |
 | `/jellyfin playing` | What is being played on your own Jellyfin server now: who, on which device, progress, and whether it transcodes and why | Administrators (private reply) |
@@ -31,8 +32,8 @@ It runs in Docker and serves a single Discord server (guild).
 | `/container` | Lists, inspects and controls Docker containers through Portainer: `list`, `info`, `logs`, `start`, `stop`, `restart`, `kill`, `remove` | Only the users in `PORTAINER_ALLOWED_USER_IDS` |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone |
 
-`/wan`, `/server`, `/idrac`, `/network` and `/esxi` reply privately: only the
-person who ran the command sees the answer.
+`/wan`, `/server`, `/idrac`, `/network`, `/esxi` and `/minecraft` reply
+privately: only the person who ran the command sees the answer.
 
 "Administrators" is Discord's administrator permission, set as the
 command default. It can be changed per user or role in Discord under
@@ -265,6 +266,7 @@ state changes.
 | ESXi | Datastore usage, virtual machines stopping, old snapshots, host reachable | 5 min |
 | Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
 | Uptime | Public services answering, TLS certificates expiring | 5 min |
+| Minecraft | Players joining and leaving (optional), watched servers down | 60 s |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 | VPN | qBittorrent using the home address, or reporting no connection | 2 min |
@@ -459,6 +461,34 @@ UPTIME_INTERVAL=300
 UPTIME_TIMEOUT=15
 UPTIME_CERT_DAYS=14
 ```
+
+### Minecraft
+
+`/minecraft` and the Minecraft monitor ask Java Edition servers for
+their status the way the game's server list does (Server List Ping on
+the game port; nothing has to be enabled on the server). `/minecraft`
+shows one line per server: 🟢 or 🔴, name, version, players online and
+the maximum, the names of who is playing, and the latency.
+
+With `MINECRAFT_JOIN_ALERTS=true` the alert channel gets "Steve joined
+Survival" and "Steve left Survival". A server only sends up to 12
+player names, and none when names are hidden; it then gives no join
+alerts. "Minecraft Server Down" is posted only for servers named in
+`MINECRAFT_WATCH`, after two checks in a row without an answer, and
+"Minecraft Server Recovered" when it answers again. Servers that are
+stopped on purpose should not be in that list.
+
+```text
+# name=host:port, comma separated; the port defaults to 25565.
+MINECRAFT_SERVERS=Survival=mc-survival:25565,Creative=mc-creative:25565
+MINECRAFT_JOIN_ALERTS=false
+# Servers that alert when they stop answering, comma separated names.
+MINECRAFT_WATCH=
+```
+
+The address must be reachable from inside the bot's container: the
+host's address and the published port of each itzg/minecraft-server
+container, or the container name when they share a Docker network.
 
 ### Backup
 
@@ -731,6 +761,11 @@ UPTIME_URLS=
 UPTIME_INTERVAL=300
 UPTIME_TIMEOUT=15
 UPTIME_CERT_DAYS=14
+
+# Minecraft Java servers (optional): name=host:port, comma separated.
+MINECRAFT_SERVERS=
+MINECRAFT_JOIN_ALERTS=false
+MINECRAFT_WATCH=
 
 # Warn when an SSD has this percentage of its rated life left, or less.
 SSD_LIFE_WARNING=10

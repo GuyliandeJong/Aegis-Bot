@@ -264,6 +264,7 @@ state changes.
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, host reachable | 5 min |
 | Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
+| Uptime | Public services answering, TLS certificates expiring | 5 min |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 | VPN | qBittorrent using the home address, or reporting no connection | 2 min |
@@ -410,6 +411,30 @@ ESXI_DATASTORE_WARNING=85
 ESXI_DATASTORE_CRITICAL=95
 # Virtual machines not to watch, comma separated.
 ESXI_IGNORE_VMS=
+```
+
+### Public services
+
+`UPTIME_URLS` lists the services that should be reachable from the
+internet, for example the ones published through Pangolin, as full
+URLs separated by commas. Every `UPTIME_INTERVAL` seconds (default
+300) the bot requests each one. A service is down when it does not
+answer within `UPTIME_TIMEOUT` seconds (default 15), its certificate
+is not valid, or it answers with HTTP 500 or higher; a login page
+answering 401 or 403, or a redirect, counts as up. After two failed
+checks in a row "Service Down" is posted with the reason, and "Service
+Back Up" once it answers again, with how long it was down. For https
+URLs the bot also reads the certificate: "Certificate Expiring" is
+posted once when fewer than `UPTIME_CERT_DAYS` days are left (default
+14) and again, as critical, below three days. A renewed certificate
+clears it. The requests come from the server itself, so they test the
+public address through the reverse proxy.
+
+```text
+UPTIME_URLS=https://jellyfin.example.org,https://photos.example.org
+UPTIME_INTERVAL=300
+UPTIME_TIMEOUT=15
+UPTIME_CERT_DAYS=14
 ```
 
 ### Backup
@@ -675,6 +700,12 @@ ESXI_PASSWORD=
 ESXI_DATASTORE_WARNING=85
 ESXI_DATASTORE_CRITICAL=95
 ESXI_IGNORE_VMS=
+
+# Public services to check (optional), full URLs, comma separated.
+UPTIME_URLS=
+UPTIME_INTERVAL=300
+UPTIME_TIMEOUT=15
+UPTIME_CERT_DAYS=14
 
 # Warn when an SSD has this percentage of its rated life left, or less.
 SSD_LIFE_WARNING=10

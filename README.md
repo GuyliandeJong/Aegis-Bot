@@ -15,7 +15,7 @@ It runs in Docker and serves a single Discord server (guild).
 | `/torrent add` | Adds a magnet link to qBittorrent | Everyone |
 | `/torrent list` | Lists torrents, with filter, sort and live refresh | Everyone |
 | `/torrent info` | Details and controls for one torrent | Everyone |
-| `/torrent status` | qBittorrent version and transfer totals | Everyone |
+| `/torrent status` | qBittorrent version, transfer totals and whether it is behind its VPN | Everyone |
 | `/torrent watchlist` | Titles you are waiting for; remove them | Everyone (own list) |
 | `/torrent cleanup` | Finished torrents by ratio and seeding time; remove them | Administrators |
 | `/torrent speed` | Show qBittorrent's speed limits; switch between normal and slow | Everyone sees; administrators switch |
@@ -265,6 +265,7 @@ state changes.
 | Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
+| VPN | qBittorrent using the home address, or reporting no connection | 2 min |
 
 The container monitor alerts once when a container crashes (exits
 with another code than a normal stop: 0, 137 or 143), turns unhealthy
@@ -297,6 +298,19 @@ is posted; that usually means the category saves outside the library.
 Torrent notifications (completed, stalled, error) mention the person
 who added the torrent through the bot. Torrents added some other way,
 for example in qBittorrent itself, mention `DISCORD_USER_ID`.
+
+The VPN monitor checks that qBittorrent (in the `qbittorrentvpn`
+container) is not torrenting over the home line. qBittorrent 5.1 and
+later report the external address peers see; when that equals the home
+address found by the WAN monitor, "Torrents Not Behind VPN" is posted
+(critical, once), and "Torrents Behind VPN Again" when it changes.
+Addresses in these alerts show only the first two numbers
+(`203.0.x.x`). When qBittorrent reports "disconnected" three checks in
+a row (six minutes), "qBittorrent Disconnected" is posted; a failed
+tunnel is the usual cause. Older qBittorrent versions do not report
+their address, so only the connection is watched. `VPN_CHECK=false`
+turns this off. `/torrent status` shows the result as VPN: OK, Not
+behind VPN or Unknown.
 
 Monitor state is kept in `data/` so a restart does not repeat alerts.
 
@@ -640,6 +654,9 @@ ESXI_IGNORE_VMS=
 
 # Warn when an SSD has this percentage of its rated life left, or less.
 SSD_LIFE_WARNING=10
+
+# false: do not check that qBittorrent is behind its VPN.
+VPN_CHECK=true
 
 # Container management through Portainer (/container). The address must
 # be reachable from inside the bot's container. Create the key under

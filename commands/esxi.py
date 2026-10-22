@@ -1,3 +1,5 @@
+import time
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -19,7 +21,7 @@ POWER = {
 
 
 class Esxi(commands.Cog):
-    """`/esxi`: datastores and virtual machines on the ESXi host."""
+    """`/esxi`: datastores, virtual machines and their snapshots on the ESXi host."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -84,15 +86,45 @@ class Esxi(commands.Cog):
         if not_watched:
             summary += f" · {not_watched} not watched (ESXI_IGNORE_VMS)"
 
+        fields = [
+            EmbedField("💾 Datastores", "\n".join(stores)[:1024] or "None", inline=False),
+            EmbedField("📦 Virtual Machines", "\n".join(vms)[:1024] or "None", inline=False),
+        ]
+
+        # Only VMs that have snapshots; ⚠️ marks a watched VM with one
+        # older than ESXI_SNAPSHOT_DAYS, which the monitor warns about.
+        days = EsxiMonitor.snapshot_days()
+        snapshots = []
+
+        for v in status["vms"]:
+            if not v.get("snapshots"):
+                continue
+
+            count = len(v["snapshots"])
+            oldest = v["snapshots"][0]["created"]
+            old = (
+                days and oldest is not None
+                and v["name"].lower() not in ignored
+                and time.time() - oldest >= days * 86400
+            )
+            snapshots.append(
+                f"**{v['name']}**: 📸 {count} snapshot{'s' if count != 1 else ''}, "
+                f"oldest {EsxiMonitor.age(oldest)}" + (" ⚠️" if old else "")
+                + "\n" + " · ".join(
+                    f"{s['name']} ({EsxiMonitor.age(s['created'])})"
+                    for s in v["snapshots"]
+                )
+            )
+
+        if snapshots:
+            fields.append(EmbedField("📸 Snapshots", "\n".join(snapshots)[:1024], inline=False))
+
         embed = create_embed(
             interaction=interaction,
             title="🖥️ ESXi",
             description=summary,
             color=theme.INFO_COLOR,
-            fields=[
-                EmbedField("💾 Datastores", "\n".join(stores)[:1024] or "None", inline=False),
-                EmbedField("📦 Virtual Machines", "\n".join(vms)[:1024] or "None", inline=False),
-            ],
+            fields=fields,
         )
 
         await interaction.followup.send(embed=embed, ephemeral=True)

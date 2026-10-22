@@ -10,6 +10,11 @@ no extra library is required:
     CreateContainerView     every Datastore / VirtualMachine
     RetrievePropertiesEx    their properties
 
+A VM's `snapshot` property is a VirtualMachineSnapshotInfo: a
+rootSnapshotList of VirtualMachineSnapshotTree elements (name,
+description, createTime, ...), each with its children repeated in
+childSnapshotList. The tree is flattened into one list per VM.
+
 .env:
     ESXI_HOST       address of the ESXi host
     ESXI_USERNAME   preferably a user with the read-only role
@@ -17,6 +22,7 @@ no extra library is required:
 """
 
 import os
+from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
 
@@ -41,6 +47,7 @@ DATASTORE_PROPERTIES = (
 VM_PROPERTIES = (
     "name",
     "runtime.powerState",
+    "snapshot",
 )
 
 
@@ -72,10 +79,48 @@ def _ref(element) -> dict:
     }
 
 
+def _timestamp(text: str) -> float | None:
+    """ISO 8601 xsd:dateTime, e.g. 2026-10-07T09:15:02.123456Z, as epoch seconds."""
+    text = (text or "").strip()
+
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    # ESXi sends UTC with "Z"; a time without a zone is taken as UTC too.
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+
+    return moment.timestamp()
+
+
+def _snapshots(element) -> list[dict]:
+    """Flatten the snapshot tree under a VirtualMachineSnapshotInfo."""
+    result = []
+    pending = list(element.findall("vim:rootSnapshotList", NS))
+
+    while pending:
+        tree = pending.pop(0)
+        result.append({
+            "name": (tree.findtext("vim:name", "", NS) or "").strip() or "Unnamed snapshot",
+            "description": (tree.findtext("vim:description", "", NS) or "").strip(),
+            "created": _timestamp(tree.findtext("vim:createTime", "", NS)),
+        })
+        pending.extend(tree.findall("vim:childSnapshotList", NS))
+
+    # Oldest first; a time that could not be read goes last.
+    result.sort(key=lambda s: (s["created"] is None, s["created"] or 0))
+    return result
+
+
 def _value(element):
     """Convert one <val> to a Python value by its xsi:type."""
     kind = element.get(f"{{{NS['xsi']}}}type", "")
     text = (element.text or "").strip()
+
+    if kind.endswith("VirtualMachineSnapshotInfo"):
+        return _snapshots(element)
 
     if kind.endswith("long") or kind.endswith("int"):
         try:
@@ -240,7 +285,9 @@ class EsxiService:
         Return {"datastores": [...], "vms": [...]}.
 
         Datastore: name, capacity, free (bytes), accessible.
-        VM: name, power ("poweredOn", "poweredOff" or "suspended").
+        VM: name, power ("poweredOn", "poweredOff" or "suspended"),
+        snapshots (name, description, created as epoch seconds or
+        None; oldest first, empty when there are none).
         """
         datastores = [
             {
@@ -256,6 +303,8 @@ class EsxiService:
             {
                 "name": v.get("name") or "Unnamed VM",
                 "power": v.get("runtime.powerState") or "unknown",
+                # A VM without snapshots has no snapshot property at all.
+                "snapshots": v.get("snapshot") if isinstance(v.get("snapshot"), list) else [],
             }
             for v in await self._objects("VirtualMachine", VM_PROPERTIES)
         ]

@@ -123,6 +123,7 @@ async def weekly():
     await mon.check()
     print("next Sunday disks:", notes.sent[-1][3][0][1].splitlines()[0])
     print("tiny change:", notes.sent[-1][3][0][1].splitlines()[1])
+    print("one week of growth, no estimate yet:", "full in" not in notes.sent[-1][3][0][1])
     print("next Sunday copies:", notes.sent[-1][3][2][1])
 
     # A busy week: too many titles for the field.
@@ -151,6 +152,20 @@ async def weekly():
     print("busy week field:", field.replace(chr(10), " / "))
     print("thread:", thread.name, "| messages:", len(thread.posts), "| lines:", sum(p.count("•") for p in thread.posts),
           "| longest message:", max(len(p) for p in thread.posts), "| first:", thread.posts[0].splitlines()[1])
+
+    # Disk forecast: the first monitor has seen two Sundays (40, 52 GiB);
+    # a third with the same growth gives an estimate.
+    QS.QBittorrentService.get_torrents = torrents
+    used["/"] = (64 * 1024 ** 3, 100 * 1024 ** 3)
+    clock["now"] = datetime(2026, 11, 1, 10, 30)
+    await mon.check()
+    print("third Sunday:", notes.sent[-1][3][0][1].splitlines()[0])
+    print("  steady disk has no estimate:", "full in" not in notes.sent[-1][3][0][1].splitlines()[1])
+    WSM = WS.WeeklySummaryMonitor
+    week = 7 * 86400
+    print("  slow growth:", WSM._forecast([[0, 10 * 1024 ** 3], [week, 11 * 1024 ** 3], [2 * week, 12 * 1024 ** 3]], 12 * 1024 ** 3, 100 * 1024 ** 3))
+    print("  months away:", WSM._forecast([[0, 0], [week, 10 * 1024 ** 3], [2 * week, 20 * 1024 ** 3]], 20 * 1024 ** 3, 400 * 1024 ** 3))
+    print("  nearly full:", WSM._forecast([[0, 0], [week, 50 * 1024 ** 3], [2 * week, 95 * 1024 ** 3]], 95 * 1024 ** 3, 100 * 1024 ** 3))
 
 
 def drives():

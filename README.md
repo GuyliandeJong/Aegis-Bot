@@ -260,7 +260,7 @@ state changes.
 | Containers | Crashed, unhealthy and restarting Docker containers, through Portainer | 60 s |
 | Backup | Last successful backup older than `BACKUP_MAX_AGE_DAYS` (8) | Hourly |
 | Watchlist | Titles people are waiting for | Twice a day |
-| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, alerts | Once a week |
+| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, what was watched, alerts | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, old snapshots, host reachable | 5 min |
 | Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
@@ -351,6 +351,7 @@ WEEKLY_SUMMARY=true          # false turns it off
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10       # container time
 WEEKLY_SUMMARY_NEW_CONTENT=true   # false leaves out "New in Jellyfin"
+WEEKLY_SUMMARY_WATCH_STATS=true   # false leaves out "Watched this week"
 ```
 
 Disk growth is measured from one summary to the next, so the first
@@ -367,6 +368,19 @@ counts per server on its first line ("Home: 4 movies, 2 series ·
 Friend: 10 movies"). A server that does not answer is named ("Friend
 did not answer"). The summary also counts internet
 outages (number, total and longest) confirmed by the WAN monitor.
+
+"🍿 Watched this week" shows what was watched on the primary Jellyfin
+server (`JELLYFIN_1_*`): total hours, hours for the five busiest users,
+the five most watched titles (episodes counted towards their series)
+and the share of plays that were transcoded. Jellyfin keeps no viewing
+history itself, so this needs the **Playback Reporting** plugin
+(Dashboard → Plugins → Catalog → Playback Reporting, then restart
+Jellyfin). It only records plays from the moment it is installed.
+Without it the field says "Needs the Playback Reporting plugin on
+<server>". Music is left out, and so are users excluded in the
+plugin's own settings. The bot reads the plugin's data with its SQL
+query endpoint, which needs the API key in `JELLYFIN_1_API_KEY` (API
+keys have administrator rights).
 
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
@@ -701,6 +715,7 @@ WEEKLY_SUMMARY=true
 WEEKLY_SUMMARY_DAY=sunday
 WEEKLY_SUMMARY_HOUR=10
 WEEKLY_SUMMARY_NEW_CONTENT=true
+WEEKLY_SUMMARY_WATCH_STATS=true
 
 # ESXi host (optional). Use a user with the read-only role.
 ESXI_HOST=

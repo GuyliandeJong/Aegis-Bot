@@ -4,16 +4,25 @@ set -e
 # ------------------------------------------------------------
 # Aegis-Bot restart script
 #
-# Python source files are bind-mounted into /app.
-# Normal source changes therefore only require restarting
-# the container. The Docker image does not need rebuilding.
+# Recreates the aegis-bot container and shows its startup log.
+#
+# With DockSTARTer (the "ds" command) the container is managed by
+# DockSTARTer; otherwise docker compose is used in the folder this is
+# run from (the one with docker-compose.yml).
+#
+# When the project folder is bind-mounted into /app, source changes
+# only need this restart, not an image rebuild.
 # ------------------------------------------------------------
 
 echo "Stopping Aegis-Bot..."
 
 # Stop and remove the existing container.
 # The Docker image is intentionally kept.
-ds -y -c down aegis-bot
+if command -v ds >/dev/null 2>&1; then
+    ds -y -c down aegis-bot
+else
+    docker compose rm --stop --force aegis-bot
+fi
 
 
 echo
@@ -23,12 +32,15 @@ echo "Starting Aegis-Bot..."
 START_TIME=$(date +%s)
 
 
-# Start the container using the existing image and the
-# current source files from the /app bind mount.
+# Start the container using the existing image.
 #
 # DockSTARTer manages the foreground/background behavior,
-# so do not pass Docker Compose's "-d" option here.
-ds -y -c up aegis-bot
+# so do not pass Docker Compose's "-d" option to it.
+if command -v ds >/dev/null 2>&1; then
+    ds -y -c up aegis-bot
+else
+    docker compose up -d aegis-bot
+fi
 
 
 echo

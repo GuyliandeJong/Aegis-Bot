@@ -16,8 +16,9 @@ class VpnMonitor(BaseMonitor):
     """
     Checks every two minutes that qBittorrent is behind its VPN.
 
-    qBittorrent runs in the qbittorrentvpn container; when the tunnel
-    fails it may connect through the home line instead.
+    qBittorrent usually runs behind a VPN (for example in a container
+    with a built-in VPN); when the tunnel fails it may connect through
+    the home line instead.
 
     Leak: qBittorrent 5.1 and later report the external IPv4 address
     peers and trackers see (`last_external_address_v4` in
@@ -184,7 +185,7 @@ class VpnMonitor(BaseMonitor):
                 description=(
                     "qBittorrent reports the home internet address as its "
                     "external address: torrents are not going through the "
-                    "VPN. Check the qbittorrentvpn container.\n\n"
+                    "VPN. Check qBittorrent's VPN connection.\n\n"
                     f"{addresses}"
                 ),
             )
@@ -215,9 +216,8 @@ class VpnMonitor(BaseMonitor):
                     description=(
                         f"qBittorrent has reported no connection for "
                         f"{self.state['disconnected']} checks in a row "
-                        f"(every {self.INTERVAL // 60} minutes). The VPN "
-                        "tunnel of the qbittorrentvpn container is the "
-                        "usual cause."
+                        f"(every {self.INTERVAL // 60} minutes). A VPN "
+                        "tunnel that is down is the usual cause."
                     ),
                 )
             return

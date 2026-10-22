@@ -4,7 +4,8 @@
 #
 # Runs on the server from root's cron, outside the bot. Packs the
 # configured folders into one archive, keeps the last few locally,
-# uploads the newest to Proton Drive with rclone, and reports the
+# uploads the newest with rclone to any remote (Proton Drive needs a
+# setting, below), and reports the
 # result to Discord and to the weekly summary.
 #
 # Settings, in .env next to this project:
@@ -28,7 +29,7 @@
 #   BACKUP_PART_SIZE        the archive is split into parts of this size
 #                           (256M), so a failed upload only repeats one
 #                           part instead of the whole archive
-#   BACKUP_REMOTE           rclone destination, e.g. proton:Backups/home
+#   BACKUP_REMOTE           rclone destination, e.g. remote:Backups/server
 #                           (empty: no upload)
 #   BACKUP_KEEP_REMOTE      archives, and runs of replaced mirror files,
 #                           kept in the destination (8)

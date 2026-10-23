@@ -34,6 +34,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_discord_http.py` | The download button through discord.py's request code | Local fake Discord API |
 | `check_seasons_subtitles.py` | Missing seasons and episodes, reusing an existing season folder, subtitle reporting, separate subtitle files | Two local fake Jellyfin servers |
 | `check_summary_new_content.py` | The weekly summary's "New in Jellyfin" field: grouping movies and episodes per server, paging by DateCreated, a server that does not answer, the overflow thread, turning it off | Two local fake Jellyfin servers |
+| `check_cleanup_view.py` | `/torrent cleanup` picker: choosing every ✅ torrent on all pages at once, and clearing it | Fake interaction |
 | `check_container_updates.py` | The weekly summary's Container updates field: Watchtower's log (logfmt, pretty, json), matching images to containers, linked restarts, the week's window, overflow to the thread, missing Portainer or Watchtower | Local fake Portainer with a framed log stream |
 | `check_esxi.py` | ESXi over the vSphere SOAP API: login, datastores, VMs, logout; datastore and VM alerts; host not reachable | Local fake ESXi `/sdk` |
 | `check_maintenance.py` | Maintenance mode: muted levels, critical alerts passing, activity log, restart, expiry by the monitor and by the next alert, the end message, ending early | Fake channel |

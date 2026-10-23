@@ -123,7 +123,8 @@ class CleanupView(ExpiringView):
     Choose finished torrents and remove them, with or without files.
 
     Shows 25 torrents per page. What is chosen on one page stays
-    chosen when moving to another.
+    chosen when moving to another. "Choose all ✅" picks every torrent
+    that reached the seeding target, on all pages at once.
     """
 
     def __init__(self, owner_id: int, finished: list[dict]):
@@ -180,7 +181,22 @@ class CleanupView(ExpiringView):
         self.next_button.callback = self._next
         self.add_item(self.next_button)
 
+        self.all_button = discord.ui.Button(
+            style=discord.ButtonStyle.success,
+            row=2,
+        )
+        self.all_button.callback = self._toggle_all
+        self.add_item(self.all_button)
+
         self._fill_page()
+
+    def _done_hashes(self) -> list[str]:
+        """Every torrent that reached the seeding target, all pages."""
+        return [h for h, t in self.torrents.items() if t["done"]]
+
+    def _all_chosen(self) -> bool:
+        done = self._done_hashes()
+        return bool(done) and set(done) <= set(self.chosen)
 
     def _page_torrents(self) -> list[dict]:
         return [
@@ -215,6 +231,16 @@ class CleanupView(ExpiringView):
         self.previous_button.disabled = self.page == 0
         self.next_button.disabled = self.page >= page_count(self.finished) - 1
 
+        if self._all_chosen():
+            self.all_button.label = "Clear choice"
+            self.all_button.style = discord.ButtonStyle.secondary
+            self.all_button.disabled = False
+        else:
+            done = len(self._done_hashes())
+            self.all_button.label = f"Choose all ✅ ({done})"
+            self.all_button.style = discord.ButtonStyle.success
+            self.all_button.disabled = not done
+
     def embed(self) -> discord.Embed:
         return cleanup_embed(self.finished, self.page, self.chosen)
 
@@ -234,6 +260,15 @@ class CleanupView(ExpiringView):
         on_page = {str(t.get("hash")) for t in self._page_torrents()}
         self.chosen = [h for h in self.chosen if h not in on_page]
         self.chosen += list(self.select.values)
+
+        await self._show(interaction)
+
+    async def _toggle_all(self, interaction: discord.Interaction):
+        if self._all_chosen():
+            self.chosen = []
+        else:
+            # Keep anything picked by hand that is not ✅ yet.
+            self.chosen = list(dict.fromkeys(self.chosen + self._done_hashes()))
 
         await self._show(interaction)
 

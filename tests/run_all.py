@@ -474,6 +474,14 @@ EXPECTED = {
         "last success kept: True | no repeat: True",
         "BACKUP_MAX_AGE_DAYS=0 -> []",
     ],
+    "check_cleanup_view.py": [
+        "start: Choose all ✅ (40) | remove enabled: False",
+        "after choose all: 40 chosen | all done: True | button: Clear choice | remove enabled: True",
+        "footer: **40 chosen** across all pages.",
+        "after clear: 0 | button: Choose all ✅ (40)",
+        "hand-picked kept: True | total: 41",
+        "nothing done: Choose all ✅ (0) | disabled: True",
+    ],
     "check_container.py": [
         "stranger: You are not allowed to use the container commands. | private: True | requests: 0",
         "autocomplete for stranger: []",

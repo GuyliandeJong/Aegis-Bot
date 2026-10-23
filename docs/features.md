@@ -207,7 +207,9 @@ watchlist. Each person can watch up to 25 titles.
 `/torrent cleanup` lists finished torrents, those that reached a
 seeding target first, with ratio, seeding time and size, 25 per page
 with Previous and Next buttons. Torrents chosen on one page stay
-chosen on the others. Remove them with or without their files;
+chosen on the others; **Choose all ✅** chooses every torrent that
+reached a target, on all pages at once (press again to clear). Remove
+them with or without their files;
 removing files asks for confirmation. Only administrators can use it,
 and the reply is visible to them only.
 

@@ -360,6 +360,27 @@ def find_visible(visible: list, name: str):
     return None
 
 
+def matching(visible: list, name: str) -> list:
+    """
+    Visible commands for text that names none exactly, as when someone
+    sends "tor" without picking a suggestion: those starting with it,
+    or else those containing it.
+    """
+    wanted = " ".join(name.strip().lstrip("/").lower().split())
+
+    if not wanted:
+        return []
+
+    names = [command for _area, command in visible]
+    starting = [c for c in names if c.qualified_name.lower().startswith(wanted)]
+
+    return starting or [c for c in names if wanted in c.qualified_name.lower()]
+
+
+# Commands named in the "several match" reply before "and N more".
+MATCHES_SHOWN = 15
+
+
 # ----------------------------------------------------------------
 # Cog
 # ----------------------------------------------------------------
@@ -412,13 +433,31 @@ class Help(commands.Cog):
             embed = overview_embed(interaction, visible)
         else:
             found = find_visible(visible, command)
+            candidates = [] if found else matching(visible, command)
+
+            if found is None and len(candidates) == 1:
+                found = candidates[0]
 
             if found is None:
-                await interaction.response.send_message(
-                    f"There is no command `/{command.strip().lstrip('/')}` "
-                    "that you can use. Run `/help` for the list.",
-                    ephemeral=True,
-                )
+                typed = command.strip().lstrip("/")
+
+                if candidates:
+                    names = ", ".join(
+                        f"`/{c.qualified_name}`" for c in candidates[:MATCHES_SHOWN]
+                    )
+                    more = len(candidates) - MATCHES_SHOWN
+                    text = (
+                        f"Several commands match `{typed}`: {names}"
+                        + (f" and {more} more" if more > 0 else "")
+                        + ". Pick one from the suggestions while typing."
+                    )
+                else:
+                    text = (
+                        f"There is no command `/{typed}` that you can use. "
+                        "Run `/help` for the list."
+                    )
+
+                await interaction.response.send_message(text, ephemeral=True)
                 return
 
             embed = detail_embed(interaction, found)

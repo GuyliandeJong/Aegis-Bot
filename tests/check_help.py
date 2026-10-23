@@ -114,7 +114,7 @@ for label in ("admin", "member"):
             print(f"    | {line}")
 
 print("\none command in detail")
-for label, name in (("member", "torrent speed"), ("member", "/jellyfin movies"), ("member", "torrent cleanup"), ("member", "container list"), ("container member", "container stop"), ("admin", "torrent cleanup")):
+for label, name in (("member", "torrent speed"), ("member", "/jellyfin movies"), ("member", "torrent cleanup"), ("member", "container list"), ("container member", "container stop"), ("admin", "torrent cleanup"), ("member", "tor"), ("admin", "cleanup"), ("member", "cleanup"), ("member", "zzz")):
     i = interaction(tree, people[label])
     asyncio.run(cog.help_command.callback(cog, i, name))
     content, kw = i.response.sent[-1]

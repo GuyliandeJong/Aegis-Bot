@@ -3,8 +3,9 @@ import os
 from dotenv import load_dotenv
 
 
-# Load configuration values from the .env file.
-load_dotenv()
+# Load configuration values from the .env file (or ENV_FILE, see
+# config/paths.py).
+load_dotenv(os.getenv("ENV_FILE") or None)
 
 
 class Settings:

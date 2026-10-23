@@ -764,8 +764,33 @@ def run(name: str) -> tuple[bool, str, list[str]]:
         return _run(name, data)
 
 
+def _bot_settings() -> set[str]:
+    """Names of the bot's settings, from .env.example."""
+    names = set()
+
+    for line in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines():
+        name = line.split("=", 1)[0].strip()
+
+        if "=" in line and name.isupper() and not line.startswith("#"):
+            names.add(name)
+
+    return names
+
+
 def _run(name: str, data: str) -> tuple[bool, str, list[str]]:
-    environment = dict(os.environ)
+    # Without the bot's own settings, so a check behaves the same inside
+    # the real container as anywhere else and never reaches a real
+    # service: settings from the environment are removed, and .env is
+    # replaced by an empty file.
+    settings = _bot_settings()
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in settings and not key.startswith("JELLYFIN_")
+    }
+    empty = Path(data) / "empty.env"
+    empty.write_text("")
+    environment["ENV_FILE"] = str(empty)
     environment["PYTHONPATH"] = os.pathsep.join(
         [str(ROOT), str(TESTS)]
     )

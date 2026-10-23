@@ -14,7 +14,9 @@ from dotenv import load_dotenv
 
 
 # Read .env here too: this module is imported before config.settings.
-load_dotenv()
+# ENV_FILE names another file to read instead; tests/run_all.py points
+# it at an empty file so the checks never see real settings.
+load_dotenv(os.getenv("ENV_FILE") or None)
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
 

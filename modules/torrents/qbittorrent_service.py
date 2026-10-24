@@ -60,10 +60,7 @@ class QBittorrentService:
             if self.session is not None and not self.session.closed:
                 return
 
-            logger.info(
-                "[QBittorrentService] Connecting to qBittorrent at %s",
-                self.base_url,
-            )
+            logger.info("[QBittorrentService] Connecting to qBittorrent.")
 
             session = aiohttp.ClientSession(
                 timeout=self.timeout,

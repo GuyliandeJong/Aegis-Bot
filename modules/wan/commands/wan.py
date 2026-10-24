@@ -60,11 +60,7 @@ class Wan(commands.Cog):
 
             await interaction.followup.send(embed=embed, ephemeral=True)
 
-            logger.info(
-                "WAN IP requested by %s: %s",
-                interaction.user,
-                ip_address,
-            )
+            logger.info("WAN IP requested by %s", interaction.user)
 
         except Exception:
             # Log the complete exception internally while

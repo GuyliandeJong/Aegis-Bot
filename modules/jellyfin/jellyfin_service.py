@@ -234,11 +234,7 @@ class JellyfinService:
             raise
 
         except Exception:
-            logger.exception(
-                "Failed to search %s at %s",
-                server.name,
-                server.url,
-            )
+            logger.exception("Failed to search %s", server.name)
             return []
 
     async def is_available(

@@ -109,7 +109,9 @@ does.
   administrator permission as their default. Change it per command,
   role or user under Server Settings > Integrations > Aegis-Bot.
 
-Settings are never logged. `scripts/tidy_env.py` reports which
+Passwords, tokens and API keys are never logged, and normal log lines
+leave out addresses; an error from a service that cannot be reached
+may still name its address. `scripts/tidy_env.py` reports which
 settings an existing `.env` has, by name only, and can sort it into the
 layout of `.env.example`.
 

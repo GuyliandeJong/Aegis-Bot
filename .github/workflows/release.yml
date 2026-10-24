@@ -1,0 +1,66 @@
+# Creates the GitHub release for a version tag once its image is
+# published, with release notes from .github/release-notes.md and the
+# two files a new user needs (docker-compose.yml, env.example) taken
+# from that tag.
+#
+# Runs after "Publish image" succeeds for a v* tag, or by hand for an
+# existing tag (Actions > Release > Run workflow). Running it again
+# updates the notes and files of a release that already exists.
+
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["Publish image"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, e.g. v1.0.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    steps:
+      # The notes come from the default branch; the files from the tag.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null || {
+            echo "No tag $TAG in this repository." >&2
+            exit 1
+          }
+          version="${TAG#v}"
+          owner="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+
+          mkdir dist
+          git show "$TAG:docker-compose.example.yml" > dist/docker-compose.yml
+          git show "$TAG:.env.example" > dist/env.example
+          sed -e "s|{{VERSION}}|$version|g" -e "s|{{TAG}}|$TAG|g" \
+              -e "s|{{OWNER}}|$owner|g" -e "s|{{REPO}}|$REPO|g" \
+              .github/release-notes.md > dist/notes.md
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Aegis-Bot $version" --notes-file dist/notes.md
+            gh release upload "$TAG" dist/docker-compose.yml dist/env.example --clobber
+          else
+            gh release create "$TAG" dist/docker-compose.yml dist/env.example \
+              --verify-tag --latest --title "Aegis-Bot $version" --notes-file dist/notes.md
+          fi

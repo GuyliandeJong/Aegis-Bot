@@ -53,7 +53,9 @@ What each command and alert does is described in
 In an empty folder, put a copy of
 [docker-compose.example.yml](docker-compose.example.yml) named
 `docker-compose.yml`, and a copy of [.env.example](.env.example) named
-`.env`. In `.env`, set:
+`.env`. Both are also attached to every
+[release](../../releases/latest), as `docker-compose.yml` and
+`env.example`. In `.env`, set:
 
 ```bash
 DISCORD_TOKEN=<the bot token>

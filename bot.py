@@ -21,8 +21,10 @@ from utils.logger import logger
 
 intents = discord.Intents.default()
 
+# Only slash commands are used. A mention as prefix keeps discord.py
+# from warning about the message content intent, which is not needed.
 bot = commands.Bot(
-    command_prefix="!",
+    command_prefix=commands.when_mentioned,
     intents=intents,
 )
 

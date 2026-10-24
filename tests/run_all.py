@@ -808,6 +808,9 @@ def _run(name: str, data: str) -> tuple[bool, str, list[str]]:
     environment["PYTHONIOENCODING"] = "utf-8"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment["DATA_DIR"] = data
+    # Checks with dates expect UTC; local time would move them across
+    # summer time changes.
+    environment["TZ"] = "UTC"
 
     try:
         result = subprocess.run(

@@ -8,7 +8,7 @@ off, and its commands and alerts do not exist.
 
 | Command | What it does | Who can use it | Module |
 |---|---|---|---|
-| `/torrent search` | Checks Jellyfin first, then searches Jackett and adds the chosen result to qBittorrent | Everyone | torrents |
+| `/torrent search` | Checks Jellyfin first (or the PC games folder for PC), then searches Jackett and adds the chosen result to qBittorrent | Everyone | torrents |
 | `/torrent add` | Adds a magnet link to qBittorrent | Everyone | torrents |
 | `/torrent list` | Lists torrents, with filter, sort and live refresh | Everyone | torrents |
 | `/torrent info` | Details and controls for one torrent | Everyone | torrents |
@@ -86,6 +86,33 @@ never downloaded.
 
 The primary server is `JELLYFIN_1`. The download button only appears
 when a library folder is configured for the category.
+
+### PC games you already have
+
+For the PC category, `/torrent search` looks in a folder of games
+before it searches Jackett. Set `PC_GAMES_DIR` to that folder as the
+bot's container sees it; empty turns the check off, and it does not
+need the jellyfin module.
+
+- Every folder and file directly in it counts as a game (nothing
+  deeper is read). Names are cleaned like torrent names, so
+  `Cyberpunk.2077.v2.1-GOG` is found as "Cyberpunk 2077" and
+  `Game.iso` as "Game".
+- A match shows "Already in your PC games folder" with the names that
+  matched (never the path) and a **Search for torrent** button, as for a
+  title in Jellyfin.
+- Numbers always count: "Football Manager 2024" does not match 2025.
+  A short query may match a longer name ("The Witcher 3" finds "The
+  Witcher 3 Wild Hunt"), but must cover most of its words, so "Hades"
+  does not claim "Hades II". A miss only costs a normal search.
+- A missing, unreadable or slow folder (more than 10 seconds) is logged
+  and the torrent search goes on.
+
+The container must see the folder. With the read-only `/:/host:ro`
+mount from `docker-compose.example.yml`, it is under `/host`; check
+with `docker exec aegis-bot ls "/host/<path to the folder>"`. A folder
+on a network share mounted after the container started does not show
+up there: add a read-only volume for it instead.
 
 ### Downloading from another Jellyfin server
 

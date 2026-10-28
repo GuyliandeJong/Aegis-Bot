@@ -25,3 +25,7 @@ services:
 
       # Read-write media folder, only for Jellyfin downloads.
       # - /path/to/media:/media
+
+      # Read-only folder of PC games, for PC_GAMES_DIR in .env. Only
+      # needed when it is not already under the /host mount above.
+      # - /path/to/games:/games:ro

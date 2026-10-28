@@ -33,12 +33,9 @@ PROJECT = Path(__file__).resolve().parent.parent
 KEY_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 
 # Settings the bot cannot start or run its core features without.
-REQUIRED = {
-    "DISCORD_TOKEN", "GUILD_ID", "ALERT_CHANNEL_ID",
-    "IDRAC_HOST", "IDRAC_USERNAME", "IDRAC_PASSWORD",
-    "GPTWOL_HOST", "GPTWOL_TARGET_IP", "GPTWOL_TARGET_MAC",
-    "QBITTORRENT_HOST", "QBITTORRENT_USERNAME", "QBITTORRENT_PASSWORD",
-}
+# Only what the bot cannot start without. The settings of a module are
+# not required: the module stays off while they are empty.
+REQUIRED = {"DISCORD_TOKEN", "GUILD_ID", "ALERT_CHANNEL_ID"}
 
 
 def read_env(path: Path) -> dict:

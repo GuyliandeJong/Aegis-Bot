@@ -21,6 +21,8 @@ TEMPLATE.write_text("""# Aegis-Bot settings
 DISCORD_TOKEN=
 # Server ID. (required)
 GUILD_ID=
+# Channel for alerts. (required)
+ALERT_CHANNEL_ID=
 
 # ------------------------------------------------------------
 # Thresholds
@@ -34,7 +36,7 @@ MEMORY_WARNING=80
 # iDRAC
 # ------------------------------------------------------------
 
-# Address. (required)
+# Address of the iDRAC; its module stays off while this is empty.
 IDRAC_HOST=
 
 # ------------------------------------------------------------
@@ -88,7 +90,8 @@ print("  exit:", code, "| no value shown:", not any(s in out for s in SECRETS), 
 print("  mode:", oct((ROOT / ".env.tidy").stat().st_mode & 0o777), "| .env untouched:", ENV.read_bytes() == ORIGINAL.encode())
 print("  values kept:", all(s in tidy for s in SECRETS if s != "9999-old-guild"), "| last duplicate wins:", "GUILD_ID=123" in tidy and "9999" not in tidy)
 print("  quotes kept:", 'QBITTORRENT_PASSWORD="hunter2-password"' in tidy, "| export dropped:", "PORTAINER_URL=http://portainer:9000" in tidy.splitlines())
-print("  unset default commented:", "# MEMORY_WARNING=80" in tidy, "| required marked:", "# IDRAC_HOST=    <- required, not set" in tidy)
+print("  unset default commented:", "# MEMORY_WARNING=80" in tidy, "| required marked:", "# ALERT_CHANNEL_ID=    <- required, not set" in tidy,
+      "| module setting not marked:", "# IDRAC_HOST=    <- required, not set" not in tidy and "# IDRAC_HOST=" in tidy)
 print("  unknown at the end:", tidy.rstrip().endswith("OLD_SETTING=keep me"), "| LF only:", "\r" not in tidy)
 order = [l.split("=")[0] for l in tidy.splitlines() if l and not l.startswith("#")]
 print("  order follows the template:", order)

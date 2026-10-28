@@ -94,19 +94,19 @@ before it searches Jackett. Set `PC_GAMES_DIR` to that folder as the
 bot's container sees it; empty turns the check off, and it does not
 need the jellyfin module.
 
-- Every folder and file directly in it counts as a game (nothing
-  deeper is read). Names are cleaned like torrent names, so
+- Every folder directly in it counts as a game, and so do installers
+  and disc images (`.iso`, `.zip`, `.rar`, `.7z`, `.exe`, `.msi`,
+  `.img`); nothing deeper is read, and notes or pictures next to the
+  games are ignored. Names are cleaned like torrent names, so
   `Cyberpunk.2077.v2.1-GOG` is found as "Cyberpunk 2077" and
   `Game.iso` as "Game".
-- A match shows "Already in your PC games folder" with the names that
-  matched (never the path) and a **Search for torrent** button, as for a
-  title in Jellyfin.
+- Every word you type must be in the name, so "Chop" and "Chop Chop"
+  both find "Chop Chop Inc (2026)", and "the" or "of" may be left out.
+  "Hades" also lists "Hades II": the answer shows the names and the
+  button searches anyway, which beats missing a game you have.
 - Words like "Game of the Year Edition", "Deluxe Edition" and "GOTY"
-  are ignored on both sides.
-- Numbers always count: "Football Manager 2024" does not match 2025.
-  A short query may match a longer name ("The Witcher 3" finds "The
-  Witcher 3 Wild Hunt"), but must cover most of its words, so "Hades"
-  does not claim "Hades II". A miss only costs a normal search.
+  are ignored on both sides, and numbers count: "Football Manager 2024"
+  does not match 2025.
 - A missing, unreadable or slow folder (more than 10 seconds) is logged
   and the torrent search goes on.
 

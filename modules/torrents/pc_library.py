@@ -34,6 +34,15 @@ def games_dir() -> Path | None:
     return Path(value) if value else None
 
 
+# "Game of the Year Edition", "Deluxe Edition", "GOTY": the same game,
+# so they do not count as words of its name.
+EDITION = re.compile(
+    r"\b(?:(?:game of the year|complete|deluxe|definitive|ultimate|enhanced|"
+    r"gold|premium|collectors|special|anniversary|legendary|standard|"
+    r"digital|royal)\s+)?edition\b|\bgoty\b"
+)
+
+
 def normalise(title: str) -> str:
     """
     Words of a title for comparison. Unlike movie titles, every number
@@ -42,6 +51,7 @@ def normalise(title: str) -> str:
     """
     text = re.sub(r"\s*\((?:19|20)\d{2}\)\s*$", "", str(title or ""))
     text = text.lower().replace("'", "").replace("’", "")
+    text = EDITION.sub(" ", text)
     text = re.sub(r"[^a-z0-9]+", " ", text)
 
     return re.sub(r"\s+", " ", text).strip()

@@ -101,6 +101,8 @@ need the jellyfin module.
 - A match shows "Already in your PC games folder" with the names that
   matched (never the path) and a **Search for torrent** button, as for a
   title in Jellyfin.
+- Words like "Game of the Year Edition", "Deluxe Edition" and "GOTY"
+  are ignored on both sides.
 - Numbers always count: "Football Manager 2024" does not match 2025.
   A short query may match a longer name ("The Witcher 3" finds "The
   Witcher 3 Wild Hunt"), but must cover most of its words, so "Hades"

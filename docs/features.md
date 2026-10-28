@@ -221,18 +221,34 @@ user name on each server. A server without it shows ▫️, and the reply
 says which setting is missing or which user was not found. The reply
 is private.
 
-### Cam and telesync releases
+### Cam, telesync and other kinds of release
 
-Movie searches never offer cam, telesync and similar recordings (words
-such as `CAM`, `CAMRip`, `HDCAM`, `HDTS`, `HDTC`, `TS`, `TELESYNC`).
-They are left out of the list, and a word of the search itself is never
-counted: looking for the film "Cam" still finds it. Other categories
-are not filtered. `reject_low_quality` under Movies in
-`config/torrent_preferences.json` turns it off (a copy of that file in
-`data/` overrides the default).
+Jackett is searched without a category, so a search for a film also
+returns games, soundtracks and adult releases whose titles match. Each
+release carries Torznab category numbers from its indexer (2xxx movies,
+3xxx audio, 4xxx PC, 5xxx TV, 6xxx adult), and the bot uses them:
 
-When only such releases exist, the message says so, with how many were
-hidden, and offers **Watch for it**.
+- **Other kinds are hidden.** Movies and Series show movies, TV and
+  uncategorised ("Other") releases; PC shows PC and Other; Music shows
+  audio and Other. A release with no category, or only an indexer's own
+  numbers (100000 and up), is kept, since nothing says it is wrong.
+- **Cam and telesync are hidden for Movies.** Words such as `CAM`,
+  `CAMRip`, `HDCAM`, `HDTS`, `HDTC`, `TS` and `TELESYNC`. A word of the
+  search itself is never counted: looking for the film "Cam" still
+  finds it. PC, Series and Music are not filtered for these.
+
+The footer of the results says how many were hidden. When nothing is
+left, the message says why ("Hidden: 2 listed under another category,
+1 cam or telesync") and offers **Watch for it**.
+
+In `config/torrent_preferences.json`, `reject_low_quality` (cam,
+Movies only) and `hide_other_kinds` (per category) under a category
+turn each filter off; a copy of the file in `data/` overrides the
+default. The bot's log says what was hidden and under which category
+numbers (`Hid N Movies result(s) ... listed under other categories`).
+How an indexer maps its own categories decides what is hidden: Jackett's
+definitions put adult releases of 1337x and The Pirate Bay under 6xxx,
+for example, but RuTracker has no adult category.
 
 ### Watchlist
 
@@ -241,7 +257,7 @@ offers **Watch for it**. Under a list of results, **Watch for a better
 release** does the same and remembers the releases in that list: they
 no longer count, so only a release you have not seen turns the title
 up. Twice a day the bot looks again: first on every Jellyfin server,
-then on Jackett with the same search, relevance filter and cam filter
+then on Jackett with the same search and filters
 as `/torrent search`. When the title turns up, the person who asked is
 mentioned in the channel they searched in, with a **Show results**
 button that runs the normal search. The title is then removed from the

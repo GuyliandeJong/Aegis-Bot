@@ -22,6 +22,7 @@ from modules.jellyfin.jellyfin_compare import (
     describe_quality,
 )
 from modules.jellyfin.jellyfin_service import JellyfinService
+from modules.torrents import pc_library
 from modules.torrents.share_link_service import (
     ShareLinkError,
     ShareLinkService,
@@ -146,7 +147,10 @@ class TorrentJellyfinSearchButton(discord.ui.Button):
 
 
 class TorrentJellyfinSearchView(ExpiringView):
-    """Owner-restricted view shown when Jellyfin already has the title."""
+    """
+    Owner-restricted view shown when the title is already in a library:
+    Jellyfin for Movies and Series, the PC games folder for PC.
+    """
     def __init__(
         self,
         owner_id,
@@ -1140,6 +1144,24 @@ class TorrentSearchMixin:
             await service.close()
 
     @staticmethod
+    def _build_pc_library_embed(names):
+        """The "already in the PC games folder" embed. Names only."""
+        shown = names[:10]
+        lines = [f"• {discord.utils.escape_markdown(name)}" for name in shown]
+
+        if len(names) > len(shown):
+            lines.append(f"…and {len(names) - len(shown)} more")
+
+        return discord.Embed(
+            title="Already in your PC games folder",
+            description=(
+                "\n".join(lines)
+                + "\n\nNo torrent search has been performed."
+            ),
+            color=discord.Color.green(),
+        )
+
+    @staticmethod
     def _jellyfin_download_source(matches, category):
         """
         Return the match a title can be downloaded from, if any.
@@ -1491,10 +1513,37 @@ class TorrentSearchMixin:
             ):
                 query = f"{query} {resolved['year']}"
 
+        # PC games: look in the games folder (PC_GAMES_DIR), when there
+        # is one. The "Search for torrent" button comes back here with
+        # skip_jellyfin set, so it is not checked twice.
+        if category == "PC" and not skip_jellyfin:
+            owned = await pc_library.find(query)
+
+            if owned:
+                logger.info(
+                    "[TorrentSearch] '%s' is already in the PC games "
+                    "folder. Skipping torrent search.",
+                    query,
+                )
+
+                view = TorrentJellyfinSearchView(
+                    owner_id=interaction.user.id,
+                    query=query,
+                    category=category,
+                    torrent_cog=self,
+                )
+
+                view.message = await interaction.edit_original_response(
+                    content=None,
+                    embed=self._build_pc_library_embed(owned),
+                    view=view,
+                )
+                return
+
         # Check Jellyfin before creating or querying Jackett.
         #
-        # Only Movies and Series are checked. Music and PC continue
-        # directly to the normal Jackett search.
+        # Only Movies and Series are checked. Music continues directly
+        # to the normal Jackett search.
         jellyfin_matches = []
         if not skip_jellyfin:
             jellyfin_matches = await self._check_jellyfin(

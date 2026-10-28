@@ -153,6 +153,37 @@ class JackettService:
         return attributes
 
     @classmethod
+    def categories(cls, item):
+        """
+        Every Torznab category number of an item, in order.
+
+        Jackett writes them twice, as <category> elements and as
+        torznab:attr name="category" values, and an item may have
+        several. Custom numbers of an indexer (100000 and up) are kept;
+        text that is not a number is skipped.
+        """
+        found = []
+
+        for child in item.iter():
+            name = cls.local_name(child)
+
+            if name == "category":
+                text = cls.clean_text(child.text)
+            elif (
+                name == "attr"
+                and cls.clean_text(child.attrib.get("name")).lower()
+                == "category"
+            ):
+                text = cls.clean_text(child.attrib.get("value"))
+            else:
+                continue
+
+            if text.isdigit() and int(text) not in found:
+                found.append(int(text))
+
+        return found
+
+    @classmethod
     def enclosure_url(cls, item):
         """Return the item enclosure URL, when present."""
         for child in item:
@@ -315,6 +346,7 @@ class JackettService:
                         item,
                         "category",
                     ),
+                    "categories": cls.categories(item),
                     "publish_date": cls.child_text(
                         item,
                         "pubdate",

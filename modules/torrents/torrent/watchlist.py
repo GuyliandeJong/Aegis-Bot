@@ -24,7 +24,7 @@ class WatchlistAddView(ExpiringView):
         self.owner_id = owner_id
         self.query = query
         self.category = category
-        # Cam or telesync releases that were left out of the search.
+        # Releases left out of the search (cam, other categories).
         self.hidden = hidden
         self.message = None
 
@@ -74,7 +74,7 @@ class WatchlistAddView(ExpiringView):
                 self.category,
             )
             found = (
-                "Only cam or telesync releases of"
+                "Nothing usable found for"
                 if self.hidden
                 else "Nothing found for"
             )

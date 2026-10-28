@@ -41,6 +41,9 @@ class Ranked(list):
 
     hidden = 0
 
+    # Releases left out because they are listed under another category.
+    other = 0
+
 
 class TorrentSearchSelect(discord.ui.Select):
     """Dropdown used to choose a Jackett search result."""
@@ -435,6 +438,40 @@ class TorrentSearchMixin:
         ("1080p", r"\b1080p\b"),
         ("720p", r"\b720p\b"),
     )
+
+    # The Torznab category groups (thousands: 2 movies, 3 audio, 4 PC,
+    # 5 TV) each search category may show. 8 ("Other") says nothing, so
+    # it is allowed everywhere. Jackett sends no category with a search,
+    # so a Movies search also returns games, music and adult releases
+    # whose titles match.
+    KIND_GROUPS = {
+        "Movies": {2, 5, 8},
+        "Series": {2, 5, 8},
+        "PC": {4, 8},
+        "Music": {3, 8},
+    }
+
+    @classmethod
+    def _kind_groups(cls, result):
+        """Category groups (1-8) of a result; custom numbers are ignored."""
+        return {
+            number // 1000
+            for number in result.get("categories") or []
+            if isinstance(number, int) and 1000 <= number < 9000
+        }
+
+    @classmethod
+    def _other_kind(cls, result, category):
+        """
+        Whether a result is listed only under other kinds of content.
+
+        A result with no category, or only an indexer's own numbers,
+        stays: nothing says it is wrong.
+        """
+        allowed = cls.KIND_GROUPS.get(category)
+        groups = cls._kind_groups(result)
+
+        return bool(allowed and groups and not groups & allowed)
 
     @classmethod
     def _is_low_quality(cls, title, query):
@@ -1156,12 +1193,20 @@ class TorrentSearchMixin:
             }
         )
 
-        embed.set_footer(
-            text=(
-                f"{len(results)} ranked result(s) · "
-                f"Sources: {', '.join(source_names)}"
-            )
+        footer = (
+            f"{len(results)} ranked result(s) · "
+            f"Sources: {', '.join(source_names)}"
         )
+
+        hidden = (
+            getattr(results, "hidden", 0)
+            + getattr(results, "other", 0)
+        )
+
+        if hidden:
+            footer += f" · {hidden} hidden (cam, other categories)"
+
+        embed.set_footer(text=footer)
 
         if errors:
             unavailable = ", ".join(
@@ -1502,6 +1547,40 @@ class TorrentSearchMixin:
                     query,
                 )
 
+        # Releases listed under another kind of content (games and
+        # music in a Movies search, adult releases anywhere) are left
+        # out too.
+        other = 0
+
+        if category_preferences.get(
+            "hide_other_kinds",
+            category in self.KIND_GROUPS,
+        ):
+            kept = [
+                result
+                for result in results
+                if not self._other_kind(result, category)
+            ]
+            other = len(results) - len(kept)
+
+            if other:
+                seen_groups = sorted(
+                    f"{group}xxx"
+                    for result in results
+                    if self._other_kind(result, category)
+                    for group in self._kind_groups(result)
+                )
+                logger.info(
+                    "[TorrentSearch] Hid %d %s result(s) for '%s' listed "
+                    "under other categories: %s.",
+                    other,
+                    category,
+                    query,
+                    ", ".join(seen_groups),
+                )
+
+            results = kept
+
         has_preferred_resolution = (
             self._has_preferred_resolution(
                 results,
@@ -1551,6 +1630,7 @@ class TorrentSearchMixin:
             ]
         )
         ranked_results.hidden = hidden
+        ranked_results.other = other
 
         return (
             ranked_results,
@@ -1793,18 +1873,29 @@ class TorrentSearchMixin:
                 )
 
             hidden = getattr(ranked_results, "hidden", 0)
+            other = getattr(ranked_results, "other", 0)
 
             view = WatchlistAddView(
                 interaction.user.id,
                 query,
                 category,
-                hidden=hidden,
+                hidden=hidden + other,
             )
 
-            if hidden:
+            if hidden or other:
+                parts = []
+
+                if other:
+                    parts.append(
+                        f"{other} listed under another category"
+                    )
+
+                if hidden:
+                    parts.append(f"{hidden} cam or telesync")
+
                 found = (
-                    f"Only cam or telesync releases found for "
-                    f"**{query}** ({hidden} hidden).{detail}\n"
+                    f"Nothing usable found for **{query}**. "
+                    f"Hidden: {', '.join(parts)}.{detail}\n"
                     "Press **Watch for it** to be told when a proper "
                     "release turns up."
                 )

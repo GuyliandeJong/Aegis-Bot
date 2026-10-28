@@ -24,11 +24,13 @@ GAMES = Path(tempfile.mkdtemp(prefix="games-", dir=os.environ.get("DATA_DIR") or
 NAMES = [
     "Cyberpunk.2077.v2.1-GOG", "Football Manager 2024", "Hades II", "Castlevania Belmonts Curse [DODI Repack]",
     "Baldur's Gate 3", "The Witcher 3 Wild Hunt", "Portal 2.iso", "Stardew Valley (2016)", "Hades",
-    "Fallout 4 - Game of the Year Edition", "Doom Eternal Deluxe Edition",
+    "Fallout 4 - Game of the Year Edition", "Doom Eternal Deluxe Edition", "Chop Chop Inc (2026)",
 ]
 for name in NAMES:
     (GAMES / name).mkdir()
 (GAMES / "readme.txt").write_text("not a game")
+(GAMES / "Sekiro.rar").write_text("an archive")
+(GAMES / "cover.jpg").write_text("a picture")
 
 
 class Message:
@@ -75,9 +77,11 @@ def listed(query):
 print("== matching ==")
 os.environ["PC_GAMES_DIR"] = str(GAMES)
 for query in ("cyberpunk 2077", "Football Manager 2024", "Football Manager 2025", "Hades", "Hades II", "Belmonts Curse",
-              "Belmont's Curse", "Baldurs Gate 3", "Baldur's Gate 3", "The Witcher 3", "Witcher", "Portal 2", "Portal", "Stardew Valley", "Fallout 4", "Fallout 4 GOTY", "Doom Eternal", "Elden Ring"):
+              "Belmont's Curse", "Baldurs Gate 3", "Baldur's Gate 3", "The Witcher 3", "Witcher", "Portal 2", "Portal", "Stardew Valley", "Fallout 4", "Fallout 4 GOTY", "Doom Eternal", "Chop Chop", "Chop", "Chop Chop Chop",
+              "Football Manager", "The Hades", "Elden Ring"):
     print(f"  {query:24} -> {listed(query)}")
-print("  the readme is a file but not a game:", listed("readme"))
+print("  notes and pictures are not games:", listed("readme"), listed("cover"))
+print("  an archive is:", listed("Sekiro"))
 
 print("\n== off, missing, unreadable ==")
 os.environ["PC_GAMES_DIR"] = ""

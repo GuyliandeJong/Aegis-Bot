@@ -3,14 +3,16 @@ Finds a PC game in a folder of games, before /torrent search looks for a
 torrent.
 
 PC_GAMES_DIR is the folder as seen from inside the bot's container. Its
-folders and files (one level deep) are the games you already have;
-names are cleaned with pc_title(), so "Cyberpunk.2077.v2.1-GOG" and
+folders, and installers and disc images (.iso, .zip, .rar, .7z, .exe,
+.msi, .img), one level deep, are the games you already have; names are
+cleaned with pc_title(), so "Cyberpunk.2077.v2.1-GOG" and
 "Castlevania Belmonts Curse [DODI Repack]" can be found by their title.
 """
 
 import asyncio
 import os
 import re
+from collections import Counter
 from pathlib import Path
 
 from modules.torrents.release_name import pc_title
@@ -23,8 +25,12 @@ LIST_TIMEOUT = 10
 # More entries than this are ignored; a games folder is not that large.
 MAX_ENTRIES = 20000
 
-# The query must cover at least this share of the words of a game's name.
-MIN_COVERAGE = 0.6
+# Files that count as a game (folders always do): installers and disc
+# images. Notes, pictures and checksums next to the games do not.
+GAME_FILES = {".iso", ".zip", ".rar", ".7z", ".exe", ".msi", ".img"}
+
+# Words of a search that need not be in the name.
+STOP_WORDS = {"a", "an", "and", "of", "the"}
 
 
 def games_dir() -> Path | None:
@@ -59,33 +65,42 @@ def normalise(title: str) -> str:
 
 def matches(query: str, name: str) -> bool:
     """
-    Whether a folder or file name is the game asked for.
+    Whether a folder or file name is the game asked for: every word of
+    the search is in the name, as often as it was typed ("Chop Chop"
+    finds "Chop Chop Inc (2026)", "Chop" does too).
 
-    A shortened query may match a longer name ("The Witcher 3" finds
-    "The Witcher 3 Wild Hunt"), but must cover most of it, so "Hades"
-    does not claim "Hades II". A miss only costs a normal torrent search.
+    A short search can match several games ("Hades" lists "Hades II"
+    as well). That is deliberate: the answer shows the names and offers
+    to search anyway, while a missed match could download a game you
+    already have. Numbers count, so 2024 is not 2025.
     """
-    wanted = normalise(query).split()
-    found = normalise(pc_title(name)).split()
+    words = normalise(query).split()
+    wanted = Counter(w for w in words if w not in STOP_WORDS) or Counter(words)
+    found = Counter(normalise(pc_title(name)).split())
 
     if not wanted or not found:
         return False
 
-    if wanted == found:
-        return True
-
-    if not set(wanted).issubset(found):
-        return False
-
-    return len(set(wanted)) / len(set(found)) >= MIN_COVERAGE
+    return all(found[word] >= count for word, count in wanted.items())
 
 
 def _list_names(folder: Path) -> list[str]:
-    """Names of the entries directly in the folder (blocking)."""
+    """Names of the games directly in the folder (blocking)."""
     names = []
 
     with os.scandir(folder) as entries:
         for entry in entries:
+            try:
+                game = (
+                    entry.is_dir()
+                    or Path(entry.name).suffix.lower() in GAME_FILES
+                )
+            except OSError:
+                continue
+
+            if not game:
+                continue
+
             names.append(entry.name)
 
             if len(names) >= MAX_ENTRIES:
@@ -118,7 +133,10 @@ async def find(query: str) -> list[str]:
         logger.warning("[PCLibrary] The games folder cannot be read: %s", type(ex).__name__)
         return []
 
+    exact = normalise(query)
+
+    # The name that is exactly the search first, then the rest.
     return sorted(
         (name for name in names if matches(query, name)),
-        key=str.casefold,
+        key=lambda name: (normalise(pc_title(name)) != exact, name.casefold()),
     )

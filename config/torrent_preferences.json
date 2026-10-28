@@ -12,6 +12,7 @@
     ],
     "categories": {
         "Movies": {
+            "reject_low_quality": true,
             "preferred_resolutions": [
                 "1080p"
             ],

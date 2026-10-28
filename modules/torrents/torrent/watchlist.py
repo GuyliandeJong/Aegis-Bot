@@ -12,12 +12,20 @@ from utils.open_messages import ExpiringView
 class WatchlistAddView(ExpiringView):
     """The "Watch for it" button under a search that found nothing."""
 
-    def __init__(self, owner_id: int, query: str, category: str):
+    def __init__(
+        self,
+        owner_id: int,
+        query: str,
+        category: str,
+        hidden: int = 0,
+    ):
         super().__init__(timeout=180)
 
         self.owner_id = owner_id
         self.query = query
         self.category = category
+        # Cam or telesync releases that were left out of the search.
+        self.hidden = hidden
         self.message = None
 
         button = discord.ui.Button(
@@ -65,8 +73,13 @@ class WatchlistAddView(ExpiringView):
                 self.query,
                 self.category,
             )
+            found = (
+                "Only cam or telesync releases of"
+                if self.hidden
+                else "Nothing found for"
+            )
             text = (
-                f"Nothing found for **{self.query}** yet. It is on "
+                f"{found} **{self.query}** yet. It is on "
                 "your watchlist now: the bot checks Jellyfin and "
                 "Jackett twice a day and mentions you when it turns "
                 "up. `/torrent watchlist` shows your list."

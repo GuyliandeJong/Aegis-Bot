@@ -32,6 +32,15 @@ from utils.logger import logger
 from utils.open_messages import ExpiringView
 
 
+class Ranked(list):
+    """
+    Ranked results, with how many releases were left out as cam or
+    telesync recordings. Still a plain list for everything that reads it.
+    """
+
+    hidden = 0
+
+
 class TorrentSearchSelect(discord.ui.Select):
     """Dropdown used to choose a Jackett search result."""
 
@@ -349,6 +358,9 @@ class TorrentSearchMixin:
         "telecine",
         "tc",
         "ts",
+        "camrip",
+        "hdcamrip",
+        "hdtc",
     }
 
     SEARCH_STOP_WORDS = {
@@ -369,6 +381,19 @@ class TorrentSearchMixin:
         ("1080p", r"\b1080p\b"),
         ("720p", r"\b720p\b"),
     )
+
+    @classmethod
+    def _is_low_quality(cls, title, query):
+        """
+        Whether a release is a cam or telesync recording.
+
+        A word of the search itself never counts, so looking for the
+        film "Cam" does not hide everything.
+        """
+        return bool(
+            (cls.REJECTED_TERMS & cls._search_tokens(title))
+            - cls._search_tokens(query)
+        )
 
     @staticmethod
     def _search_tokens(value):
@@ -834,7 +859,7 @@ class TorrentSearchMixin:
         rejected = (
             cls.REJECTED_TERMS
             & cls._search_tokens(title)
-        )
+        ) - query_tokens
 
         if rejected:
             score -= 75
@@ -1396,6 +1421,33 @@ class TorrentSearchMixin:
             )
         )
 
+        # Cam and telesync releases are never offered for movies. The
+        # count is kept, so the search can say why nothing is left.
+        hidden = 0
+
+        if category_preferences.get(
+            "reject_low_quality",
+            category == "Movies",
+        ):
+            kept = [
+                result
+                for result in results
+                if not self._is_low_quality(
+                    result.get("title"),
+                    query,
+                )
+            ]
+            hidden = len(results) - len(kept)
+            results = kept
+
+            if hidden:
+                logger.info(
+                    "[TorrentSearch] Hid %d cam or telesync "
+                    "release(s) for '%s'.",
+                    hidden,
+                    query,
+                )
+
         has_preferred_resolution = (
             self._has_preferred_resolution(
                 results,
@@ -1439,9 +1491,12 @@ class TorrentSearchMixin:
             reverse=True,
         )
 
-        ranked_results = ranked_results[
-            :self.MAX_RESULTS
-        ]
+        ranked_results = Ranked(
+            ranked_results[
+                :self.MAX_RESULTS
+            ]
+        )
+        ranked_results.hidden = hidden
 
         return (
             ranked_results,
@@ -1683,18 +1738,31 @@ class TorrentSearchMixin:
                     )
                 )
 
+            hidden = getattr(ranked_results, "hidden", 0)
+
             view = WatchlistAddView(
                 interaction.user.id,
                 query,
                 category,
+                hidden=hidden,
             )
 
-            view.message = await interaction.edit_original_response(
-                content=(
+            if hidden:
+                found = (
+                    f"Only cam or telesync releases found for "
+                    f"**{query}** ({hidden} hidden).{detail}\n"
+                    "Press **Watch for it** to be told when a proper "
+                    "release turns up."
+                )
+            else:
+                found = (
                     f"No magnet-capable results found for "
                     f"**{query}**.{detail}\n"
                     "Press **Watch for it** to be told when it turns up."
-                ),
+                )
+
+            view.message = await interaction.edit_original_response(
+                content=found,
                 embed=None,
                 view=view,
             )

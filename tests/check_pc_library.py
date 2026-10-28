@@ -19,10 +19,12 @@ from modules.torrents import pc_library as PL
 import modules.torrents.torrent.search as SM
 import isolate  # state files go to a temporary folder
 
-GAMES = Path(tempfile.mkdtemp(prefix="aegis-games-"))
+# Under DATA_DIR, which run_all.py removes after the check.
+GAMES = Path(tempfile.mkdtemp(prefix="games-", dir=os.environ.get("DATA_DIR") or None))
 NAMES = [
     "Cyberpunk.2077.v2.1-GOG", "Football Manager 2024", "Hades II", "Castlevania Belmonts Curse [DODI Repack]",
     "Baldur's Gate 3", "The Witcher 3 Wild Hunt", "Portal 2.iso", "Stardew Valley (2016)", "Hades",
+    "Fallout 4 - Game of the Year Edition", "Doom Eternal Deluxe Edition",
 ]
 for name in NAMES:
     (GAMES / name).mkdir()
@@ -73,7 +75,7 @@ def listed(query):
 print("== matching ==")
 os.environ["PC_GAMES_DIR"] = str(GAMES)
 for query in ("cyberpunk 2077", "Football Manager 2024", "Football Manager 2025", "Hades", "Hades II", "Belmonts Curse",
-              "Belmont's Curse", "Baldurs Gate 3", "Baldur's Gate 3", "The Witcher 3", "Witcher", "Portal 2", "Portal", "Stardew Valley", "Elden Ring"):
+              "Belmont's Curse", "Baldurs Gate 3", "Baldur's Gate 3", "The Witcher 3", "Witcher", "Portal 2", "Portal", "Stardew Valley", "Fallout 4", "Fallout 4 GOTY", "Doom Eternal", "Elden Ring"):
     print(f"  {query:24} -> {listed(query)}")
 print("  the readme is a file but not a game:", listed("readme"))
 

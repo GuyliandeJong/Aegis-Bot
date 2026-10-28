@@ -14,7 +14,9 @@ module layout and the rules below.
 - No addresses, names or credentials in code, tests or documentation.
   Use `example.test`, `192.0.2.x` and similar documentation values.
 - New settings go in `.env.example`, in the module's section, with
-  their default.
+  their default and a comment, in the same change that adds them. The
+  checks fail when the code reads a setting the file does not list (see
+  "Settings and .env.example" in docs/development.md).
 - Keep each file's line endings (some files use CRLF).
 
 ## Checks

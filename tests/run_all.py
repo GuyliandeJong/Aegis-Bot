@@ -645,6 +645,16 @@ EXPECTED = {
         "edited at startup: (503, 'The bot restarted, so these buttons no longer work. Use `/torrent cleanup` to remove these torrents.', None)",
         "left after startup: []",
     ],
+    "check_env_example.py": [
+        "problem: none",
+        "a setting removed          : ['PC_GAMES_DIR is read by the code but missing from the example']",
+        "a setting nothing reads    : ['SOME_OLD_SETTING is in the example but nothing reads it']",
+        "a setting listed twice     : ['PC_GAMES_DIR is listed twice']",
+        "a module without a section : ['module minecraft has no section']",
+        "a heading that is wrong    : ['the uptime heading does not name UPTIME_URLS']",
+        "sub-headings removed       : long sections flagged",
+        "ignored names, each with a reason: True",
+    ],
     "check_esxi.py": [
         "datastore media      capacity=4000 GiB free=1000 GiB accessible=True",
         "vm homeassistant  poweredOn",

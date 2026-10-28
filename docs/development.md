@@ -76,12 +76,36 @@ that imports it (`grep -r "modules.<name>"`).
    (`warning`, `critical`, `recovered`, `info`, `success`), never to a
    channel directly, so maintenance mode and mirrors apply.
 5. Add every setting to `.env.example` in a section for the module,
-   with its default, and read it with `os.getenv` (or add it to
-   `config/settings.py`). Never put addresses, names or credentials in
-   code as defaults.
+   with its default (see "Settings and .env.example" below), and read
+   it with `os.getenv` (or add it to `config/settings.py`). Never put
+   addresses, names or credentials in code as defaults.
 6. Add `tests/check_<name>.py` and its expected lines in
    `tests/run_all.py`. `tests/check_modules.py` checks every
    `module.py` automatically.
+
+## Settings and .env.example
+
+`.env.example` is the one list of settings. Whoever adds a setting adds
+it there in the same change, and keeps the file tidy:
+
+- One section per module, headed `Module: <name>. On when: <the
+  required settings>`, in the style of the others. The settings a
+  module needs to switch on must be inside its section and named in
+  its heading.
+- Every setting is shown with its default and a comment that says what
+  it does and its unit. Empty means off or unset. Settings that belong
+  together sit in one block, separated from the next by a blank line.
+- A section with more than 12 settings is split with sub-headings, a
+  line such as `# -- Search (Jackett) --` above each group. Split a
+  section before it gets long, not after.
+- A setting that is no longer read is removed from the file.
+
+`tests/check_env_example.py` enforces this: it fails for a setting the
+code or the host scripts read that is missing, a listed setting nothing
+reads, a name listed twice, a module without a section, a heading that
+does not name the module's required settings, and a long section without
+sub-headings. A name the code mentions that is not a setting goes in
+`IGNORE` in that check, with the reason.
 
 ## Checks
 

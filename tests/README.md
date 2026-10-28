@@ -20,6 +20,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 
 | Script | Covers | Stand-ins |
 |---|---|---|
+| `check_cam_releases.py` | Cam and telesync releases hidden for movies (not PC), a search word never counted, the text when only those exist, the "Watch for a better release" button, the watchlist ignoring releases already seen | Fake search results |
 | `check_library_flow.py` | Reading title, year, season and episode from release names; the Jellyfin refresh and "Now in Jellyfin" message after a torrent completes | Local fake Jellyfin |
 | `check_modules.py` | Every module loads; MODULES and missing settings decide what runs; the startup report shows no values; summary fields follow their module; bot.py stops without the Discord values | Real modules, stand-in environment |
 | `check_pc_library.py` | PC search looks in the games folder first: name matching, an unset, missing or slow folder, the embed and button, the button going on to Jackett | Temporary folder, fake Jackett |

@@ -21,6 +21,31 @@ ROOT = TESTS.parent
 # Output that must appear for a check to count as passed. These are the
 # results that matter; the rest of the output is context for a reader.
 EXPECTED = {
+    "check_cam_releases.py": [
+        "Movies : ['Resident Evil 2026 1080p WEB-DL x265', 'Resident Evil 2026 720p WEBRip'] | hidden: 5",
+        "PC     : 7 kept | hidden: 0",
+        "Series : 7 kept | hidden: 0",
+        "query 'Cam 2018': ['Cam.2018.1080p.WEB-DL'] | hidden: 2",
+        "ordinary titles : ['Monsters.2010.1080p.BluRay.x265'] | hidden: 1",
+        "Movies reject_low_quality: True",
+        "turned off: 7 kept | hidden: 0",
+        "an older preferences file without the key: 2 kept | hidden: 5",
+        "message: Only cam or telesync releases found for **Resident Evil 2026** (3 hidden).",
+        "buttons: ['Watch for it']",
+        "pressed: Only cam or telesync releases of **Resident Evil 2026** yet.",
+        "entry: Resident Evil 2026 Movies | seen: None",
+        "message: No magnet-capable results found for **Obscure Film 1971**.",
+        "buttons: ['dropdown', 'Watch for a better release', 'Cancel']",
+        "someone else may press: False",
+        "private: True",
+        "entry: Resident Evil 2026 Movies | seen: 2 keys",
+        "again: **Resident Evil 2026** is already on your watchlist.",
+        "same releases      : None",
+        "one new release    : 1 new torrent result found.",
+        "only a new camrip  : None",
+        "entry without seen : 2 torrent results found.",
+        "key without a hash : rutracker|same title 1080p",
+    ],
     "check_library_flow.py": [
         "'The Dark Knight Rises'  year=2012 season=None episode=None",
         "'Fallout'                year=None season=2 episode=3",

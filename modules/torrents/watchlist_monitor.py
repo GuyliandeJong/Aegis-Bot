@@ -127,9 +127,19 @@ class WatchlistMonitor(BaseMonitor):
             )
         )
 
+        # Releases the person already saw and passed on do not count.
+        seen = set(entry.get("seen") or [])
+        results = [
+            result
+            for result in results
+            if watchlist.result_key(result) not in seen
+        ]
+
         if results:
+            new = "new " if seen else ""
+
             return (
-                f"{len(results)} torrent result"
+                f"{len(results)} {new}torrent result"
                 f"{'s' if len(results) != 1 else ''} found."
             )
 

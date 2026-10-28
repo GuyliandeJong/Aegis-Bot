@@ -67,12 +67,35 @@ def _save() -> None:
         )
 
 
-def add(query: str, category: str, user_id: int, channel_id: int) -> tuple[bool, str]:
+def result_key(result: dict) -> str:
+    """
+    Identifies a torrent result across searches: its info hash, or the
+    indexer and title when the indexer gives no hash.
+    """
+    info_hash = str(result.get("info_hash") or "").strip().lower()
+
+    if info_hash:
+        return info_hash
+
+    return f"{result.get('indexer')}|{result.get('title')}".lower()[:200]
+
+
+def add(
+    query: str,
+    category: str,
+    user_id: int,
+    channel_id: int,
+    seen: list[str] | None = None,
+) -> tuple[bool, str]:
     """
     Add a title to someone's watchlist.
 
     Returns (added, reason). The same title in the same category is
     only listed once per person.
+
+    `seen` holds the result_key of releases the person has already
+    seen and did not want; the entry only counts releases not in it as
+    found. Without it, any result counts.
     """
     query = " ".join(str(query or "").split())
 
@@ -94,16 +117,19 @@ def add(query: str, category: str, user_id: int, channel_id: int) -> tuple[bool,
             "one with `/torrent watchlist` first."
         )
 
-    _load().append(
-        {
-            "id": uuid.uuid4().hex[:12],
-            "query": query,
-            "category": category,
-            "user_id": str(user_id),
-            "channel_id": str(channel_id or ""),
-            "added": int(time.time()),
-        }
-    )
+    entry = {
+        "id": uuid.uuid4().hex[:12],
+        "query": query,
+        "category": category,
+        "user_id": str(user_id),
+        "channel_id": str(channel_id or ""),
+        "added": int(time.time()),
+    }
+
+    if seen:
+        entry["seen"] = [str(key) for key in seen][:100]
+
+    _load().append(entry)
     _save()
 
     return True, ""

@@ -14,6 +14,7 @@ from modules.jellyfin.jellyfin_download import (
     expire_view,
     find_missing_content,
 )
+from modules.torrents import watchlist
 from modules.torrents.torrent.watchlist import WatchlistAddView
 from modules.torrents.jackett_service import JackettService
 from modules.jellyfin.jellyfin_compare import (
@@ -93,6 +94,51 @@ class TorrentSearchSelect(discord.ui.Select):
             interaction,
             int(self.values[0]),
         )
+
+
+class TorrentSearchWatchButton(discord.ui.Button):
+    """Watch the title until a release that is not in this list turns up."""
+
+    def __init__(self, search_view):
+        self.search_view = search_view
+
+        super().__init__(
+            label="Watch for a better release",
+            style=discord.ButtonStyle.secondary,
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction,
+    ):
+        view = self.search_view
+
+        added, reason = watchlist.add(
+            view.query,
+            view.category,
+            interaction.user.id,
+            getattr(interaction.channel, "id", 0),
+            seen=[watchlist.result_key(r) for r in view.results],
+        )
+
+        if added:
+            logger.info(
+                "[Watchlist] %s is watching for a better release of "
+                "'%s' (%s).",
+                interaction.user,
+                view.query,
+                view.category,
+            )
+            text = (
+                f"**{view.query}** is on your watchlist. The bot checks "
+                "twice a day and mentions you when a release turns up "
+                "that is not in this list. `/torrent watchlist` shows "
+                "your list."
+            )
+        else:
+            text = reason
+
+        await interaction.response.send_message(text, ephemeral=True)
 
 
 class TorrentSearchCancelButton(discord.ui.Button):
@@ -203,6 +249,7 @@ class TorrentSearchView(ExpiringView):
         category,
         results,
         torrent_cog,
+        query=None,
     ):
         super().__init__(timeout=180)
 
@@ -210,11 +257,18 @@ class TorrentSearchView(ExpiringView):
         self.category = category
         self.results = results
         self.torrent_cog = torrent_cog
+        self.query = query
         self.message = None
 
         self.add_item(
             TorrentSearchSelect(self)
         )
+
+        # Only when the search text is known: the watchlist searches it.
+        if query:
+            self.add_item(
+                TorrentSearchWatchButton(self)
+            )
 
         self.add_item(
             TorrentSearchCancelButton(self)
@@ -1790,6 +1844,7 @@ class TorrentSearchMixin:
             category=category,
             results=ranked_results,
             torrent_cog=self,
+            query=query,
         )
 
         try:

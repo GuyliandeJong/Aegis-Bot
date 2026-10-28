@@ -213,7 +213,9 @@ class TorrentWatchlistMixin:
         if not entries:
             await interaction.response.send_message(
                 "Your watchlist is empty. When `/torrent search` finds "
-                "nothing, press **Watch for it** to add the title.",
+                "nothing, press **Watch for it** to add the title; "
+                "under a list of results, **Watch for a better "
+                "release** does the same and ignores those results.",
                 ephemeral=True,
             )
             return

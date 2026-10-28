@@ -221,15 +221,35 @@ user name on each server. A server without it shows ▫️, and the reply
 says which setting is missing or which user was not found. The reply
 is private.
 
+### Cam and telesync releases
+
+Movie searches never offer cam, telesync and similar recordings (words
+such as `CAM`, `CAMRip`, `HDCAM`, `HDTS`, `HDTC`, `TS`, `TELESYNC`).
+They are left out of the list, and a word of the search itself is never
+counted: looking for the film "Cam" still finds it. Other categories
+are not filtered. `reject_low_quality` under Movies in
+`config/torrent_preferences.json` turns it off (a copy of that file in
+`data/` overrides the default).
+
+When only such releases exist, the message says so, with how many were
+hidden, and offers **Watch for it**.
+
 ### Watchlist
 
-When `/torrent search` finds nothing, the message offers **Watch for
-it**. Twice a day the bot looks again: first on every Jellyfin server,
-then on Jackett with the same search and relevance filter as
-`/torrent search`. When the title turns up, the person who asked is
+When `/torrent search` finds nothing, or only cam releases, the message
+offers **Watch for it**. Under a list of results, **Watch for a better
+release** does the same and remembers the releases in that list: they
+no longer count, so only a release you have not seen turns the title
+up. Twice a day the bot looks again: first on every Jellyfin server,
+then on Jackett with the same search, relevance filter and cam filter
+as `/torrent search`. When the title turns up, the person who asked is
 mentioned in the channel they searched in, with a **Show results**
 button that runs the normal search. The title is then removed from the
 watchlist. Each person can watch up to 25 titles.
+
+A new release only means one that was not in the list, not that it is
+good: judge it in **Show results**, and press the button there again to
+keep waiting.
 
 ### Seeding and cleanup
 

@@ -76,6 +76,14 @@
                 "iso": -60,
                 "uncompressed": -60
             }
+        },
+        "Music": {
+            "format_scores": {
+                "flac": 30,
+                "lossless": 15,
+                "other lossless": 5,
+                "lossy": -40
+            }
         }
     }
 }

@@ -305,6 +305,7 @@ class Torrent(
     @app_commands.describe(
         query="Title or release to search for.",
         category="qBittorrent category to download into.",
+        format="Music only: FLAC shows lossless FLAC releases and nothing else.",
     )
     @app_commands.choices(
         category=[
@@ -325,17 +326,29 @@ class Torrent(
                 value="PC",
             ),
         ],
+        format=[
+            app_commands.Choice(
+                name="Any",
+                value="Any",
+            ),
+            app_commands.Choice(
+                name="FLAC only",
+                value="FLAC",
+            ),
+        ],
     )
     async def torrent_search(
         self,
         interaction: discord.Interaction,
         query: str,
         category: app_commands.Choice[str],
+        format: app_commands.Choice[str] | None = None,
     ):
         await self._search(
             interaction,
             query=query,
             category=category.value,
+            lossless=format is not None and format.value == "FLAC",
         )
 
     @torrent_group.command(

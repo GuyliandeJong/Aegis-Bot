@@ -44,6 +44,9 @@ class Ranked(list):
     # Releases left out because they are listed under another category.
     other = 0
 
+    # Releases left out of a FLAC-only search because they are not FLAC.
+    not_flac = 0
+
 
 class TorrentSearchSelect(discord.ui.Select):
     """Dropdown used to choose a Jackett search result."""
@@ -122,6 +125,7 @@ class TorrentSearchWatchButton(discord.ui.Button):
             interaction.user.id,
             getattr(interaction.channel, "id", 0),
             seen=[watchlist.result_key(r) for r in view.results],
+            lossless=view.lossless,
         )
 
         if added:
@@ -253,6 +257,7 @@ class TorrentSearchView(ExpiringView):
         results,
         torrent_cog,
         query=None,
+        lossless=False,
     ):
         super().__init__(timeout=180)
 
@@ -261,6 +266,8 @@ class TorrentSearchView(ExpiringView):
         self.results = results
         self.torrent_cog = torrent_cog
         self.query = query
+        # A FLAC-only search: a watchlist entry made from it stays so.
+        self.lossless = lossless
         self.message = None
 
         self.add_item(
@@ -472,6 +479,61 @@ class TorrentSearchMixin:
         groups = cls._kind_groups(result)
 
         return bool(allowed and groups and not groups & allowed)
+
+    # Words, not substrings: "FLAC24", "24bit-FLAC" and "[FLAC 24-96]"
+    # count, "Flacco" does not.
+    FLAC_PATTERN = re.compile(r"(?<![a-z])flac(?![a-z])")
+    LOSSLESS_PATTERN = re.compile(r"(?<![a-z])lossless(?![a-z])")
+    OTHER_LOSSLESS_PATTERN = re.compile(
+        r"(?<![a-z])(?:ape|alac|wavpack|wv|wav|tta|dsd)(?![a-z])"
+    )
+    LOSSY_PATTERN = re.compile(
+        r"(?<![a-z])(?:mp3|aac|m4a|ogg|opus|wma)(?![a-z])"
+        r"|\b\d{2,3}\s?kbps\b"
+    )
+
+    # Torznab categories: Audio/MP3 and Audio/Lossless.
+    AUDIO_MP3 = 3010
+    AUDIO_LOSSLESS = 3040
+
+    @classmethod
+    def _audio_format(cls, result):
+        """
+        "flac", "lossless" (a lossless release that does not say which
+        codec), "other lossless" (APE, ALAC, WavPack, WAV...), "lossy"
+        or "unknown", from the title and the indexer's category.
+
+        A title that names FLAC is FLAC. A title that names a lossy or
+        another lossless format beats the category: indexers file
+        mixed releases under Audio/Lossless.
+        """
+        title = str(result.get("title") or "").lower()
+        categories = result.get("categories") or []
+
+        if cls.FLAC_PATTERN.search(title):
+            return "flac"
+
+        if cls.LOSSY_PATTERN.search(title) or (
+            cls.AUDIO_MP3 in categories
+            and cls.AUDIO_LOSSLESS not in categories
+        ):
+            return "lossy"
+
+        if cls.OTHER_LOSSLESS_PATTERN.search(title):
+            return "other lossless"
+
+        if (
+            cls.AUDIO_LOSSLESS in categories
+            or cls.LOSSLESS_PATTERN.search(title)
+        ):
+            return "lossless"
+
+        return "unknown"
+
+    @classmethod
+    def _is_flac(cls, result):
+        """Whether a result may be offered in a FLAC-only search."""
+        return cls._audio_format(result) in {"flac", "lossless"}
 
     @classmethod
     def _is_low_quality(cls, title, query):
@@ -1067,6 +1129,24 @@ class TorrentSearchMixin:
                 "large source release"
             )
 
+        # Audio format, for categories that score it (Music).
+        format_scores = category_preferences.get("format_scores")
+
+        if isinstance(format_scores, dict):
+            audio_format = cls._audio_format(result)
+            format_score = int(format_scores.get(audio_format, 0))
+            score += format_score
+
+            label = {
+                "flac": "FLAC",
+                "lossless": "lossless",
+                "other lossless": "lossless, not FLAC",
+                "lossy": "lossy format",
+            }.get(audio_format)
+
+            if label and format_score:
+                reasons.insert(0, label)
+
         size = max(
             0,
             int(
@@ -1198,13 +1278,16 @@ class TorrentSearchMixin:
             f"Sources: {', '.join(source_names)}"
         )
 
-        hidden = (
-            getattr(results, "hidden", 0)
-            + getattr(results, "other", 0)
-        )
+        hidden = [
+            (getattr(results, "hidden", 0), "cam"),
+            (getattr(results, "other", 0), "other categories"),
+            (getattr(results, "not_flac", 0), "not FLAC"),
+        ]
+        total = sum(count for count, _ in hidden)
 
-        if hidden:
-            footer += f" · {hidden} hidden (cam, other categories)"
+        if total:
+            reasons = ", ".join(label for count, label in hidden if count)
+            footer += f" · {total} hidden ({reasons})"
 
         embed.set_footer(text=footer)
 
@@ -1419,6 +1502,7 @@ class TorrentSearchMixin:
         self,
         query,
         category,
+        lossless=False,
     ):
         """
         Search Jackett and rank the results by the preferences.
@@ -1427,6 +1511,8 @@ class TorrentSearchMixin:
         finds nothing. Returns (ranked results, errors per indexer,
         the query that was searched, whether it was broadened).
         Raises when Jackett cannot be searched at all.
+
+        `lossless` (Music only) offers FLAC releases and nothing else.
         """
         service = JackettService()
 
@@ -1581,6 +1667,27 @@ class TorrentSearchMixin:
 
             results = kept
 
+        # A FLAC-only search: everything not shown to be FLAC goes,
+        # including releases that say nothing about their format.
+        not_flac = 0
+
+        if lossless and category == "Music":
+            kept = [
+                result
+                for result in results
+                if self._is_flac(result)
+            ]
+            not_flac = len(results) - len(kept)
+            results = kept
+
+            if not_flac:
+                logger.info(
+                    "[TorrentSearch] Hid %d release(s) that are not "
+                    "FLAC for '%s'.",
+                    not_flac,
+                    query,
+                )
+
         has_preferred_resolution = (
             self._has_preferred_resolution(
                 results,
@@ -1631,6 +1738,7 @@ class TorrentSearchMixin:
         )
         ranked_results.hidden = hidden
         ranked_results.other = other
+        ranked_results.not_flac = not_flac
 
         return (
             ranked_results,
@@ -1645,11 +1753,15 @@ class TorrentSearchMixin:
         query,
         category,
         skip_jellyfin=False,
+        lossless=False,
     ):
         """Search Jellyfin first, then Jackett if necessary."""
         query = str(
             query or ""
         ).strip()
+
+        # FLAC-only is a Music option; other categories ignore it.
+        lossless = bool(lossless) and category == "Music"
 
         if not query:
             await interaction.response.send_message(
@@ -1840,6 +1952,7 @@ class TorrentSearchMixin:
             ) = await self._find_torrents(
                 query,
                 category,
+                **({"lossless": True} if lossless else {}),
             )
 
         except Exception as ex:
@@ -1874,15 +1987,17 @@ class TorrentSearchMixin:
 
             hidden = getattr(ranked_results, "hidden", 0)
             other = getattr(ranked_results, "other", 0)
+            not_flac = getattr(ranked_results, "not_flac", 0)
 
             view = WatchlistAddView(
                 interaction.user.id,
                 query,
                 category,
-                hidden=hidden + other,
+                hidden=hidden + other + not_flac,
+                lossless=lossless,
             )
 
-            if hidden or other:
+            if hidden or other or not_flac:
                 parts = []
 
                 if other:
@@ -1893,10 +2008,15 @@ class TorrentSearchMixin:
                 if hidden:
                     parts.append(f"{hidden} cam or telesync")
 
+                if not_flac:
+                    parts.append(f"{not_flac} not FLAC")
+
                 found = (
-                    f"Nothing usable found for **{query}**. "
+                    f"{'No FLAC release' if lossless else 'Nothing usable'} "
+                    f"found for **{query}**. "
                     f"Hidden: {', '.join(parts)}.{detail}\n"
-                    "Press **Watch for it** to be told when a proper "
+                    "Press **Watch for it** to be told when a "
+                    f"{'FLAC ' if lossless else 'proper '}"
                     "release turns up."
                 )
             else:
@@ -1936,6 +2056,7 @@ class TorrentSearchMixin:
             results=ranked_results,
             torrent_cog=self,
             query=query,
+            lossless=lossless,
         )
 
         try:

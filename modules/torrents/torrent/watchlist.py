@@ -18,12 +18,15 @@ class WatchlistAddView(ExpiringView):
         query: str,
         category: str,
         hidden: int = 0,
+        lossless: bool = False,
     ):
         super().__init__(timeout=180)
 
         self.owner_id = owner_id
         self.query = query
         self.category = category
+        # A FLAC-only search: the entry keeps looking for FLAC only.
+        self.lossless = lossless
         # Releases left out of the search (cam, other categories).
         self.hidden = hidden
         self.message = None
@@ -64,6 +67,7 @@ class WatchlistAddView(ExpiringView):
             self.category,
             interaction.user.id,
             getattr(interaction.channel, "id", 0),
+            lossless=self.lossless,
         )
 
         if added:
@@ -73,11 +77,13 @@ class WatchlistAddView(ExpiringView):
                 self.query,
                 self.category,
             )
-            found = (
-                "Nothing usable found for"
-                if self.hidden
-                else "Nothing found for"
-            )
+            if self.lossless:
+                found = "No FLAC release of"
+            elif self.hidden:
+                found = "Nothing usable found for"
+            else:
+                found = "Nothing found for"
+
             text = (
                 f"{found} **{self.query}** yet. It is on "
                 "your watchlist now: the bot checks Jellyfin and "
@@ -133,11 +139,13 @@ class WatchlistFoundView(ExpiringView):
             return
 
         # The normal search: Jellyfin first, then Jackett, with the
-        # usual buttons. It replaces this notification.
+        # usual buttons. It replaces this notification. A FLAC-only
+        # entry searches FLAC-only.
         await cog._search(
             interaction,
             query=self.entry["query"],
             category=self.entry["category"],
+            **({"lossless": True} if self.entry.get("lossless") else {}),
         )
 
 
@@ -189,7 +197,8 @@ class WatchlistRemoveView(ExpiringView):
 
 def watchlist_embed(entries: list[dict]) -> discord.Embed:
     lines = [
-        f"• **{entry['query']}** ({entry['category']}), "
+        f"• **{entry['query']}** "
+        f"({entry['category']}{', FLAC only' if entry.get('lossless') else ''}), "
         f"since <t:{entry['added']}:D>"
         for entry in entries
     ]

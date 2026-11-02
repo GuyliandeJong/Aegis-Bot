@@ -25,6 +25,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_library_flow.py` | Reading title, year, season and episode from release names; the Jellyfin refresh and "Now in Jellyfin" message after a torrent completes | Local fake Jellyfin |
 | `check_modules.py` | Every module loads; MODULES and missing settings decide what runs; the startup report shows no values; summary fields follow their module; bot.py stops without the Discord values | Real modules, stand-in environment |
 | `check_pc_library.py` | PC search looks in the games folder first: name matching, an unset, missing or slow folder, the embed and button, the button going on to Jackett | Temporary folder, fake Jackett |
+| `check_music_flac.py` | Audio format read from title and category (FLAC spellings, other lossless, lossy), FLAC first in a normal Music search, a FLAC-only search, the option ignored outside Music, and a watchlist entry that keeps looking for FLAC through the button, the check and the Found message | Fake search results |
 | `check_monitors.py` | CPU and memory thresholds, alert cooldown, temperature recovery | Fake services and clock |
 | `check_jellyfin_lookup.py` | Searching several Jellyfin servers, title and year matching | Fake HTTP |
 | `check_server_health.py` | Power supplies, fans and voltages, the `/server` line, the weekly summary with outages, SSD wear, the heartbeat, `scripts/watchdog.sh` | Fake iDRAC data, clock, qBittorrent; fake `docker` and `curl` for the script |

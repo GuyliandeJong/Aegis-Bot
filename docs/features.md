@@ -280,6 +280,24 @@ mixed releases under Audio/Lossless.
   codecs; the result line says why ("FLAC", "lossless", "lossless, not
   FLAC"). The points are `format_scores` under Music in
   `config/torrent_preferences.json`.
+- **24-bit above 16-bit:** among lossless releases, one that says 24-bit
+  (`24bit`, `[24-96]`, Hi-Res, or one of RuTracker's Hi-Res forums)
+  scores `bit_depth_scores` `24-bit` (default +10) and one that says
+  16-bit (`16bit`, `16-44`, `16/44.1`) scores `16-bit` (default 0). The
+  result line shows "24-bit". The bonus is small on purpose: a 24-bit
+  ALAC still ranks below a 16-bit FLAC. Set both to 0 for no
+  preference, or raise `16-bit` to prefer the smaller CD-quality files.
+  A bare "24" in a title counts for nothing.
+- **Discographies below albums:** a title with "discography"
+  (also in Russian: "дискография") or a span of at least three years
+  (`1983-2016`) scores `discography_score` (default -25) and shows
+  "discography" in the result line. A single album with a few seeders
+  still ranks above a pack with hundreds. A search that contains the
+  word "discography" is not penalised. Anthology, collection and box set
+  are real album names and are not touched.
+- **Preferences copy in `data/`:** it replaces the shipped file as a
+  whole. If it has no `bit_depth_scores` or `discography_score`, the
+  defaults above apply.
 - **Nothing lossless found:** the message says "No lossless release
   found" with how many were hidden, and offers **Watch for it**. The
   watchlist then checks twice a day with the same rule, so a Music title

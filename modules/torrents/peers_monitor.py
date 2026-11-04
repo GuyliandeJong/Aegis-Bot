@@ -120,7 +120,8 @@ class NoPeersMonitor(BaseMonitor):
         except Exception as ex:
             logger.error("[NoPeersMonitor] Failed to save state: %s", ex)
 
-    async def _dht_enabled(self, service) -> bool | None:
+    @staticmethod
+    async def dht_enabled(service) -> bool | None:
         """True or False from the preferences; None when unknown."""
         try:
             preferences = await service.get_preferences()
@@ -144,7 +145,7 @@ class NoPeersMonitor(BaseMonitor):
             dht = None
 
             if isinstance(nodes, int) and not isinstance(nodes, bool) and nodes == 0:
-                dht = await self._dht_enabled(service)
+                dht = await self.dht_enabled(service)
         except Exception as ex:
             # Down or restarting: not counted either way.
             logger.warning("[NoPeersMonitor] qBittorrent not reachable: %s", ex)

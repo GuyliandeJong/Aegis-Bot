@@ -2,6 +2,7 @@
 
 import discord
 
+from modules.torrents.peers_monitor import NoPeersMonitor
 from modules.torrents.vpn_monitor import VpnMonitor
 from modules.torrents.qbittorrent_service import QBittorrentService
 from utils import theme
@@ -26,6 +27,12 @@ class TorrentStatusMixin:
         try:
             version = await service.get_version()
             transfer = await service.get_transfer_info()
+
+            # Zero DHT nodes is only a problem while DHT is turned on.
+            dht = None
+
+            if NoPeersMonitor.enabled() and transfer.get("dht_nodes") == 0:
+                dht = await NoPeersMonitor.dht_enabled(service)
 
         except Exception as ex:
             logger.exception(
@@ -123,6 +130,24 @@ class TorrentStatusMixin:
                     True,
                 )
             )
+
+        # Nodes qBittorrent is in contact with to find peers; none
+        # for a while means it needs a restart (see NoPeersMonitor).
+        nodes = transfer.get("dht_nodes")
+
+        if (
+            NoPeersMonitor.enabled()
+            and isinstance(nodes, int)
+            and not isinstance(nodes, bool)
+        ):
+            if nodes > 0:
+                peers = f"{nodes} DHT nodes"
+            elif dht is False:
+                peers = "DHT off"
+            else:
+                peers = f"{theme.WARNING_EMOJI} No DHT nodes"
+
+            fields.append(EmbedField("Peers", peers, True))
 
         embed = create_embed(
             interaction=interaction,

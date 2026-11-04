@@ -513,7 +513,7 @@ EXPECTED = {
         "address 185.65.134.80  -> VPN field: ['OK']",
         "address 203.0.113.7    -> VPN field: ['⚠️ Not behind VPN']",
         "address None           -> VPN field: ['Unknown']",
-        "VPN_CHECK=false -> fields: ['Version', 'Connection', 'Download Speed', 'Upload Speed', 'Downloaded', 'Uploaded']",
+        "VPN_CHECK=false -> fields: ['Version', 'Connection', 'Download Speed', 'Upload Speed', 'Downloaded', 'Uploaded', 'Peers']",
         "VPN_CHECK=false -> requests: []",
         "qBittorrent not configured -> requests: []",
     ],

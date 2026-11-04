@@ -124,7 +124,6 @@ class WatchlistMonitor(BaseMonitor):
             await searcher._find_torrents(
                 entry["query"],
                 entry["category"],
-                **({"lossless": True} if entry.get("lossless") else {}),
             )
         )
 

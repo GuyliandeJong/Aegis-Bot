@@ -1,4 +1,4 @@
-"""Music: the audio format is read from the title and the category (FLAC spellings, other lossless codecs, lossy), FLAC ranks first in a normal Music search, a FLAC-only search offers FLAC and nothing else, the option is ignored for other categories, and a watchlist entry keeps looking for FLAC through the button, the check and the Found message."""
+"""Music: the audio format is read from the title and the category (FLAC spellings, other lossless codecs, lossy), a Music search offers FLAC and nothing else (also without a Music section in the preferences, and unless flac_only is false), FLAC still ranks first, other categories are untouched, /torrent search has no format option, and a watchlist entry for Music waits for FLAC."""
 import asyncio
 import logging
 import os
@@ -8,12 +8,16 @@ from pathlib import Path
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 m = types.ModuleType("utils.logger"); m.logger = logging.getLogger("aegis"); sys.modules["utils.logger"] = m
-c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(ALERT_CHANNEL_ID=10); sys.modules["config.settings"] = c
+c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(
+    ALERT_CHANNEL_ID=10, QBITTORRENT_HOST="h", QBITTORRENT_PORT=1, QBITTORRENT_TIMEOUT=5,
+    QBITTORRENT_USERNAME="u", QBITTORRENT_PASSWORD="p", DISCORD_USER_ID="")
+sys.modules["config.settings"] = c
 for key in [k for k in os.environ if k.startswith("JELLYFIN_")]:
     del os.environ[key]
 os.environ.update({"JACKETT_URL": "http://127.0.0.1:1", "JACKETT_API_KEY": "k"})
 
 import discord
+from discord.ext import commands
 from modules.torrents import watchlist as W
 import modules.torrents.torrent.search as SM
 import modules.torrents.torrent.watchlist as WV
@@ -36,26 +40,26 @@ def release(title, number, categories=None, seeders=50):
 A = "Aurora Falls - Night Drive"
 print("== the format of a release ==")
 CASES = [
-    (f"{A} (2024) [FLAC]", [3040], "flac"),
-    (f"{A} (2024) FLAC24", None, "flac"),
-    (f"{A} 24bit-FLAC", None, "flac"),
-    (f"{A} [FLAC 24-96]", None, "flac"),
-    (f"{A} FLAC + MP3", [3040], "flac"),
-    ("Aurora Flacco - Night Drive", None, "unknown"),
-    (f"{A} MP3 320kbps", [3010], "lossy"),
-    (f"{A} 256 kbps", None, "lossy"),
-    (f"{A} MP3", [3040], "lossy"),
-    (f"{A}", [3010], "lossy"),
-    (f"{A} (Lossless)", None, "lossless"),
-    (f"{A}", [3040], "lossless"),
-    (f"{A} APE", [3040], "other lossless"),
-    (f"{A} [ALAC]", None, "other lossless"),
-    (f"{A} WavPack", None, "other lossless"),
-    (f"{A} 2024", None, "unknown"),
+    (f"{A} (2024) [FLAC]", [3040]),
+    (f"{A} (2024) FLAC24", None),
+    (f"{A} 24bit-FLAC", None),
+    (f"{A} [FLAC 24-96]", None),
+    (f"{A} FLAC + MP3", [3040]),
+    ("Aurora Flacco - Night Drive", None),
+    (f"{A} MP3 320kbps", [3010]),
+    (f"{A} 256 kbps", None),
+    (f"{A} MP3", [3040]),
+    (f"{A}", [3010]),
+    (f"{A} (Lossless)", None),
+    (f"{A}", [3040]),
+    (f"{A} APE", [3040]),
+    (f"{A} [ALAC]", None),
+    (f"{A} WavPack", None),
+    (f"{A} 2024", None),
 ]
-for title, categories, _expected in CASES:
+for title, categories in CASES:
     r = release(title, 1, categories)
-    print(f"  {title:34} {str(categories):8} -> {SM.TorrentSearchMixin._audio_format(r):15} FLAC search: {SM.TorrentSearchMixin._is_flac(r)}")
+    print(f"  {title:34} {str(categories):8} -> {SM.TorrentSearchMixin._audio_format(r):15} offered: {SM.TorrentSearchMixin._is_flac(r)}")
 
 
 class Cog(TorrentFormattingMixin, SM.TorrentSearchMixin, WV.TorrentWatchlistMixin):
@@ -76,30 +80,48 @@ MIXED = lambda: [
 ]
 
 
-async def find(category, lossless=False, results=None):
+async def find(category, results=None):
     Cog.raw = results if results is not None else MIXED()
-    kwargs = {"lossless": True} if lossless else {}
-    ranked, _e, _q, _f = await Cog()._find_torrents("Aurora Falls Night Drive", category, **kwargs)
+    ranked, _e, _q, _f = await Cog()._find_torrents("Aurora Falls Night Drive", category)
     return ranked
 
 
 def short(title): return title.replace(f"{A} ", "")
 
 
-async def ranking():
-    print("\n== a normal Music search ranks by format ==")
+def with_preferences(change):
+    """Run searches with the shipped preferences changed by `change`."""
+    real = SM.TorrentSearchMixin._load_preferences
+    shipped = real(Cog())
+    SM.TorrentSearchMixin._load_preferences = lambda self: change(shipped)
+    return real
+
+
+async def searches():
+    print("\n== a Music search offers FLAC and nothing else ==")
     ranked = await find("Music")
     for r in ranked:
         print(f"  {r['score']:4} {short(r['title']):22} {r['score_reason']}")
-    print("  hidden:", ranked.hidden, ranked.other, ranked.not_flac)
-
-    print("\n== a FLAC-only search ==")
-    ranked = await find("Music", lossless=True)
-    print("  shown :", [short(r["title"]) for r in ranked])
     print("  hidden:", ranked.not_flac, "not FLAC | cam:", ranked.hidden, "| other categories:", ranked.other)
     print("  footer:", Cog()._build_search_embed("q", "Music", ranked, {}).footer.text)
-    ranked = await find("Movies", lossless=True)
-    print("  asked for Movies, nothing hidden for format:", ranked.not_flac)
+
+    print("\n== without a Music section in the preferences ==")
+    real = with_preferences(lambda p: {**p, "categories": {k: v for k, v in p["categories"].items() if k != "Music"}})
+    ranked = await find("Music")
+    print("  shown:", [short(r["title"]) for r in ranked], "| hidden:", ranked.not_flac)
+    SM.TorrentSearchMixin._load_preferences = real
+
+    print("\n== flac_only turned off ==")
+    real = with_preferences(lambda p: {**p, "categories": {**p["categories"], "Music": {**p["categories"]["Music"], "flac_only": False}}})
+    ranked = await find("Music")
+    print("  shown:", len(ranked), "| hidden:", ranked.not_flac, "| first:", short(ranked[0]["title"]), "| last:", short(ranked[-1]["title"]))
+    SM.TorrentSearchMixin._load_preferences = real
+
+    print("\n== other categories are not filtered for format ==")
+    plain = lambda: [release(f"{A} 2024 MP3", 1), release(f"{A} 2024", 2), release(f"{A} 2024 FLAC", 3)]
+    for category in ("Movies", "Series", "PC"):
+        ranked = await find(category, plain())
+        print(f"  {category:6}: {len(ranked)} shown | not FLAC: {ranked.not_flac}")
 
 
 class Message:
@@ -138,82 +160,63 @@ def clear():
 
 
 async def flows():
-    print("\n== the option ==")
-    calls = []
-
-    class Spy(Cog):
-        async def _find_torrents(self, query, category, **kwargs):
-            calls.append((category, kwargs))
-            return await super()._find_torrents(query, category, **kwargs)
-
-    Cog.raw = MIXED()
-    for category, lossless in (("Music", True), ("Music", False), ("Movies", True)):
-        await Spy()._search(Inter(), query="Aurora Falls Night Drive", category=category, lossless=lossless)
-    print("  find called with:", calls)
-
     print("\n== nothing FLAC found ==")
     Cog.raw = [release(f"{A} 2024 MP3 320kbps", 1, [3010]), release(f"{A} 2024 APE", 2, [3040]), release(f"{A} 2024", 3, None)]
-    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music", lossless=True)
+    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
     k = last(i)
     print("  message:", k["content"].replace("\n", " | "))
     press = Inter(); await k["view"].children[0].callback(press)
     print("  pressed:", last(press)["content"][:48])
-    print("  entry:", [(e["query"], e["category"], e.get("lossless")) for e in W.all_entries()])
-    print("  the same title as a normal search is another entry:", W.add("Aurora Falls Night Drive", "Music", 1, 55)[0], "| a second FLAC one is refused:", W.add("Aurora Falls Night Drive", "Music", 1, 55, lossless=True)[0])
-    print("  /torrent watchlist:", [l.split(", since")[0] for l in WV.watchlist_embed(W.all_entries()).description.splitlines()[:2]])
+    print("  entry:", [(e["query"], e["category"], sorted(set(e) - {"id", "query", "category", "user_id", "channel_id", "added"})) for e in W.all_entries()])
+    print("  /torrent watchlist:", WV.watchlist_embed(W.all_entries()).description.splitlines()[0].split(", since")[0])
     clear()
 
-    print("\n== watching from a list of FLAC results ==")
+    print("\n== watching from a list of results ==")
     Cog.raw = MIXED()
-    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music", lossless=True)
+    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
     k = last(i)
     print("  buttons:", [getattr(b, "label", None) or "dropdown" for b in k["view"].children], "| footer:", k["embed"].footer.text.split(" · ")[-1])
     button = next(b for b in k["view"].children if getattr(b, "label", "") == "Watch for a better release")
     press = Inter(); await button.callback(press)
     entry = W.all_entries()[-1]
-    print("  entry:", entry["query"], entry["category"], "| FLAC:", entry.get("lossless"), "| seen:", len(entry["seen"]))
-    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
-    button = next(b for b in last(i)["view"].children if getattr(b, "label", "") == "Watch for a better release")
-    press = Inter(); await button.callback(press)
-    print("  from a normal search:", [e.get("lossless") for e in W.all_entries()])
-    clear()
+    print("  entry:", entry["query"], entry["category"], "| seen:", len(entry["seen"]))
 
 
 async def watchlist():
-    print("\n== the watchlist keeps looking for FLAC ==")
-    asked = []
-
-    class Spy(Cog):
-        async def _find_torrents(self, query, category, **kwargs):
-            asked.append(kwargs)
-            return ([release(f"{A} FLAC", 9, [3040])], {}, query, False)
-
+    print("\n== the watchlist waits for FLAC ==")
     mon = WM.WatchlistMonitor(types.SimpleNamespace(bot=None))
-    flac_entry = {"id": "a", "query": "Aurora Falls Night Drive", "category": "Music", "lossless": True}
-    old_entry = {"id": "b", "query": "Aurora Falls Night Drive", "category": "Music"}
-    print("  FLAC entry :", await mon.look_for(Spy(), flac_entry), "| asked with", asked[-1])
-    print("  old entry  :", await mon.look_for(Spy(), old_entry), "| asked with", asked[-1])
+    entry = W.all_entries()[-1]
+    Cog.raw = [release(f"{A} MP3 320kbps", 1, [3010]), release(f"{A} 2024", 2, None)]
+    print("  only MP3 and untagged:", await mon.look_for(Cog(), {"id": "a", "query": "Aurora Falls Night Drive", "category": "Music"}))
+    Cog.raw = [release(f"{A} MP3 320kbps", 1, [3010]), release(f"{A} (2024) [FLAC]", 9, [3040])]
+    print("  a FLAC release turns up:", await mon.look_for(Cog(), {"id": "a", "query": "Aurora Falls Night Drive", "category": "Music"}))
+    print("  an entry from the earlier test version, with lossless: True:", await mon.look_for(Cog(), {"id": "b", "query": "Aurora Falls Night Drive", "category": "Music", "lossless": True}))
+    print("  seen releases still ignored:", await mon.look_for(Cog(), {**entry, "seen": [W.result_key(r) for r in Cog.raw]}))
+    clear()
 
-    searches = []
+    searches_made = []
 
     class Torrent:
-        async def _search(self, interaction, query, category, **kwargs): searches.append((query, category, kwargs))
+        async def _search(self, interaction, query, category, **kwargs): searches_made.append((query, category, kwargs))
 
     bot = types.SimpleNamespace(get_cog=lambda name: Torrent())
-    for entry in (flac_entry, old_entry):
-        view = WV.WatchlistFoundView(bot, {**entry, "user_id": "1"})
-        await view._show(Inter())
-    print("  Show results:", searches)
+    view = WV.WatchlistFoundView(bot, {"id": "a", "query": "Aurora Falls Night Drive", "category": "Music", "user_id": "1", "lossless": True})
+    await view._show(Inter())
+    print("  Show results runs:", searches_made)
 
-    # A FLAC-only search that finds only MP3 is not "found" by the check.
-    Cog.raw = [release(f"{A} MP3 320kbps", 1, [3010])]
-    print("  only MP3, FLAC entry :", await mon.look_for(Cog(), flac_entry))
-    print("  only MP3, normal entry:", await mon.look_for(Cog(), old_entry))
+
+async def command():
+    print("\n== /torrent search ==")
+    bot = commands.Bot(command_prefix="!", intents=discord.Intents.default())
+    await bot.load_extension("modules.torrents.commands.torrent")
+    search = bot.tree.get_command("torrent").get_command("search")
+    print("  options:", [o["name"] for o in search.to_dict(bot.tree)["options"]])
 
 
 async def main():
-    await ranking()
+    await searches()
     await flows()
     await watchlist()
+    await command()
 
 asyncio.run(main())

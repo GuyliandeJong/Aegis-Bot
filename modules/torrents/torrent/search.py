@@ -125,7 +125,6 @@ class TorrentSearchWatchButton(discord.ui.Button):
             interaction.user.id,
             getattr(interaction.channel, "id", 0),
             seen=[watchlist.result_key(r) for r in view.results],
-            lossless=view.lossless,
         )
 
         if added:
@@ -257,7 +256,6 @@ class TorrentSearchView(ExpiringView):
         results,
         torrent_cog,
         query=None,
-        lossless=False,
     ):
         super().__init__(timeout=180)
 
@@ -266,8 +264,6 @@ class TorrentSearchView(ExpiringView):
         self.results = results
         self.torrent_cog = torrent_cog
         self.query = query
-        # A FLAC-only search: a watchlist entry made from it stays so.
-        self.lossless = lossless
         self.message = None
 
         self.add_item(
@@ -1502,7 +1498,6 @@ class TorrentSearchMixin:
         self,
         query,
         category,
-        lossless=False,
     ):
         """
         Search Jackett and rank the results by the preferences.
@@ -1512,7 +1507,8 @@ class TorrentSearchMixin:
         the query that was searched, whether it was broadened).
         Raises when Jackett cannot be searched at all.
 
-        `lossless` (Music only) offers FLAC releases and nothing else.
+        Music offers FLAC releases and nothing else, unless `flac_only`
+        under Music in the preferences is false.
         """
         service = JackettService()
 
@@ -1667,11 +1663,14 @@ class TorrentSearchMixin:
 
             results = kept
 
-        # A FLAC-only search: everything not shown to be FLAC goes,
+        # Music is FLAC-only: everything not shown to be FLAC goes,
         # including releases that say nothing about their format.
         not_flac = 0
 
-        if lossless and category == "Music":
+        if category == "Music" and category_preferences.get(
+            "flac_only",
+            True,
+        ):
             kept = [
                 result
                 for result in results
@@ -1753,15 +1752,11 @@ class TorrentSearchMixin:
         query,
         category,
         skip_jellyfin=False,
-        lossless=False,
     ):
         """Search Jellyfin first, then Jackett if necessary."""
         query = str(
             query or ""
         ).strip()
-
-        # FLAC-only is a Music option; other categories ignore it.
-        lossless = bool(lossless) and category == "Music"
 
         if not query:
             await interaction.response.send_message(
@@ -1952,7 +1947,6 @@ class TorrentSearchMixin:
             ) = await self._find_torrents(
                 query,
                 category,
-                **({"lossless": True} if lossless else {}),
             )
 
         except Exception as ex:
@@ -1994,7 +1988,6 @@ class TorrentSearchMixin:
                 query,
                 category,
                 hidden=hidden + other + not_flac,
-                lossless=lossless,
             )
 
             if hidden or other or not_flac:
@@ -2011,12 +2004,14 @@ class TorrentSearchMixin:
                 if not_flac:
                     parts.append(f"{not_flac} not FLAC")
 
+                flac = category == "Music" and not_flac
+
                 found = (
-                    f"{'No FLAC release' if lossless else 'Nothing usable'} "
+                    f"{'No FLAC release' if flac else 'Nothing usable'} "
                     f"found for **{query}**. "
                     f"Hidden: {', '.join(parts)}.{detail}\n"
                     "Press **Watch for it** to be told when a "
-                    f"{'FLAC ' if lossless else 'proper '}"
+                    f"{'FLAC ' if flac else 'proper '}"
                     "release turns up."
                 )
             else:
@@ -2056,7 +2051,6 @@ class TorrentSearchMixin:
             results=ranked_results,
             torrent_cog=self,
             query=query,
-            lossless=lossless,
         )
 
         try:

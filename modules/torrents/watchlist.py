@@ -86,7 +86,6 @@ def add(
     user_id: int,
     channel_id: int,
     seen: list[str] | None = None,
-    lossless: bool = False,
 ) -> tuple[bool, str]:
     """
     Add a title to someone's watchlist.
@@ -97,9 +96,6 @@ def add(
     `seen` holds the result_key of releases the person has already
     seen and did not want; the entry only counts releases not in it as
     found. Without it, any result counts.
-
-    `lossless` marks a FLAC-only search (Music): the same title as a
-    normal search is a separate entry, and it keeps looking for FLAC.
     """
     query = " ".join(str(query or "").split())
 
@@ -112,7 +108,6 @@ def add(
         if (
             entry["query"].lower() == query.lower()
             and entry["category"] == category
-            and bool(entry.get("lossless")) == bool(lossless)
         ):
             return False, f"**{query}** is already on your watchlist."
 
@@ -133,9 +128,6 @@ def add(
 
     if seen:
         entry["seen"] = [str(key) for key in seen][:100]
-
-    if lossless:
-        entry["lossless"] = True
 
     _load().append(entry)
     _save()

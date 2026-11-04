@@ -238,8 +238,52 @@ async def command():
     print("  options:", [o["name"] for o in search.to_dict(bot.tree)["options"]])
 
 
+async def quality():
+    print("\n== bit depth and discographies ==")
+    for title, categories in [
+        (f"{A} [FLAC 24-96]", None), (f"{A} FLAC 24bit", None), (f"{A} Hi-Res", None),
+        (f"{A} FLAC 16-bit", None), (f"{A} FLAC 16/44.1", None), (f"{A} [FLAC] 16-44", None),
+        (f"{A} FLAC", None), (f"{A} Night 24 Hours FLAC", None), (f"{A} FLAC 1624", None),
+        (HIRES, [3000, 101890]),
+    ]:
+        r = release(title, 1, categories)
+        label = title[len(A):][:28] if title.startswith(A) else "RuTracker Hi-Res forum"
+        print(f"  depth {label:30} -> {SM.TorrentSearchMixin._bit_depth(r)}")
+    for title, query in [
+        (f"{A} - Discography (1998-2024) FLAC", A), (f"{A} Дискография FLAC", A), (f"{A} 1983-2016 FLAC", A),
+        (f"{A} (2015-2016) FLAC", A), (f"{A} Anthology FLAC", A), (f"{A} Box Set FLAC", A),
+        (f"{A} Complete Collection FLAC", A), (f"{A} Discography FLAC", f"{A} discography"),
+    ]:
+        print(f"  discography {title[len(A):][:34]:36} query {query[len(A):] or 'plain':14} -> {SM.TorrentSearchMixin._is_discography(title, query)}")
+
+    print("\n== how they rank ==")
+    ranked = await find("Music", [release(f"{A} (2024) [FLAC] 16-bit", 1, None, 50), release(f"{A} (2024) [FLAC] 24-bit", 2, None, 50)])
+    print("  same seeders      :", [(short(r["title"]), r["score"]) for r in ranked])
+    ranked = await find("Music", [release(f"{A} (2024) [FLAC] 16-bit", 1, None, 50), release(f"{A} (2024) [ALAC] 24-bit", 2, None, 50)])
+    print("  24-bit ALAC vs 16-bit FLAC:", [short(r["title"]) for r in ranked])
+    pack = release(f"{A} - Discography (1998-2024) [FLAC]", 3, None, 900)
+    album = release(f"{A} (2024) [FLAC]", 4, None, 5)
+    ranked = await find("Music", [dict(pack), dict(album)])
+    print("  pack with 900 seeders vs album with 5:", [(short(r["title"]), r["score_reason"].split(",")[0]) for r in ranked])
+    Cog.raw = [dict(pack), dict(album)]
+    asked, _e, _q, _f = await Cog()._find_torrents(f"{A} discography", "Music")
+    print("  the search asks for a discography:", [short(r["title"]) for r in asked])
+    ranked = await find("Movies", [release("Some Film 1998-2024 Collection 1080p", 5, [2040], 5)])
+    print("  other categories:", [r["score_reason"] for r in ranked])
+
+    real = with_preferences(lambda p: {**p, "categories": {**p["categories"], "Music": {k: v for k, v in p["categories"]["Music"].items() if k not in {"bit_depth_scores", "discography_score"}}}})
+    ranked = await find("Music", [dict(pack), dict(album)])
+    print("  a copy in data/ without the two keys:", [short(r["title"]) for r in ranked])
+    SM.TorrentSearchMixin._load_preferences = real
+    real = with_preferences(lambda p: {**p, "categories": {**p["categories"], "Music": {**p["categories"]["Music"], "bit_depth_scores": {"24-bit": 0, "16-bit": 0}, "discography_score": 0}}})
+    ranked = await find("Music", [dict(pack), dict(album)])
+    print("  both set to 0:", [short(r["title"]) for r in ranked])
+    SM.TorrentSearchMixin._load_preferences = real
+
+
 async def main():
     await searches()
+    await quality()
     await flows()
     await watchlist()
     await command()

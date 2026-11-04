@@ -172,6 +172,7 @@ class WeeklySummaryMonitor(BaseMonitor):
         ("jellyfin", "📥 Copied from Jellyfin", "_copies"),
         ("jellyfin", "🆕 New in Jellyfin", "_new_in_jellyfin"),
         ("wan", "🌐 Internet", "_outages"),
+        ("torrents", "🧲 qBittorrent peers", "_no_peers"),
         ("backup", "🗄️ Backup", "_backup"),
         ("jellyfin", "💬 Subtitles", "_subtitles"),
         ("jellyfin", "🍿 Watched this week", "_watched"),
@@ -660,6 +661,38 @@ class WeeklySummaryMonitor(BaseMonitor):
             return "Not available."
 
     @staticmethod
+    def _restart_counts(entries: list[dict]) -> str:
+        """"newt restarted 2×; other failed 1×", per container."""
+        counts = {}
+
+        for entry in entries:
+            name = entry.get("container") or "?"
+            ok, failed = counts.get(name, (0, 0))
+            counts[name] = (ok + 1, failed) if entry.get("ok") else (ok, failed + 1)
+
+        parts = []
+
+        for name, (ok, failed) in counts.items():
+            done = [f"restarted {ok}×"] if ok else []
+            done += [f"failed {failed}×"] if failed else []
+            parts.append(f"{name} " + ", ".join(done))
+
+        return "; ".join(parts)
+
+    @staticmethod
+    def _no_peers(since: float) -> str | None:
+        """Restarts made because qBittorrent had no peers (NoPeersMonitor)."""
+        restarts = activity_log.since(since, "no_peers_restart")
+
+        if not restarts:
+            return None
+
+        return (
+            WeeklySummaryMonitor._restart_counts(restarts)
+            + " after it lost all its peers."
+        )
+
+    @staticmethod
     def _outages(since: float) -> str:
         outages = activity_log.since(since, "wan_outage")
         restarts = activity_log.since(since, "wan_restart")
@@ -676,23 +709,7 @@ class WeeklySummaryMonitor(BaseMonitor):
 
         # Restarts after outages (WAN_RECOVERY_RESTART), per container.
         if restarts:
-            counts = {}
-
-            for entry in restarts:
-                name = entry.get("container") or "?"
-                ok, failed = counts.get(name, (0, 0))
-                counts[name] = (ok + 1, failed) if entry.get("ok") else (ok, failed + 1)
-
-            parts = []
-
-            for name, (ok, failed) in counts.items():
-                done = [f"restarted {ok}×"] if ok else []
-                done += [f"failed {failed}×"] if failed else []
-                text = f"{name} " + ", ".join(done)
-
-                parts.append(text)
-
-            line += "\nAfter outages: " + "; ".join(parts) + "."
+            line += "\nAfter outages: " + WeeklySummaryMonitor._restart_counts(restarts) + "."
 
         return line
 

@@ -49,18 +49,31 @@ EDITION = re.compile(
 )
 
 
+# Roman numerals in game titles ("Hades II", "Diablo IV", "Final
+# Fantasy VII") are read as numbers, so a search for "Hades 2" finds
+# them. Only these multi-letter numerals count: "X" in "Mega Man X" and
+# "I" in "I Am Alive" are words, and "mix" or "dim" are not numerals.
+ROMAN = {
+    "ii": "2", "iii": "3", "iv": "4", "vi": "6", "vii": "7", "viii": "8",
+    "ix": "9", "xi": "11", "xii": "12", "xiii": "13", "xiv": "14",
+    "xv": "15", "xvi": "16", "xvii": "17", "xviii": "18", "xix": "19",
+    "xx": "20",
+}
+
+
 def normalise(title: str) -> str:
     """
     Words of a title for comparison. Unlike movie titles, every number
     is kept: "Football Manager 2024" and "2025" are different games.
     Only the release year pc_title() puts in parentheses is dropped.
+    Roman numerals II to XX become digits (see ROMAN).
     """
     text = re.sub(r"\s*\((?:19|20)\d{2}\)\s*$", "", str(title or ""))
     text = text.lower().replace("'", "").replace("’", "")
     text = EDITION.sub(" ", text)
     text = re.sub(r"[^a-z0-9]+", " ", text)
 
-    return re.sub(r"\s+", " ", text).strip()
+    return " ".join(ROMAN.get(word, word) for word in text.split())
 
 
 def matches(query: str, name: str) -> bool:

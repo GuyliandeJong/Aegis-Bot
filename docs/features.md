@@ -8,7 +8,7 @@ off, and its commands and alerts do not exist.
 
 | Command | What it does | Who can use it | Module |
 |---|---|---|---|
-| `/torrent search` | Checks Jellyfin first (or the PC games folder for PC), then searches Jackett and adds the chosen result to qBittorrent; Music searches offer FLAC releases only | Everyone | torrents |
+| `/torrent search` | Checks Jellyfin first (or the PC games folder for PC), then searches Jackett and adds the chosen result to qBittorrent; Music searches offer lossless releases only, FLAC first | Everyone | torrents |
 | `/torrent add` | Adds a magnet link to qBittorrent | Everyone | torrents |
 | `/torrent list` | Lists torrents, with filter, sort and live refresh | Everyone | torrents |
 | `/torrent info` | Details and controls for one torrent | Everyone | torrents |
@@ -250,30 +250,31 @@ How an indexer maps its own categories decides what is hidden: Jackett's
 definitions put adult releases of 1337x and The Pirate Bay under 6xxx,
 for example, but RuTracker has no adult category.
 
-### Music and FLAC
+### Music and lossless
 
-A Music search offers FLAC and nothing else. The bot reads each
-release's audio format from its title and its category: `flac` (the
-title names FLAC, in any spelling such as `[FLAC 24-96]`, `FLAC24` or
-`24bit-FLAC`), `lossless` (filed under Audio/Lossless or called
-"lossless", codec not named), `other lossless` (APE, ALAC, WavPack, WAV:
-not FLAC), `lossy` (MP3, AAC, OGG, Opus, or an Audio/MP3 category) or
-`unknown`. A title that names a format wins over the category, because
-indexers file mixed releases under Audio/Lossless.
+A Music search offers lossless releases and nothing else, FLAC first. The
+bot reads each release's audio format from its title and its category:
+`flac` (the title names FLAC, in any spelling such as `[FLAC 24-96]`,
+`FLAC24` or `24bit-FLAC`), `other lossless` (APE, ALAC, WavPack, TAK,
+TTA, WAV or DSD), `lossless` (filed under Audio/Lossless or called
+"lossless", codec not named), `lossy` (MP3, AAC, OGG, Opus, or an
+Audio/MP3 category) or `unknown`. A title that names a lossless format
+is lossless even when it also mentions MP3 ("Lossless + MP3"); a title
+that names only a lossy format beats the category, because indexers file
+mixed releases under Audio/Lossless.
 
-- **What is offered:** `flac` and `lossless` releases. Everything else
-  is hidden: MP3 and other lossy releases, APE, ALAC, WavPack and WAV
-  releases, and releases that say nothing about their format. "FLAC +
-  MP3" is kept, since it contains FLAC. The footer says how many were
-  hidden ("3 hidden (not FLAC)").
-- **Ranking:** FLAC comes before unnamed lossless, and the result line
-  says why ("FLAC", "lossless"). The points are `format_scores` under
-  Music in `config/torrent_preferences.json`.
-- **Nothing FLAC found:** the message says "No FLAC release found" with
-  how many were hidden, and offers **Watch for it**. The watchlist then
-  checks twice a day, with the same FLAC-only rule, so a Music title
-  waits for a FLAC release.
-- **Turning it off:** `flac_only` under Music in
+- **What is offered:** `flac`, `lossless` and `other lossless`. Hidden
+  are lossy releases and releases that say nothing about their format.
+  The footer says how many were hidden ("2 hidden (not lossless)").
+- **Ranking:** FLAC first, then lossless, then the other lossless
+  codecs; the result line says why ("FLAC", "lossless", "lossless, not
+  FLAC"). The points are `format_scores` under Music in
+  `config/torrent_preferences.json`.
+- **Nothing lossless found:** the message says "No lossless release
+  found" with how many were hidden, and offers **Watch for it**. The
+  watchlist then checks twice a day with the same rule, so a Music title
+  waits for a lossless release.
+- **Turning it off:** `lossless_only` under Music in
   `config/torrent_preferences.json`; `false` offers every format again,
   ranked FLAC first. Without the key, or without a Music section at all,
   it is on. A copy of the file in `data/` replaces the shipped one.

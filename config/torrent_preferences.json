@@ -84,7 +84,12 @@
                 "lossless": 15,
                 "other lossless": 5,
                 "lossy": -40
-            }
+            },
+            "bit_depth_scores": {
+                "24-bit": 10,
+                "16-bit": 0
+            },
+            "discography_score": -25
         }
     }
 }

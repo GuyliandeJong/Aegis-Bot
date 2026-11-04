@@ -267,6 +267,15 @@ mixed releases under Audio/Lossless.
 - **What is offered:** `flac`, `lossless` and `other lossless`. Hidden
   are lossy releases and releases that say nothing about their format.
   The footer says how many were hidden ("2 hidden (not lossless)").
+- **RuTracker's Hi-Res forums count as lossless.** Jackett files them
+  under plain Audio and adds the forum as a custom category (100000 plus
+  the forum number), and their titles often name no format, such as
+  `[TR24][OF] Artist - Album - 2026 (Alternative Metal)`. The 15 forums
+  whose name contains "Hi-Res" in Jackett's RuTracker definition are
+  listed in `RUTRACKER_HI_RES_FORUMS` in `search.py`; the rule only
+  applies to results of `rutracker`, and a lossy word in the title still
+  wins. A forum RuTracker adds later is not known until the list is
+  updated.
 - **Ranking:** FLAC first, then lossless, then the other lossless
   codecs; the result line says why ("FLAC", "lossless", "lossless, not
   FLAC"). The points are `format_scores` under Music in

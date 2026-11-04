@@ -402,6 +402,7 @@ state changes.
 | Torrent | Completed downloads | 10 s |
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 | VPN | qBittorrent using the home address, or reporting no connection | 2 min |
+| No peers | qBittorrent without DHT nodes after a network drop | 2 min |
 
 The container monitor alerts once when a container crashes (exits
 with another code than a normal stop: 0, 137 or 143), turns unhealthy
@@ -447,6 +448,32 @@ tunnel is the usual cause. Older qBittorrent versions do not report
 their address, so only the connection is watched. `VPN_CHECK=false`
 turns this off. `/torrent status` shows the result as VPN: OK, Not
 behind VPN or Unknown.
+
+The no-peers monitor covers a different failure: after a network drop
+(a switch restarting, the VPN reconnecting) qBittorrent can stay dead.
+Its WebUI answers and it reports "firewalled", which is normal behind a
+VPN, but it has no DHT nodes and torrents sit on "downloading
+metadata". When `dht_nodes` stays at 0 for `QBITTORRENT_NO_PEERS_MINUTES`
+(default 10, 0 turns it off) and DHT is enabled in qBittorrent,
+"qBittorrent Has No Peers" is posted once and "qBittorrent Has Peers
+Again" when nodes return. Checks that cannot reach qBittorrent are not
+counted. It does not depend on `VPN_CHECK`.
+
+With `QBITTORRENT_NO_PEERS_RESTART` set to a container name (for
+example `qbittorrentvpn`) the container is also restarted through
+Portainer, with the same protection as `/container restart`: the
+container must not be in `PORTAINER_PROTECTED`. After a restart nothing
+is counted for 10 minutes, since DHT needs time to bootstrap. At most
+two restarts are made per six hours; if peers are still missing,
+"qBittorrent Restart Did Not Help" is posted and nothing is restarted
+until peers return. Without the setting, or without Portainer, it only
+alerts.
+
+`WAN_RECOVERY_RESTART` restarts containers within about a minute of an
+outage ending (an outage needs `WAN_RECOVERY_MIN_OUTAGE`, 60 seconds by
+default, to count). This monitor waits ten minutes, so it only acts when
+that did not happen or did not help; adding the same container to both
+is safe.
 
 Monitor state is kept in `data/` so a restart does not repeat alerts.
 

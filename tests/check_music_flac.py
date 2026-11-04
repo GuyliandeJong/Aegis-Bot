@@ -73,7 +73,7 @@ for title, categories in CASES:
 
 
 print("\n== RuTracker's Hi-Res forums ==")
-HIRES = "[TR24][OF][LDR] Five Finger Death Punch - Legacy - 2026 (Alternative Metal)"
+HIRES = "[TR24][OF][LDR] Aurora Falls - Night Drive - 2026 (Alternative Metal)"
 for label, title, categories, indexer in [
     ("hi-res forum, no format in the title", HIRES, [3000, 101890], "rutracker"),
     ("another hi-res forum (Rock)", "Artist - Album - 2020 (Rock)", [3000, 101755], "rutracker"),

@@ -485,7 +485,14 @@ class TorrentSearchMixin:
     )
     LOSSY_PATTERN = re.compile(
         r"(?<![a-z])(?:mp3|aac|m4a|ogg|opus|wma)(?![a-z])"
-        r"|\b\d{2,3}\s?kbps\b"
+        r"|\b\d{2,3}[\s_]?kbps\b"
+    )
+    # 24-bit or hi-res markers ("24bit", "[24-96]", "24/48", "Hi-Res"):
+    # lossless audio even when no codec is named. A lossy word beats it.
+    HI_RES_PATTERN = re.compile(
+        r"\b24[\s_-]?bit\b"
+        r"|\b24[\s/_-](?:44|48|88|96|176|192)\b"
+        r"|(?<![a-z])hi[\s_-]?res(?![a-z])"
     )
 
     # Torznab categories: Audio/MP3 and Audio/Lossless.
@@ -502,7 +509,8 @@ class TorrentSearchMixin:
         A title that names a lossless format is lossless, even when it
         also mentions MP3 ("Lossless + MP3"). A title that names only a
         lossy format beats the category: indexers file mixed releases
-        under Audio/Lossless.
+        under Audio/Lossless. 24-bit and hi-res markers count as
+        lossless when nothing says lossy.
         """
         title = str(result.get("title") or "").lower()
         categories = result.get("categories") or []
@@ -521,6 +529,9 @@ class TorrentSearchMixin:
             and cls.AUDIO_LOSSLESS not in categories
         ):
             return "lossy"
+
+        if cls.HI_RES_PATTERN.search(title):
+            return "lossless"
 
         if cls.AUDIO_LOSSLESS in categories:
             return "lossless"

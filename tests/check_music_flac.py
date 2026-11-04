@@ -58,6 +58,13 @@ CASES = [
     (f"{A} TAK", None),
     (f"{A} Lossless + MP3", None),
     (f"{A} APE + MP3 320kbps", [3010]),
+    (f"{A} Metal (2026) 320_kbps Beats", [3000]),
+    (f"{A} [24-96]", [3000]),
+    (f"{A} 24bit 96kHz", None),
+    (f"{A} 24/48", None),
+    (f"{A} Hi-Res", None),
+    (f"{A} 24/48 MP3", None),
+    (f"{A} Night 24 Hours", None),
     (f"{A} 2024", None),
 ]
 for title, categories in CASES:

@@ -205,6 +205,13 @@ EXPECTED = {
         "seen releases still ignored: None",
         "Show results runs: [('Aurora Falls Night Drive', 'Music', {})]",
         "options: ['query', 'category']",
+        "Aurora Falls - Night Drive Metal (2026) 320_kbps Beats [3000]   -> lossy           offered: False",
+        "Aurora Falls - Night Drive [24-96] [3000]   -> lossless        offered: True",
+        "Aurora Falls - Night Drive 24bit 96kHz None     -> lossless        offered: True",
+        "Aurora Falls - Night Drive 24/48   None     -> lossless        offered: True",
+        "Aurora Falls - Night Drive Hi-Res  None     -> lossless        offered: True",
+        "Aurora Falls - Night Drive 24/48 MP3 None     -> lossy           offered: False",
+        "Aurora Falls - Night Drive Night 24 Hours None     -> unknown         offered: False",
     ],
     "check_jackett_search.py": [
         "\"Castlevania: Belmont's Curse\"   -> 'Castlevania Belmont Curse'",

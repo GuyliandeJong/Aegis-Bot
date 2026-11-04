@@ -78,7 +78,7 @@
             }
         },
         "Music": {
-            "flac_only": true,
+            "lossless_only": true,
             "format_scores": {
                 "flac": 30,
                 "lossless": 15,

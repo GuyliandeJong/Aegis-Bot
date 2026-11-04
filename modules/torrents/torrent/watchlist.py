@@ -74,7 +74,7 @@ class WatchlistAddView(ExpiringView):
                 self.category,
             )
             if self.category == "Music" and self.hidden:
-                found = "No FLAC release of"
+                found = "No lossless release of"
             elif self.hidden:
                 found = "Nothing usable found for"
             else:

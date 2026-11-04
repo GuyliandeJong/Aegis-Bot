@@ -1,4 +1,4 @@
-"""Music: the audio format is read from the title and the category (FLAC spellings, other lossless codecs, lossy), a Music search offers FLAC and nothing else (also without a Music section in the preferences, and unless flac_only is false), FLAC still ranks first, other categories are untouched, /torrent search has no format option, and a watchlist entry for Music waits for FLAC."""
+"""Music: the audio format is read from the title and the category (FLAC spellings, other lossless codecs, lossy), a Music search offers any lossless release and nothing else (also without a Music section in the preferences, and unless lossless_only is false), FLAC still ranks first, other categories are untouched, /torrent search has no format option, and a watchlist entry for Music waits for a lossless release."""
 import asyncio
 import logging
 import os
@@ -55,11 +55,14 @@ CASES = [
     (f"{A} APE", [3040]),
     (f"{A} [ALAC]", None),
     (f"{A} WavPack", None),
+    (f"{A} TAK", None),
+    (f"{A} Lossless + MP3", None),
+    (f"{A} APE + MP3 320kbps", [3010]),
     (f"{A} 2024", None),
 ]
 for title, categories in CASES:
     r = release(title, 1, categories)
-    print(f"  {title:34} {str(categories):8} -> {SM.TorrentSearchMixin._audio_format(r):15} offered: {SM.TorrentSearchMixin._is_flac(r)}")
+    print(f"  {title:34} {str(categories):8} -> {SM.TorrentSearchMixin._audio_format(r):15} offered: {SM.TorrentSearchMixin._is_lossless(r)}")
 
 
 class Cog(TorrentFormattingMixin, SM.TorrentSearchMixin, WV.TorrentWatchlistMixin):
@@ -77,6 +80,7 @@ MIXED = lambda: [
     release(f"{A} 2024", 5, None, 55),
     release(f"{A} 2024 APE", 6, [3040], 50),
     release(f"{A} 2024 FLAC + MP3", 7, [3040], 40),
+    release(f"{A} 2024 Lossless + MP3", 8, None, 30),
 ]
 
 
@@ -98,30 +102,30 @@ def with_preferences(change):
 
 
 async def searches():
-    print("\n== a Music search offers FLAC and nothing else ==")
+    print("\n== a Music search offers lossless releases and nothing else ==")
     ranked = await find("Music")
     for r in ranked:
         print(f"  {r['score']:4} {short(r['title']):22} {r['score_reason']}")
-    print("  hidden:", ranked.not_flac, "not FLAC | cam:", ranked.hidden, "| other categories:", ranked.other)
+    print("  hidden:", ranked.not_lossless, "not lossless | cam:", ranked.hidden, "| other categories:", ranked.other)
     print("  footer:", Cog()._build_search_embed("q", "Music", ranked, {}).footer.text)
 
     print("\n== without a Music section in the preferences ==")
     real = with_preferences(lambda p: {**p, "categories": {k: v for k, v in p["categories"].items() if k != "Music"}})
     ranked = await find("Music")
-    print("  shown:", [short(r["title"]) for r in ranked], "| hidden:", ranked.not_flac)
+    print("  shown:", [short(r["title"]) for r in ranked], "| hidden:", ranked.not_lossless)
     SM.TorrentSearchMixin._load_preferences = real
 
-    print("\n== flac_only turned off ==")
-    real = with_preferences(lambda p: {**p, "categories": {**p["categories"], "Music": {**p["categories"]["Music"], "flac_only": False}}})
+    print("\n== lossless_only turned off ==")
+    real = with_preferences(lambda p: {**p, "categories": {**p["categories"], "Music": {**p["categories"]["Music"], "lossless_only": False}}})
     ranked = await find("Music")
-    print("  shown:", len(ranked), "| hidden:", ranked.not_flac, "| first:", short(ranked[0]["title"]), "| last:", short(ranked[-1]["title"]))
+    print("  shown:", len(ranked), "| hidden:", ranked.not_lossless, "| first:", short(ranked[0]["title"]), "| last:", short(ranked[-1]["title"]))
     SM.TorrentSearchMixin._load_preferences = real
 
     print("\n== other categories are not filtered for format ==")
     plain = lambda: [release(f"{A} 2024 MP3", 1), release(f"{A} 2024", 2), release(f"{A} 2024 FLAC", 3)]
     for category in ("Movies", "Series", "PC"):
         ranked = await find(category, plain())
-        print(f"  {category:6}: {len(ranked)} shown | not FLAC: {ranked.not_flac}")
+        print(f"  {category:6}: {len(ranked)} shown | not lossless: {ranked.not_lossless}")
 
 
 class Message:
@@ -160,8 +164,8 @@ def clear():
 
 
 async def flows():
-    print("\n== nothing FLAC found ==")
-    Cog.raw = [release(f"{A} 2024 MP3 320kbps", 1, [3010]), release(f"{A} 2024 APE", 2, [3040]), release(f"{A} 2024", 3, None)]
+    print("\n== nothing lossless found ==")
+    Cog.raw = [release(f"{A} 2024 MP3 320kbps", 1, [3010]), release(f"{A} 2024 OGG", 2, None), release(f"{A} 2024", 3, None)]
     i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
     k = last(i)
     print("  message:", k["content"].replace("\n", " | "))
@@ -183,7 +187,7 @@ async def flows():
 
 
 async def watchlist():
-    print("\n== the watchlist waits for FLAC ==")
+    print("\n== the watchlist waits for a lossless release ==")
     mon = WM.WatchlistMonitor(types.SimpleNamespace(bot=None))
     entry = W.all_entries()[-1]
     Cog.raw = [release(f"{A} MP3 320kbps", 1, [3010]), release(f"{A} 2024", 2, None)]

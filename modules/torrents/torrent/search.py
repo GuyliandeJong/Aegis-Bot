@@ -44,8 +44,8 @@ class Ranked(list):
     # Releases left out because they are listed under another category.
     other = 0
 
-    # Releases left out of a FLAC-only search because they are not FLAC.
-    not_flac = 0
+    # Releases left out of a Music search because they are not lossless.
+    not_lossless = 0
 
 
 class TorrentSearchSelect(discord.ui.Select):
@@ -481,7 +481,7 @@ class TorrentSearchMixin:
     FLAC_PATTERN = re.compile(r"(?<![a-z])flac(?![a-z])")
     LOSSLESS_PATTERN = re.compile(r"(?<![a-z])lossless(?![a-z])")
     OTHER_LOSSLESS_PATTERN = re.compile(
-        r"(?<![a-z])(?:ape|alac|wavpack|wv|wav|tta|dsd)(?![a-z])"
+        r"(?<![a-z])(?:ape|alac|wavpack|wv|wav|tta|tak|dsd)(?![a-z])"
     )
     LOSSY_PATTERN = re.compile(
         r"(?<![a-z])(?:mp3|aac|m4a|ogg|opus|wma)(?![a-z])"
@@ -499,9 +499,10 @@ class TorrentSearchMixin:
         codec), "other lossless" (APE, ALAC, WavPack, WAV...), "lossy"
         or "unknown", from the title and the indexer's category.
 
-        A title that names FLAC is FLAC. A title that names a lossy or
-        another lossless format beats the category: indexers file
-        mixed releases under Audio/Lossless.
+        A title that names a lossless format is lossless, even when it
+        also mentions MP3 ("Lossless + MP3"). A title that names only a
+        lossy format beats the category: indexers file mixed releases
+        under Audio/Lossless.
         """
         title = str(result.get("title") or "").lower()
         categories = result.get("categories") or []
@@ -509,27 +510,31 @@ class TorrentSearchMixin:
         if cls.FLAC_PATTERN.search(title):
             return "flac"
 
+        if cls.OTHER_LOSSLESS_PATTERN.search(title):
+            return "other lossless"
+
+        if cls.LOSSLESS_PATTERN.search(title):
+            return "lossless"
+
         if cls.LOSSY_PATTERN.search(title) or (
             cls.AUDIO_MP3 in categories
             and cls.AUDIO_LOSSLESS not in categories
         ):
             return "lossy"
 
-        if cls.OTHER_LOSSLESS_PATTERN.search(title):
-            return "other lossless"
-
-        if (
-            cls.AUDIO_LOSSLESS in categories
-            or cls.LOSSLESS_PATTERN.search(title)
-        ):
+        if cls.AUDIO_LOSSLESS in categories:
             return "lossless"
 
         return "unknown"
 
     @classmethod
-    def _is_flac(cls, result):
-        """Whether a result may be offered in a FLAC-only search."""
-        return cls._audio_format(result) in {"flac", "lossless"}
+    def _is_lossless(cls, result):
+        """Whether a Music search may offer a result: FLAC or any lossless."""
+        return cls._audio_format(result) in {
+            "flac",
+            "lossless",
+            "other lossless",
+        }
 
     @classmethod
     def _is_low_quality(cls, title, query):
@@ -1277,7 +1282,7 @@ class TorrentSearchMixin:
         hidden = [
             (getattr(results, "hidden", 0), "cam"),
             (getattr(results, "other", 0), "other categories"),
-            (getattr(results, "not_flac", 0), "not FLAC"),
+            (getattr(results, "not_lossless", 0), "not lossless"),
         ]
         total = sum(count for count, _ in hidden)
 
@@ -1507,8 +1512,8 @@ class TorrentSearchMixin:
         the query that was searched, whether it was broadened).
         Raises when Jackett cannot be searched at all.
 
-        Music offers FLAC releases and nothing else, unless `flac_only`
-        under Music in the preferences is false.
+        Music offers lossless releases (FLAC first) and nothing else,
+        unless `lossless_only` under Music in the preferences is false.
         """
         service = JackettService()
 
@@ -1663,27 +1668,27 @@ class TorrentSearchMixin:
 
             results = kept
 
-        # Music is FLAC-only: everything not shown to be FLAC goes,
-        # including releases that say nothing about their format.
-        not_flac = 0
+        # Music is lossless-only: everything not shown to be lossless
+        # goes, including releases that say nothing about their format.
+        not_lossless = 0
 
         if category == "Music" and category_preferences.get(
-            "flac_only",
+            "lossless_only",
             True,
         ):
             kept = [
                 result
                 for result in results
-                if self._is_flac(result)
+                if self._is_lossless(result)
             ]
-            not_flac = len(results) - len(kept)
+            not_lossless = len(results) - len(kept)
             results = kept
 
-            if not_flac:
+            if not_lossless:
                 logger.info(
                     "[TorrentSearch] Hid %d release(s) that are not "
-                    "FLAC for '%s'.",
-                    not_flac,
+                    "lossless for '%s'.",
+                    not_lossless,
                     query,
                 )
 
@@ -1737,7 +1742,7 @@ class TorrentSearchMixin:
         )
         ranked_results.hidden = hidden
         ranked_results.other = other
-        ranked_results.not_flac = not_flac
+        ranked_results.not_lossless = not_lossless
 
         return (
             ranked_results,
@@ -1981,16 +1986,16 @@ class TorrentSearchMixin:
 
             hidden = getattr(ranked_results, "hidden", 0)
             other = getattr(ranked_results, "other", 0)
-            not_flac = getattr(ranked_results, "not_flac", 0)
+            not_lossless = getattr(ranked_results, "not_lossless", 0)
 
             view = WatchlistAddView(
                 interaction.user.id,
                 query,
                 category,
-                hidden=hidden + other + not_flac,
+                hidden=hidden + other + not_lossless,
             )
 
-            if hidden or other or not_flac:
+            if hidden or other or not_lossless:
                 parts = []
 
                 if other:
@@ -2001,17 +2006,17 @@ class TorrentSearchMixin:
                 if hidden:
                     parts.append(f"{hidden} cam or telesync")
 
-                if not_flac:
-                    parts.append(f"{not_flac} not FLAC")
+                if not_lossless:
+                    parts.append(f"{not_lossless} not lossless")
 
-                flac = category == "Music" and not_flac
+                music = category == "Music" and not_lossless
 
                 found = (
-                    f"{'No FLAC release' if flac else 'Nothing usable'} "
+                    f"{'No lossless release' if music else 'Nothing usable'} "
                     f"found for **{query}**. "
                     f"Hidden: {', '.join(parts)}.{detail}\n"
                     "Press **Watch for it** to be told when a "
-                    f"{'FLAC ' if flac else 'proper '}"
+                    f"{'lossless ' if music else 'proper '}"
                     "release turns up."
                 )
             else:

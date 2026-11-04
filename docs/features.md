@@ -256,8 +256,9 @@ A Music search offers lossless releases and nothing else, FLAC first. The
 bot reads each release's audio format from its title and its category:
 `flac` (the title names FLAC, in any spelling such as `[FLAC 24-96]`,
 `FLAC24` or `24bit-FLAC`), `other lossless` (APE, ALAC, WavPack, TAK,
-TTA, WAV or DSD), `lossless` (filed under Audio/Lossless or called
-"lossless", codec not named), `lossy` (MP3, AAC, OGG, Opus, or an
+TTA, WAV or DSD), `lossless` (filed under Audio/Lossless, called
+"lossless" or marked 24-bit or hi-res such as `[24-96]`, codec not
+named), `lossy` (MP3, AAC, OGG, Opus, or an
 Audio/MP3 category) or `unknown`. A title that names a lossless format
 is lossless even when it also mentions MP3 ("Lossless + MP3"); a title
 that names only a lossy format beats the category, because indexers file

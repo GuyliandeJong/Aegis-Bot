@@ -96,8 +96,9 @@ need the jellyfin module.
 
 - Every folder directly in it counts as a game, and so do installers
   and disc images (`.iso`, `.zip`, `.rar`, `.7z`, `.exe`, `.msi`,
-  `.img`); nothing deeper is read, and notes or pictures next to the
-  games are ignored. Names are cleaned like torrent names, so
+  `.img`); notes or pictures next to the games are ignored. By default
+  nothing deeper is read: see `PC_GAMES_DIR_DEPTH` below. Names are
+  cleaned like torrent names, so
   `Cyberpunk.2077.v2.1-GOG` is found as "Cyberpunk 2077" and
   `Game.iso` as "Game".
 - Every word you type must be in the name, so "Chop" and "Chop Chop"
@@ -107,6 +108,15 @@ need the jellyfin module.
 - Words like "Game of the Year Edition", "Deluxe Edition" and "GOTY"
   are ignored on both sides, and numbers count: "Football Manager 2024"
   does not match 2025.
+- Roman numerals from II to XX are read as numbers on both sides, so
+  "Hades 2" finds "Hades II" and "Diablo IV" finds "Diablo 4". A single
+  letter stays a letter: "Mega Man X" is not game 10.
+- **Subfolders:** with `PC_GAMES_DIR_DEPTH=2` (1 to 3, default 1) the
+  folders found are searched too, for games kept under a publisher or a
+  letter. A hit in a subfolder is shown with its path
+  (`Publisher/Game`). Deeper levels can also list a folder inside a game
+  whose name matches the search, such as `Binaries`, which is why the
+  default is 1. Folders that are links are not entered.
 - A missing, unreadable or slow folder (more than 10 seconds) is logged
   and the torrent search goes on.
 

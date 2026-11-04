@@ -12,7 +12,7 @@ off, and its commands and alerts do not exist.
 | `/torrent add` | Adds a magnet link to qBittorrent | Everyone | torrents |
 | `/torrent list` | Lists torrents, with filter, sort and live refresh | Everyone | torrents |
 | `/torrent info` | Details and controls for one torrent | Everyone | torrents |
-| `/torrent status` | qBittorrent version, transfer totals and whether it is behind its VPN | Everyone | torrents |
+| `/torrent status` | qBittorrent version, transfer totals, whether it is behind its VPN and how many DHT nodes it sees | Everyone | torrents |
 | `/torrent watchlist` | Titles you are waiting for; remove them | Everyone (own list) | torrents |
 | `/torrent cleanup` | Finished torrents by ratio and seeding time; remove them | Administrators | torrents |
 | `/torrent speed` | Show qBittorrent's speed limits; switch between normal and slow | Everyone sees; administrators switch | torrents |
@@ -420,7 +420,7 @@ state changes.
 | Containers | Crashed, unhealthy and restarting Docker containers, through Portainer | 60 s |
 | Backup | Last successful backup older than `BACKUP_MAX_AGE_DAYS` (8) | Hourly |
 | Watchlist | Titles people are waiting for | Twice a day |
-| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, what was watched, alerts, container updates | Once a week |
+| Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, what was watched, qBittorrent restarts for lost peers, alerts, container updates | Once a week |
 | Seed cleanup | Suggests removing torrents that are seeded enough | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, old snapshots, host reachable | 5 min |
@@ -502,6 +502,14 @@ outage ending (an outage needs `WAN_RECOVERY_MIN_OUTAGE`, 60 seconds by
 default, to count). This monitor waits ten minutes, so it only acts when
 that did not happen or did not help; adding the same container to both
 is safe.
+
+`/torrent status` shows the same signal in a Peers field: "312 DHT
+nodes", "No DHT nodes" with a warning mark, or "DHT off" when DHT is
+turned off in qBittorrent. The field is left out when the monitor is
+turned off or this qBittorrent does not report DHT nodes. The weekly
+summary has a "qBittorrent peers" line with the restarts made in the
+week ("qbittorrentvpn restarted 2× after it lost all its peers"); it is
+left out in a week without one.
 
 Monitor state is kept in `data/` so a restart does not repeat alerts.
 

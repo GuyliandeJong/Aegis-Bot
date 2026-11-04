@@ -29,8 +29,8 @@ WM.WatchlistMonitor.STATE_FILE = isolate.DATA / "watchlist_monitor.json"
 SM.TorrentSearchMixin.PREFERENCES_FILE = Path(__file__).resolve().parent.parent / "config" / "torrent_preferences.json"
 
 
-def release(title, number, categories=None, seeders=50):
-    result = {"title": title, "magnet": f"magnet:?xt=urn:btih:{number:040x}", "indexer": "rutracker", "seeders": seeders,
+def release(title, number, categories=None, seeders=50, indexer="rutracker"):
+    result = {"title": title, "magnet": f"magnet:?xt=urn:btih:{number:040x}", "indexer": indexer, "seeders": seeders,
               "leechers": 1, "grabs": 0, "size": 400_000_000, "info_hash": f"{number:040x}", "uploader": ""}
     if categories is not None:
         result["categories"] = categories
@@ -70,6 +70,20 @@ CASES = [
 for title, categories in CASES:
     r = release(title, 1, categories)
     print(f"  {title:34} {str(categories):8} -> {SM.TorrentSearchMixin._audio_format(r):15} offered: {SM.TorrentSearchMixin._is_lossless(r)}")
+
+
+print("\n== RuTracker's Hi-Res forums ==")
+HIRES = "[TR24][OF][LDR] Five Finger Death Punch - Legacy - 2026 (Alternative Metal)"
+for label, title, categories, indexer in [
+    ("hi-res forum, no format in the title", HIRES, [3000, 101890], "rutracker"),
+    ("another hi-res forum (Rock)", "Artist - Album - 2020 (Rock)", [3000, 101755], "rutracker"),
+    ("the same numbers on another indexer", HIRES, [3000, 101890], "thepiratebay"),
+    ("a RuTracker forum that is not Hi-Res", "Artist - Album - 2020 (Rock)", [3000, 101757 + 1], "rutracker"),
+    ("hi-res forum, but MP3 in the title", HIRES + " MP3", [3000, 101890], "rutracker"),
+    ("plain Audio, no forum", HIRES, [3000], "rutracker"),
+]:
+    r = release(title, 1, categories, indexer=indexer)
+    print(f"  {label:38} -> {SM.TorrentSearchMixin._audio_format(r):9} offered: {SM.TorrentSearchMixin._is_lossless(r)}")
 
 
 class Cog(TorrentFormattingMixin, SM.TorrentSearchMixin, WV.TorrentWatchlistMixin):

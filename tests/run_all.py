@@ -212,6 +212,12 @@ EXPECTED = {
         "Aurora Falls - Night Drive Hi-Res  None     -> lossless        offered: True",
         "Aurora Falls - Night Drive 24/48 MP3 None     -> lossy           offered: False",
         "Aurora Falls - Night Drive Night 24 Hours None     -> unknown         offered: False",
+        "hi-res forum, no format in the title   -> lossless  offered: True",
+        "another hi-res forum (Rock)            -> lossless  offered: True",
+        "the same numbers on another indexer    -> unknown   offered: False",
+        "a RuTracker forum that is not Hi-Res   -> unknown   offered: False",
+        "hi-res forum, but MP3 in the title     -> lossy     offered: False",
+        "plain Audio, no forum                  -> unknown   offered: False",
     ],
     "check_jackett_search.py": [
         "\"Castlevania: Belmont's Curse\"   -> 'Castlevania Belmont Curse'",

@@ -499,6 +499,21 @@ class TorrentSearchMixin:
     AUDIO_MP3 = 3010
     AUDIO_LOSSLESS = 3040
 
+    # RuTracker's Hi-Res forums. Jackett files them under plain Audio
+    # (3000, not Audio/Lossless) and adds the forum as a custom category,
+    # 100000 plus its number, so a Hi-Res release often says nothing about
+    # its format. The numbers are the forums whose name contains "Hi-Res"
+    # in Jackett's RuTracker definition (src/Jackett.Common/Indexers/
+    # Definitions/RuTracker.cs). Custom numbers differ per indexer, so
+    # this only applies to results of rutracker.
+    RUTRACKER_HI_RES_FORUMS = frozenset(
+        100000 + forum
+        for forum in (
+            1299, 1396, 1397, 1755, 1757, 1884, 1885, 1890, 1893,
+            2302, 2303, 2345, 2346, 2512, 2513,
+        )
+    )
+
     @classmethod
     def _audio_format(cls, result):
         """
@@ -509,8 +524,8 @@ class TorrentSearchMixin:
         A title that names a lossless format is lossless, even when it
         also mentions MP3 ("Lossless + MP3"). A title that names only a
         lossy format beats the category: indexers file mixed releases
-        under Audio/Lossless. 24-bit and hi-res markers count as
-        lossless when nothing says lossy.
+        under Audio/Lossless. 24-bit and hi-res markers, and RuTracker's
+        Hi-Res forums, count as lossless when nothing says lossy.
         """
         title = str(result.get("title") or "").lower()
         categories = result.get("categories") or []
@@ -531,6 +546,12 @@ class TorrentSearchMixin:
             return "lossy"
 
         if cls.HI_RES_PATTERN.search(title):
+            return "lossless"
+
+        if (
+            result.get("indexer") == "rutracker"
+            and cls.RUTRACKER_HI_RES_FORUMS.intersection(categories)
+        ):
             return "lossless"
 
         if cls.AUDIO_LOSSLESS in categories:

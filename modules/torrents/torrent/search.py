@@ -495,6 +495,25 @@ class TorrentSearchMixin:
         r"|(?<![a-z])hi[\s_-]?res(?![a-z])"
     )
 
+    # 16-bit (CD quality) markers: "16bit", "[16-44]", "16/44.1".
+    CD_QUALITY_PATTERN = re.compile(
+        r"\b16[\s_-]?bit\b"
+        r"|\b16[\s/_-](?:44|48)(?:[.,]1)?\b"
+    )
+
+    # A whole body of work in one release: the word, in English or
+    # Russian, or a span of years ("1983-2016").
+    DISCOGRAPHY_PATTERN = re.compile(r"discograph|дискографи")
+    YEAR_SPAN_PATTERN = re.compile(
+        r"(?<!\d)((?:19|20)\d{2})\s*[-\u2013\u2014]\s*((?:19|20)\d{2})(?!\d)"
+    )
+    YEAR_SPAN_MIN = 3
+
+    # Scores of a Music search when the preferences do not list them
+    # (a copy in data/ replaces the shipped file as a whole).
+    DEFAULT_BIT_DEPTH_SCORES = {"24-bit": 10, "16-bit": 0}
+    DEFAULT_DISCOGRAPHY_SCORE = -25
+
     # Torznab categories: Audio/MP3 and Audio/Lossless.
     AUDIO_MP3 = 3010
     AUDIO_LOSSLESS = 3040
@@ -558,6 +577,49 @@ class TorrentSearchMixin:
             return "lossless"
 
         return "unknown"
+
+    @classmethod
+    def _bit_depth(cls, result):
+        """
+        "24-bit" or "16-bit" when the release says so, otherwise None.
+
+        The same markers that make a release count as lossless without
+        a codec (24-bit and hi-res words, RuTracker's Hi-Res forums)
+        mean 24-bit here, so the two never disagree. A bare "24" does
+        not count: album titles contain numbers.
+        """
+        title = str(result.get("title") or "").lower()
+        categories = result.get("categories") or []
+
+        if cls.HI_RES_PATTERN.search(title) or (
+            result.get("indexer") == "rutracker"
+            and cls.RUTRACKER_HI_RES_FORUMS.intersection(categories)
+        ):
+            return "24-bit"
+
+        if cls.CD_QUALITY_PATTERN.search(title):
+            return "16-bit"
+
+        return None
+
+    @classmethod
+    def _is_discography(cls, title, query):
+        """
+        Whether a title is a whole discography rather than one album.
+        Not when the search itself asks for one.
+        """
+        title = str(title or "").lower()
+
+        if cls.DISCOGRAPHY_PATTERN.search(str(query or "").lower()):
+            return False
+
+        if cls.DISCOGRAPHY_PATTERN.search(title):
+            return True
+
+        return any(
+            int(end) - int(start) >= cls.YEAR_SPAN_MIN
+            for start, end in cls.YEAR_SPAN_PATTERN.findall(title)
+        )
 
     @classmethod
     def _is_lossless(cls, result):
@@ -1179,6 +1241,35 @@ class TorrentSearchMixin:
 
             if label and format_score:
                 reasons.insert(0, label)
+
+        # Music only (the category that scores audio formats): bit
+        # depth among the lossless releases, and whole discographies
+        # below single albums.
+        if isinstance(format_scores, dict):
+            if cls._is_lossless(result):
+                depth = cls._bit_depth(result)
+                depth_scores = category_preferences.get(
+                    "bit_depth_scores",
+                    cls.DEFAULT_BIT_DEPTH_SCORES,
+                )
+                depth_score = (
+                    int(depth_scores.get(depth, 0))
+                    if depth and isinstance(depth_scores, dict)
+                    else 0
+                )
+                score += depth_score
+
+                if depth and depth_score:
+                    reasons.insert(1 if reasons else 0, depth)
+
+            if cls._is_discography(title, query):
+                score += int(
+                    category_preferences.get(
+                        "discography_score",
+                        cls.DEFAULT_DISCOGRAPHY_SCORE,
+                    )
+                )
+                reasons.insert(0, "discography")
 
         size = max(
             0,

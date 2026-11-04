@@ -25,6 +25,7 @@ NAMES = [
     "Cyberpunk.2077.v2.1-GOG", "Football Manager 2024", "Hades II", "Castlevania Belmonts Curse [DODI Repack]",
     "Baldur's Gate 3", "The Witcher 3 Wild Hunt", "Portal 2.iso", "Stardew Valley (2016)", "Hades",
     "Fallout 4 - Game of the Year Edition", "Doom Eternal Deluxe Edition", "Chop Chop Inc (2026)",
+    "Diablo IV", "Final Fantasy VII", "Mega Man X", "I Am Alive", "Mix Master",
 ]
 for name in NAMES:
     (GAMES / name).mkdir()
@@ -80,8 +81,37 @@ for query in ("cyberpunk 2077", "Football Manager 2024", "Football Manager 2025"
               "Belmont's Curse", "Baldurs Gate 3", "Baldur's Gate 3", "The Witcher 3", "Witcher", "Portal 2", "Portal", "Stardew Valley", "Fallout 4", "Fallout 4 GOTY", "Doom Eternal", "Chop Chop", "Chop", "Chop Chop Chop",
               "Football Manager", "The Hades", "Elden Ring"):
     print(f"  {query:24} -> {listed(query)}")
+print("\n== roman numerals ==")
+for query in ("Hades 2", "Diablo 4", "Diablo IV", "Final Fantasy 7", "Final Fantasy VII", "Mega Man X", "Mega Man 10", "I Am Alive",
+              "Alive", "Mix", "Mix Master", "Portal II", "Football Manager MMXXIV"):
+    print(f"  {query:24} -> {listed(query)}")
+print("  normalise:", [PL.normalise(t) for t in ("Hades II", "Mega Man X", "Mix Master", "Rocky XX")])
+print("\n== notes, pictures, archives ==")
 print("  notes and pictures are not games:", listed("readme"), listed("cover"))
 print("  an archive is:", listed("Sekiro"))
+
+print("\n== subfolders ==")
+DEEP = Path(tempfile.mkdtemp(prefix="deep-", dir=os.environ.get("DATA_DIR") or None))
+for path in ("Publisher One/Alpha Quest/Binaries", "Publisher One/Beta Run", "Letters/A/Gamma Gate", "Letters/A/Gamma Gate/Data", "Delta Zone"):
+    (DEEP / path).mkdir(parents=True)
+(DEEP / "Publisher One" / "Epsilon Edge.iso").write_text("a disc image")
+(DEEP / "Publisher One" / "notes.txt").write_text("not a game")
+os.symlink(DEEP, DEEP / "Publisher One" / "Loop")
+os.environ["PC_GAMES_DIR"] = str(DEEP)
+for setting in (None, "1", "2", "3", "9", "0", "two"):
+    if setting is None:
+        os.environ.pop("PC_GAMES_DIR_DEPTH", None)
+    else:
+        os.environ["PC_GAMES_DIR_DEPTH"] = setting
+    print(f"  depth {str(setting):5} -> level {PL.depth()} | Alpha: {listed('Alpha Quest')} | Gamma: {listed('Gamma Gate')} | Epsilon: {listed('Epsilon')}")
+os.environ["PC_GAMES_DIR_DEPTH"] = "3"
+print("  a folder inside a game is listed too:", listed("Binaries"), listed("Data"))
+print("  a link back to the folder is not entered:", listed("Loop"), "| Delta:", listed("Delta Zone"))
+print("  all entries:", sorted(PL._list_names(DEEP, 3)))
+os.environ["PC_GAMES_DIR_DEPTH"] = "2"
+print("  exact name first:", listed("Alpha"))
+os.environ.pop("PC_GAMES_DIR_DEPTH")
+os.environ["PC_GAMES_DIR"] = str(GAMES)
 
 print("\n== off, missing, unreadable ==")
 os.environ["PC_GAMES_DIR"] = ""

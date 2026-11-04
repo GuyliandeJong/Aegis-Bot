@@ -8,7 +8,7 @@ off, and its commands and alerts do not exist.
 
 | Command | What it does | Who can use it | Module |
 |---|---|---|---|
-| `/torrent search` | Checks Jellyfin first (or the PC games folder for PC), then searches Jackett and adds the chosen result to qBittorrent; for Music, `format: FLAC only` offers FLAC releases only | Everyone | torrents |
+| `/torrent search` | Checks Jellyfin first (or the PC games folder for PC), then searches Jackett and adds the chosen result to qBittorrent; Music searches offer FLAC releases only | Everyone | torrents |
 | `/torrent add` | Adds a magnet link to qBittorrent | Everyone | torrents |
 | `/torrent list` | Lists torrents, with filter, sort and live refresh | Everyone | torrents |
 | `/torrent info` | Details and controls for one torrent | Everyone | torrents |
@@ -252,38 +252,35 @@ for example, but RuTracker has no adult category.
 
 ### Music and FLAC
 
-For the Music category the bot reads each release's audio format from
-its title and its category: `flac` (the title names FLAC, in any
-spelling such as `[FLAC 24-96]`, `FLAC24` or `24bit-FLAC`), `lossless`
-(filed under Audio/Lossless or called "lossless", codec not named),
-`other lossless` (APE, ALAC, WavPack, WAV: not FLAC), `lossy` (MP3, AAC,
-OGG, Opus, or an Audio/MP3 category) or `unknown`. A title that names a
-format wins over the category, because indexers file mixed releases
-under Audio/Lossless.
+A Music search offers FLAC and nothing else. The bot reads each
+release's audio format from its title and its category: `flac` (the
+title names FLAC, in any spelling such as `[FLAC 24-96]`, `FLAC24` or
+`24bit-FLAC`), `lossless` (filed under Audio/Lossless or called
+"lossless", codec not named), `other lossless` (APE, ALAC, WavPack, WAV:
+not FLAC), `lossy` (MP3, AAC, OGG, Opus, or an Audio/MP3 category) or
+`unknown`. A title that names a format wins over the category, because
+indexers file mixed releases under Audio/Lossless.
 
-- **A normal Music search ranks by format.** FLAC gets the most points,
-  then lossless, and lossy releases lose points; the result line says
-  why ("FLAC", "lossy format"). The points are `format_scores` under
+- **What is offered:** `flac` and `lossless` releases. Everything else
+  is hidden: MP3 and other lossy releases, APE, ALAC, WavPack and WAV
+  releases, and releases that say nothing about their format. "FLAC +
+  MP3" is kept, since it contains FLAC. The footer says how many were
+  hidden ("3 hidden (not FLAC)").
+- **Ranking:** FLAC comes before unnamed lossless, and the result line
+  says why ("FLAC", "lossless"). The points are `format_scores` under
   Music in `config/torrent_preferences.json`.
-- **`/torrent search` with `format: FLAC only`** offers FLAC and
-  lossless releases and hides the rest: MP3 and other lossy releases,
-  APE, ALAC, WavPack and WAV releases, and releases that say nothing
-  about their format. "FLAC + MP3" is kept, since it contains FLAC. The
-  footer says how many were hidden
-  ("3 hidden (not FLAC)"). When nothing is left the message says so and
-  offers **Watch for it**, which remembers that the title is FLAC only.
-  The option does nothing for other categories.
-- **The watchlist keeps it.** A FLAC-only entry is listed as "(Music,
-  FLAC only)", is searched FLAC-only twice a day, and **Show results**
-  runs a FLAC-only search. The same title in a normal search is a
-  separate entry.
+- **Nothing FLAC found:** the message says "No FLAC release found" with
+  how many were hidden, and offers **Watch for it**. The watchlist then
+  checks twice a day, with the same FLAC-only rule, so a Music title
+  waits for a FLAC release.
+- **Turning it off:** `flac_only` under Music in
+  `config/torrent_preferences.json`; `false` offers every format again,
+  ranked FLAC first. Without the key, or without a Music section at all,
+  it is on. A copy of the file in `data/` replaces the shipped one.
 
 Size to expect: a CD-quality FLAC album is roughly 250 to 400 MB, a
 hi-res 24-bit/96 kHz one 1 GB or more, and a discography several GB. The
 size is shown for every result.
-
-A copy of `torrent_preferences.json` in `data/` replaces the shipped
-file entirely, so it needs its own Music section to rank by format.
 
 ### Watchlist
 

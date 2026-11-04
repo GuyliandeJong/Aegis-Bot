@@ -4,9 +4,10 @@ torrent.
 
 PC_GAMES_DIR is the folder as seen from inside the bot's container. Its
 folders, and installers and disc images (.iso, .zip, .rar, .7z, .exe,
-.msi, .img), one level deep, are the games you already have; names are
-cleaned with pc_title(), so "Cyberpunk.2077.v2.1-GOG" and
-"Castlevania Belmonts Curse [DODI Repack]" can be found by their title.
+.msi, .img), one level deep (PC_GAMES_DIR_DEPTH for more), are the
+games you already have; names are cleaned with pc_title(), so
+"Cyberpunk.2077.v2.1-GOG" and "Castlevania Belmonts Curse [DODI
+Repack]" can be found by their title.
 """
 
 import asyncio
@@ -31,6 +32,16 @@ GAME_FILES = {".iso", ".zip", ".rar", ".7z", ".exe", ".msi", ".img"}
 
 # Words of a search that need not be in the name.
 STOP_WORDS = {"a", "an", "and", "of", "the"}
+
+
+def depth() -> int:
+    """How many folder levels are searched, 1 to 3 (PC_GAMES_DIR_DEPTH)."""
+    try:
+        value = int(os.getenv("PC_GAMES_DIR_DEPTH", "1"))
+    except ValueError:
+        return 1
+
+    return min(3, max(1, value))
 
 
 def games_dir() -> Path | None:
@@ -97,27 +108,57 @@ def matches(query: str, name: str) -> bool:
     return all(found[word] >= count for word, count in wanted.items())
 
 
-def _list_names(folder: Path) -> list[str]:
-    """Names of the games directly in the folder (blocking)."""
+def _list_names(folder: Path, levels: int = 1) -> list[str]:
+    """
+    Paths of the games in the folder, relative to it (blocking).
+
+    One level lists the entries directly in the folder; more levels also
+    look inside the folders found, for games kept under a publisher or
+    a letter ("Publisher/Game"). Folders that are links are not entered.
+    """
     names = []
+    pending = [(folder, "")]
 
-    with os.scandir(folder) as entries:
-        for entry in entries:
+    for level in range(1, levels + 1):
+        following = []
+
+        for parent, prefix in pending:
             try:
-                game = (
-                    entry.is_dir()
-                    or Path(entry.name).suffix.lower() in GAME_FILES
-                )
+                scanner = os.scandir(parent)
             except OSError:
+                if level == 1:
+                    raise
                 continue
 
-            if not game:
-                continue
+            with scanner as entries:
+                for entry in entries:
+                    try:
+                        folder_entry = entry.is_dir()
+                        game = (
+                            folder_entry
+                            or Path(entry.name).suffix.lower() in GAME_FILES
+                        )
+                        enter = (
+                            folder_entry
+                            and level < levels
+                            and not entry.is_symlink()
+                        )
+                    except OSError:
+                        continue
 
-            names.append(entry.name)
+                    if not game:
+                        continue
 
-            if len(names) >= MAX_ENTRIES:
-                break
+                    path = prefix + entry.name
+                    names.append(path)
+
+                    if len(names) >= MAX_ENTRIES:
+                        return names
+
+                    if enter:
+                        following.append((Path(entry.path), path + "/"))
+
+        pending = following
 
     return names
 
@@ -136,7 +177,7 @@ async def find(query: str) -> list[str]:
 
     try:
         names = await asyncio.wait_for(
-            asyncio.to_thread(_list_names, folder),
+            asyncio.to_thread(_list_names, folder, depth()),
             timeout=LIST_TIMEOUT,
         )
     except asyncio.TimeoutError:
@@ -148,8 +189,16 @@ async def find(query: str) -> list[str]:
 
     exact = normalise(query)
 
-    # The name that is exactly the search first, then the rest.
+    # Matched on the name of the folder or file itself, shown with the
+    # folders above it. The name that is exactly the search first.
     return sorted(
-        (name for name in names if matches(query, name)),
-        key=lambda name: (normalise(pc_title(name)) != exact, name.casefold()),
+        (name for name in names if matches(query, _base(name))),
+        key=lambda name: (
+            normalise(pc_title(_base(name))) != exact,
+            name.casefold(),
+        ),
     )
+
+
+def _base(path: str) -> str:
+    return path.rsplit("/", 1)[-1]

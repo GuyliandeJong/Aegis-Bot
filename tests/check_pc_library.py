@@ -98,7 +98,7 @@ os.scandir = real
 print("\n== a slow share ==")
 os.environ["PC_GAMES_DIR"] = str(GAMES)
 import time
-PL._list_names = lambda folder: time.sleep(1)
+PL._list_names = lambda folder, levels=1: time.sleep(1)
 PL.LIST_TIMEOUT = 0.1
 print("  slow folder gives no hits:", listed("hades"))
 

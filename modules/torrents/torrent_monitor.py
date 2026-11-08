@@ -22,6 +22,23 @@ class TorrentMonitor(BaseMonitor):
         "completed",
     }
 
+    # States of a torrent that is really downloading (or waiting to).
+    # Checking its files (checkingUP after a power cut, a forced
+    # recheck), missing files and errors are not: a finished torrent
+    # that only shows up as incomplete there has not been downloaded
+    # again, so it must not be announced a second time.
+    DOWNLOADING_STATES = {
+        "downloading",
+        "forceddl",
+        "metadl",
+        "forcedmetadl",
+        "stalleddl",
+        "queueddl",
+        "allocating",
+        "pauseddl",
+        "stoppeddl",
+    }
+
     def __init__(
         self,
         notification_service,
@@ -507,6 +524,26 @@ class TorrentMonitor(BaseMonitor):
                 )
             )
 
+            # The time qBittorrent recorded for this completion. The
+            # same time again means the same download, however the
+            # torrent got there, so it is not announced twice.
+            completion_on = self.integer(
+                torrent.get(
+                    "completion_on",
+                    0,
+                )
+            )
+
+            # Torrents announced before the time was kept.
+            if (
+                completed
+                and completion_on > 0
+                and previous.get("notified", False)
+                and not previous.get("announced_on")
+            ):
+                previous["announced_on"] = completion_on
+                state_changed = True
+
             # Detect the transition:
             #
             # incomplete -> completed
@@ -519,9 +556,17 @@ class TorrentMonitor(BaseMonitor):
                     name,
                 )
 
-                if not previous.get(
-                    "notified",
-                    False,
+                same_completion = (
+                    completion_on > 0
+                    and previous.get("announced_on") == completion_on
+                )
+
+                if (
+                    not previous.get(
+                        "notified",
+                        False,
+                    )
+                    and not same_completion
                 ):
                     await self.notify_completed(
                         torrent,
@@ -534,9 +579,12 @@ class TorrentMonitor(BaseMonitor):
                         torrent,
                     )
 
-                    previous[
-                        "notified"
-                    ] = True
+                    if completion_on > 0:
+                        previous["announced_on"] = completion_on
+
+                previous[
+                    "notified"
+                ] = True
 
                 previous[
                     "completed"
@@ -553,14 +601,18 @@ class TorrentMonitor(BaseMonitor):
 
                 state_changed = True
 
-            # If a torrent was previously completed but later becomes
-            # incomplete again, allow a future completion notification.
+            # If a torrent that was announced starts downloading again
+            # (files removed, then rechecked), allow a future completion
+            # notification. Checking files, missing files and errors do
+            # not count: see DOWNLOADING_STATES.
             if (
                 not completed
                 and previous.get(
                     "notified",
                     False,
                 )
+                and str(torrent.get("state", "")).lower()
+                in self.DOWNLOADING_STATES
             ):
                 previous[
                     "notified"

@@ -53,6 +53,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_seed_cleanup.py` | The weekly "seeded enough" suggestion: schedule, list and overflow, administrators only, removal keeping files, dismiss, timeout and restart note | Local fake qBittorrent, fake channel and interactions |
 | `check_requesters_links.py` | Who is mentioned per torrent, and Google share links | Local fake Google and Wikidata |
 | `check_no_peers.py` | The no-peers watchdog: counting, the alert, the restart through Portainer, grace period, restart limit, recovery, state across restarts, and the cases where it stays quiet | Local fake qBittorrent and Portainer |
+| `check_recheck_notifications.py` | A finished torrent is not announced again after a recheck, missing files or a power cut; it is when it is downloaded again or gets a new completion time | Fake qBittorrent list |
 | `check_vpn.py` | The VPN check: leak alert with masked addresses, the disconnected warning and recoveries, qBittorrent before 5.1, the `/torrent status` VPN field | Local fake qBittorrent, stubbed WAN IP |
 
 `isolate.py` points the bot's state files at a temporary folder, so a

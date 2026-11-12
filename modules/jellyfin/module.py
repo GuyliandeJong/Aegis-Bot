@@ -13,6 +13,7 @@ MODULE = Module(
     monitors=(
         "modules.jellyfin.new_content_monitor:JellyfinNewContentMonitor",
         "modules.jellyfin.subtitle_monitor:SubtitleMonitor",
+        "modules.jellyfin.transcode_monitor:TranscodeMonitor",
     ),
     startup_checks="modules.jellyfin.checks:checks",
 )

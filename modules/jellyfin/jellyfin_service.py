@@ -1102,7 +1102,9 @@ class JellyfinService:
         did not answer. Each entry: user, client, device, title, kind,
         position and runtime in seconds, paused, method ("DirectPlay",
         "DirectStream" or "Transcode") and, when transcoding, the
-        target resolution, bitrate and Jellyfin's reasons.
+        target resolution, bitrate and Jellyfin's reasons, and whether
+        the video and the audio are passed through (video_direct,
+        audio_direct; None when not reported).
         """
         status, data = await self._request_json(
             server_name, "GET", "/Sessions?activeWithinSeconds=960", timeout=15,
@@ -1149,6 +1151,10 @@ class JellyfinService:
                 "height": transcode.get("Height"),
                 "bitrate": transcode.get("Bitrate"),
                 "reasons": reasons,
+                # Whether the video / audio is passed through while the
+                # rest is transcoded; None when the server does not say.
+                "video_direct": transcode.get("IsVideoDirect"),
+                "audio_direct": transcode.get("IsAudioDirect"),
             })
 
         return playing

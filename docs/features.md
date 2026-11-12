@@ -231,6 +231,11 @@ subtitles turned off).
   the start does not alert. One alert per stream; after two checks
   without transcoding it is forgotten, so a later transcode alerts
   again. A server that does not answer changes nothing.
+- When the transcoding stops, "Jellyfin Transcoding Stopped" is posted
+  (as a recovery) after two checks without it: the title, the person,
+  the device, how long it lasted, and whether the stream carries on
+  without transcoding the video or playback ended. A transcode too
+  short to alert gets no message.
 - Audio-only transcoding (the video is passed through) is cheap and
   only reported with `JELLYFIN_TRANSCODE_AUDIO_ALERTS=true`. A server
   that does not say whether the video is passed through counts as video

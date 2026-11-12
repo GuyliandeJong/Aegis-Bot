@@ -19,6 +19,7 @@ from discord.ext import commands
 
 from modules.jellyfin import movie_library
 from modules.jellyfin.jellyfin_service import JellyfinService
+from modules.jellyfin.transcode import describe_reasons
 from utils import theme
 from utils.embeds import create_embed
 from utils.logger import logger
@@ -127,23 +128,6 @@ def _clock(seconds: int, hours_format: bool) -> str:
     return f"{seconds // 60}:{seconds % 60:02d}"
 
 
-# Jellyfin's transcode reasons, as people would say them.
-REASONS = {
-    "ContainerNotSupported": "container",
-    "VideoCodecNotSupported": "video codec",
-    "AudioCodecNotSupported": "audio codec",
-    "SubtitleCodecNotSupported": "subtitles burned in",
-    "AudioIsExternal": "external audio",
-    "SecondaryAudioNotSupported": "second audio track",
-    "VideoResolutionNotSupported": "resolution",
-    "VideoBitrateNotSupported": "video bitrate",
-    "AudioBitrateNotSupported": "audio bitrate",
-    "ContainerBitrateExceedsLimit": "bitrate limit",
-    "VideoRangeTypeNotSupported": "HDR",
-    "AudioChannelsNotSupported": "audio channels",
-}
-
-
 def playing_lines(session: dict) -> str:
     """Two lines for one stream: what and who, then progress and how."""
     icon = "⏸️" if session["paused"] else "▶️"
@@ -167,7 +151,7 @@ def playing_lines(session: dict) -> str:
         if session["height"]:
             text += f" to {session['height']}p"
 
-        reasons = [REASONS.get(r, r) for r in session["reasons"]]
+        reasons = describe_reasons(session["reasons"])
 
         if reasons:
             text += f" ({', '.join(reasons)})"

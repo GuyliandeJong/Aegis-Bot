@@ -59,6 +59,12 @@ class Notes:
 
 
 _files = [0]
+CLOCK = [1_000_000.0]
+TMO.TranscodeMonitor._now = staticmethod(lambda: CLOCK[0])
+
+
+def warns(notes): return [s for s in notes.sent if s[0] == "warning"]
+def stops(notes): return [s for s in notes.sent if s[0] == "recovered"]
 
 
 def fresh():
@@ -103,14 +109,54 @@ async def main():
         SESSIONS["home"] = [stream()]; await run(mon)
         SESSIONS["home"] = [stream("DirectPlay")]; await run(mon, 3)
         SESSIONS["home"] = [stream()]; await run(mon)
-        print("  one check, direct, one check ->", len(notes.sent), "alert(s)")
+        print("  one check, direct, one check ->", len(warns(notes)), "alert(s)")
         await run(mon)
-        print("  two in a row again           ->", len(notes.sent), "alert(s)")
+        print("  two in a row again           ->", len(warns(notes)), "alert(s)")
         SESSIONS["home"] = []; await run(mon, 2)
         SESSIONS["home"] = [stream()]; await run(mon, 2)
-        print("  stopped, then transcoding    ->", len(notes.sent), "alert(s) in total")
+        print("  stopped, then transcoding    ->", len(warns(notes)), "alert(s) in total")
         SESSIONS["home"] = [stream(), stream(user="Sam", title="Other Film", device="Phone")]; await run(mon, 2)
-        print("  a second stream              ->", [s[2].split("**")[1] for s in notes.sent[2:]])
+        print("  a second stream              ->", [s[2].split("**")[1] for s in warns(notes)[2:]])
+
+        print("\n== when it stops ==")
+        notes, mon = fresh()
+        SESSIONS["home"] = [stream()]
+        await run(mon, 2)
+        CLOCK[0] += 750
+        SESSIONS["home"] = [stream("DirectPlay")]
+        await run(mon)
+        print("  one check of direct play  ->", len(stops(notes)), "message(s)")
+        await run(mon)
+        print("  second check              ->", [(lvl, t) for lvl, t, _ in stops(notes)])
+        print("  text:", stops(notes)[0][2].replace("\n\n", " / "))
+        await run(mon, 4)
+        print("  four more checks          -> messages in total:", len(stops(notes)))
+        SESSIONS["home"] = [stream()]
+        await run(mon, 2)
+        SESSIONS["home"] = []
+        await run(mon, 2)
+        print("  transcodes, ends          ->", len(warns(notes)), "alerts |", [s[2].split("\n\n")[1] for s in stops(notes)][1:])
+        notes, mon = fresh()
+        SESSIONS["home"] = [stream()]
+        await run(mon)
+        SESSIONS["home"] = []
+        await run(mon, 4)
+        print("  a blip that never alerted -> alerts:", len(warns(notes)), "| messages:", len(stops(notes)))
+        notes, mon = fresh()
+        SESSIONS["home"] = [stream()]
+        await run(mon, 2)
+        DOWN.add("home"); await run(mon, 5); DOWN.discard("home")
+        print("  server down while alerted -> messages:", len(stops(notes)))
+        again = TMO.TranscodeMonitor(notes)
+        SESSIONS["home"] = []
+        await run(again, 2)
+        print("  stops after a new instance -> messages:", len(stops(notes)), "| alerts:", len(warns(notes)))
+        notes, mon = fresh()
+        SESSIONS["home"] = [stream()]
+        await run(mon, 2)
+        SESSIONS["home"] = [stream(video_direct=True, reasons=("AudioCodecNotSupported",))]
+        await run(mon, 2)
+        print("  video direct, audio transcoded (audio alerts off) ->", [s[2].split("\n\n")[1] for s in stops(notes)])
 
         print("\n== audio only, and a server that does not say ==")
         notes, mon = fresh()

@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 
 import discord
 
@@ -9,6 +10,7 @@ from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from modules.jellyfin.jellyfin_service import JellyfinService
 from modules.jellyfin.transcode import describe_reasons
+from utils.formatting import format_compact_duration
 from utils.logger import logger
 
 
@@ -28,9 +30,12 @@ class TranscodeMonitor(BaseMonitor):
     - A stream must be transcoded for CHECKS_BEFORE_ALERT checks in a
       row, so Jellyfin switching to direct play a moment after the start
       does not alert.
-    - One alert per stream. It is forgotten after CLEAR_AFTER checks
-      without transcoding, so starting another transcode later alerts
-      again. A server that does not answer changes nothing.
+    - One alert per stream. After CLEAR_AFTER checks without
+      transcoding, "Jellyfin Transcoding Stopped" is posted (it says
+      whether the stream is still playing or ended, and how long the
+      transcoding lasted) and the stream is forgotten, so a later
+      transcode alerts again. A stream that was never alerted is
+      forgotten quietly. A server that does not answer changes nothing.
 
     Only the primary server (JELLYFIN_1_*) is watched; the others are
     usually someone else's.
@@ -52,6 +57,10 @@ class TranscodeMonitor(BaseMonitor):
         self.notification_service = notification_service
         self.state = {"streams": {}}
         self.load_state()
+
+    @staticmethod
+    def _now() -> float:
+        return time.time()
 
     @staticmethod
     def _on(name: str, default: str) -> bool:
@@ -126,6 +135,7 @@ class TranscodeMonitor(BaseMonitor):
             return
 
         streams = self.state["streams"]
+        playing = {self.stream_key(s) for s in sessions}
         current = {
             self.stream_key(s): s for s in sessions if self.is_reported(s)
         }
@@ -135,7 +145,11 @@ class TranscodeMonitor(BaseMonitor):
                 streams[key]["missed"] = streams[key].get("missed", 0) + 1
 
                 if streams[key]["missed"] >= self.CLEAR_AFTER:
-                    del streams[key]
+                    entry = streams.pop(key)
+                    self.save_state()
+
+                    if entry.get("alerted"):
+                        await self._stopped(key, entry, key in playing, primary.name)
 
         for key, session in current.items():
             entry = streams.setdefault(key, {"seen": 0, "alerted": False})
@@ -144,6 +158,7 @@ class TranscodeMonitor(BaseMonitor):
 
             if entry["seen"] >= self.CHECKS_BEFORE_ALERT and not entry["alerted"]:
                 entry["alerted"] = True
+                entry["since"] = self._now()
                 self.save_state()
                 await self._alert(session, primary.name)
 
@@ -171,5 +186,30 @@ class TranscodeMonitor(BaseMonitor):
                 f"{escape(where)} ({escape(server)}).\n\n{text}.\n\n"
                 "Direct play avoids the load: a player that handles the "
                 "file's codec, container and subtitles does not need it."
+            ),
+        )
+
+    async def _stopped(self, key: str, entry: dict, still_playing: bool, server: str) -> None:
+        user, device, client, title = (key.split("|", 3) + ["", "", "", ""])[:4]
+        escape = discord.utils.escape_markdown
+        where = device or client or "an unknown device"
+        since = entry.get("since")
+        lasted = (
+            f" after {format_compact_duration(max(0, self._now() - since))}"
+            if isinstance(since, (int, float))
+            else ""
+        )
+        text = (
+            "The video is no longer being transcoded."
+            if still_playing
+            else "Playback ended."
+        )
+
+        await self.notification_service.recovered(
+            title="Jellyfin Transcoding Stopped",
+            description=(
+                f"**{escape(title or 'Unknown')}** for "
+                f"{escape(user or 'an unknown user')} on "
+                f"{escape(where)} ({escape(server)}){lasted}.\n\n{text}"
             ),
         )

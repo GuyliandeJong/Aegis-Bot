@@ -216,6 +216,31 @@ episodes in the daily run, which they share with movies.
 
 The other server's API key must be allowed to download media.
 
+### Transcoding alert
+
+When playback on your own Jellyfin server (server 1) makes Jellyfin
+transcode the video, "Jellyfin Is Transcoding" is posted: the title,
+the person, the device and Jellyfin's reasons in plain words ("video
+codec, container"), and the resolution it transcodes to. Transcoding
+costs CPU or GPU, and usually means the player cannot handle the file;
+the reasons say what to fix (another client, a different file, burned-in
+subtitles turned off).
+
+- The server is asked every 30 seconds. A stream must be transcoded for
+  two checks in a row, so Jellyfin switching to direct play right after
+  the start does not alert. One alert per stream; after two checks
+  without transcoding it is forgotten, so a later transcode alerts
+  again. A server that does not answer changes nothing.
+- Audio-only transcoding (the video is passed through) is cheap and
+  only reported with `JELLYFIN_TRANSCODE_AUDIO_ALERTS=true`. A server
+  that does not say whether the video is passed through counts as video
+  transcoding.
+- Only server 1 is watched; the other servers are usually someone
+  else's. `/jellyfin playing` shows the same information on demand.
+- `JELLYFIN_TRANSCODE_ALERTS=false` turns it off. Whether transcoding
+  uses a GPU depends on your Jellyfin settings (hardware acceleration);
+  the bot only reports that it happens.
+
 ### Movies on all servers
 
 `/jellyfin movies <title>` looks a movie up on every Jellyfin server:
@@ -417,6 +442,7 @@ state changes.
 | WAN | Internet connectivity and public IP changes | 60 s |
 | Jellyfin new content | New seasons and episodes on the other servers | Once a day |
 | Subtitles | Missing movie subtitles, a few per run | Once a day |
+| Transcode | Playback on your Jellyfin server being transcoded | 30 s |
 | Containers | Crashed, unhealthy and restarting Docker containers, through Portainer | 60 s |
 | Backup | Last successful backup older than `BACKUP_MAX_AGE_DAYS` (8) | Hourly |
 | Watchlist | Titles people are waiting for | Twice a day |

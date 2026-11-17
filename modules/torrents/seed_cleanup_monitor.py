@@ -7,8 +7,8 @@ from datetime import datetime
 from config.paths import DATA_DIR
 from modules.torrents.torrent.cleanup import (
     SeedCleanupView,
+    describe_targets,
     seeded_enough,
-    seeding_targets,
 )
 from core.base_monitor import BaseMonitor
 from modules.general.weekly_summary_monitor import DAYS
@@ -28,7 +28,8 @@ class SeedCleanupMonitor(BaseMonitor):
         CLEANUP_REMINDER       true (default) or false
         CLEANUP_REMINDER_DAY   monday..sunday (default saturday)
         CLEANUP_REMINDER_HOUR  0-23 (default 11, container time)
-        SEED_RATIO_TARGET, SEED_DAYS_TARGET as for /torrent cleanup
+        SEED_RATIO_TARGET, SEED_DAYS_TARGET, SEED_CATEGORY_RULES as for
+        /torrent cleanup
     """
 
     STATE_FILE = DATA_DIR / "seed_cleanup_state.json"
@@ -120,7 +121,6 @@ class SeedCleanupMonitor(BaseMonitor):
             logger.info("[SeedCleanup] No torrents reached the seeding target.")
             return
 
-        ratio_target, days_target = seeding_targets()
         size = sum(int(t.get("size") or 0) for t in done)
         count = f"{len(done)} torrent{'s' if len(done) != 1 else ''}"
 
@@ -129,8 +129,7 @@ class SeedCleanupMonitor(BaseMonitor):
         message = await self.notification_service.info(
             title="Torrents seeded enough",
             description=self.describe(
-                f"{count} reached ratio {ratio_target:g} or "
-                f"{days_target:g} days of seeding, {format_bytes(size)} "
+                f"{count} reached {describe_targets()}, {format_bytes(size)} "
                 "in total. Removing them from qBittorrent keeps the "
                 "files on disk.",
                 done,

@@ -25,7 +25,7 @@ EVERYTHING = {
     "GPTWOL_HOST": "wol.test", "GPTWOL_TARGET_IP": "192.0.2.10", "GPTWOL_TARGET_MAC": "00:00:5e:00:53:01",
     "QBITTORRENT_HOST": "qbt.test", "QBITTORRENT_USERNAME": "u", "QBITTORRENT_PASSWORD": SECRET,
     "JELLYFIN_1_URL": "http://jellyfin.test", "JELLYFIN_1_API_KEY": SECRET,
-    "BACKUP_PATHS": "/srv", "MINECRAFT_SERVERS": "Test=mc.test", "UPTIME_URLS": "https://example.test",
+    "BACKUP_PATHS": "/srv", "MINECRAFT_SERVERS": "Test=mc.test", "UPTIME_URLS": "https://example.test", "NUT_HOST": "nut.test",
     "FLUXER_WEBHOOK_URL": "https://fluxer.test/v1/webhooks/1/" + SECRET,
 }
 for key in list(os.environ):

@@ -172,6 +172,7 @@ class WeeklySummaryMonitor(BaseMonitor):
         ("jellyfin", "📥 Copied from Jellyfin", "_copies"),
         ("jellyfin", "🆕 New in Jellyfin", "_new_in_jellyfin"),
         ("wan", "🌐 Internet", "_outages"),
+        ("ups", "🔌 Power", "_power"),
         ("torrents", "🧲 qBittorrent peers", "_no_peers"),
         ("backup", "🗄️ Backup", "_backup"),
         ("jellyfin", "🎞️ Transcoding", "_transcodes"),
@@ -715,6 +716,22 @@ class WeeklySummaryMonitor(BaseMonitor):
             line += " Reasons: " + ranked(reasons) + "."
 
         return line
+
+    @staticmethod
+    def _power(since: float) -> str | None:
+        """Power outages the UPS monitor saw; no field in a quiet week."""
+        outages = activity_log.since(since, "power_outage")
+
+        if not outages:
+            return None
+
+        durations = [int(o.get("seconds") or 0) for o in outages]
+
+        return (
+            f"{len(outages)} outage{'s' if len(outages) != 1 else ''}, "
+            f"{format_compact_duration(sum(durations))} on battery in total, "
+            f"longest {format_compact_duration(max(durations))}."
+        )
 
     @staticmethod
     def _no_peers(since: float) -> str | None:

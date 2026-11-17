@@ -15,7 +15,8 @@ Who may run what:
   have those permissions. Discord lets a server change this per user or
   role under Server Settings > Integrations; /help does not see those
   overrides and goes by the default.
-- /container is shown only to the users in PORTAINER_ALLOWED_USER_IDS.
+- /container and /bot are shown only to the users in
+  PORTAINER_ALLOWED_USER_IDS.
 - Subcommands in ADMIN_ONLY are shown to administrators only.
 
 The reply is private to the person who asked.
@@ -38,6 +39,7 @@ AREAS = {
     "torrent": "Torrents",
     "jellyfin": "Jellyfin",
     "container": "Containers",
+    "bot": "Containers",
     "server": "Server",
     "cpu": "Server",
     "memory": "Server",
@@ -160,7 +162,7 @@ def visible_commands(tree, user, guild=None) -> list:
         if not _has_default_permissions(user, command):
             continue
 
-        if command.name == "container" and not _container_allowed(user):
+        if command.name in ("container", "bot") and not _container_allowed(user):
             continue
 
         area = AREAS.get(command.name, "Other")

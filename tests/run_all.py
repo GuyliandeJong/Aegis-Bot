@@ -150,7 +150,7 @@ EXPECTED = {
         "general and host only: ['💾 Disks', '🔔 Alerts']",
         "every field belongs to a module: True",
         "extensions that failed to load: []",
-        "slash commands: ['alert', 'container', 'cpu', 'esxi', 'filesystems', 'hello', 'help', 'idrac', 'jellyfin', 'maintenance', 'memory', 'minecraft', 'network', 'ping', 'server', 'status', 'storage', 'temperature', 'torrent', 'wan', 'wol']",
+        "slash commands: ['alert', 'bot', 'container', 'cpu', 'esxi', 'filesystems', 'hello', 'help', 'idrac', 'jellyfin', 'maintenance', 'memory', 'minecraft', 'network', 'ping', 'server', 'status', 'storage', 'temperature', 'torrent', 'wan', 'wol']",
         "exit code: 1",
         "says: ['ERROR Missing or invalid in .env: DISCORD_TOKEN, GUILD_ID, ALERT_CHANNEL_ID.",
     ],

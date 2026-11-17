@@ -486,6 +486,8 @@ state changes.
 | Weekly summary | Disk growth with a "full in" estimate, completed torrents, Jellyfin copies, new in Jellyfin, what was watched, qBittorrent restarts for lost peers, alerts, container updates | Once a week |
 | Seed cleanup | Suggests removing torrents that are seeded enough | Once a week |
 | Heartbeat | Writes `data/heartbeat` for the watchdog script | 60 s |
+| Health endpoint | Serves `GET /health` for an uptime monitor (when `HEALTH_PORT` is set) | 30 s (start) |
+| Quiet hours | Posts the summary of alerts held during `QUIET_HOURS` | 60 s |
 | ESXi | Datastore usage, virtual machines stopping, old snapshots, host reachable | 5 min |
 | Maintenance | Posts the end of maintenance mode when its time runs out | 60 s |
 | Uptime | Public services answering, TLS certificates expiring | 5 min |
@@ -494,6 +496,9 @@ state changes.
 | Torrent health | Stalled, errored, stopped and resumed torrents | 10 s |
 | VPN | qBittorrent using the home address, or reporting no connection | 2 min |
 | No peers | qBittorrent without DHT nodes after a network drop | 2 min |
+| Dead torrents | Unfinished torrents without progress for `DEAD_TORRENT_DAYS` | 10 min |
+| UPS | Power outages, low battery and a battery to replace, through NUT | 30 s |
+| SMART | Failing disk health, bad sectors and NVMe wear (when `SMART_DEVICES` is set) | Hourly |
 
 The container monitor alerts once when a container crashes (exits
 with another code than a normal stop: 0, 137 or 143), turns unhealthy
@@ -643,6 +648,11 @@ plugin's own settings. The bot reads the plugin's data with its SQL
 query endpoint, which needs the API key in `JELLYFIN_1_API_KEY` (API
 keys have administrator rights).
 
+Further fields appear only when there is something to say: "🎞️
+Transcoding" (how many playbacks made Jellyfin transcode, on which
+devices and why), "🔌 Power" (UPS outages, total time on battery and the
+longest), and "📦 Images with updates" (see Container management).
+
 The last field, "Container updates", lists the containers Watchtower
 updated that week, with their image and date, read from the log of the
 container named `WATCHTOWER_CONTAINER` through Portainer. It needs the
@@ -655,6 +665,57 @@ updates from before Watchtower itself was recreated are not counted.
 Physical drives alert when iDRAC predicts a failure, and SSDs also when
 their remaining write endurance drops to `SSD_LIFE_WARNING` percent
 (default 10). Hard disks do not report this.
+
+### Test alerts, status and the health endpoint
+
+`/alert test [level]` posts a test alert (info, warning, critical,
+recovered or success) to the alert channel, so you can see that the
+channel, the bot's permissions and the Fluxer mirror work. It goes
+through the same path as a real alert, so maintenance mode and quiet
+hours treat it the same way (the private reply says when it was not
+posted and why). Administrators only.
+
+`/status` shows the bot's own view of its health in one private reply:
+its uptime and Discord latency, the modules that are on and, for the
+others, which settings are missing, whether maintenance is on, the
+alerts of the last 24 hours by level with the latest titles, and any
+monitor that failed its last check or has not finished one for three of
+its own intervals. The title says "All Good" or "Needs Attention".
+Administrators only.
+
+An uptime monitor outside the container (Uptime Kuma, for example) can
+check the bot over HTTP. Set a port in `.env` and publish it in
+`docker-compose.yml`:
+
+```text
+HEALTH_PORT=8099
+HEALTH_HOST=0.0.0.0    # address inside the container
+```
+
+`GET /health` answers `200 {"status": "ok"}` while the bot is connected
+to Discord and every monitor reports, `503` with `"degraded"` when a
+monitor is failing or silent, and `503` with `"down"` when the Discord
+connection is lost. The body only has counts, never names or settings,
+and there is no authentication, so do not publish the port to the
+internet. Empty or 0 turns it off.
+
+### Quiet hours
+
+`QUIET_HOURS` holds warnings, recoveries, info and success messages
+(a torrent finishing, a container update) in a daily window and posts
+them as one "🌙 Quiet Hours Summary" when it ends: how many, per level,
+and the titles with their counts. Critical alerts and scheduled reports
+such as the weekly summary still come through, and maintenance mode
+takes precedence while it is on.
+
+```text
+QUIET_HOURS=23-7          # or 22:30-07:00; container time zone; empty: off
+```
+
+The window may cross midnight. A value that cannot be read, or whose
+start equals its end, turns quiet hours off and says so once in the
+log. Held alerts are kept in `data/quiet_hours.json`, so a restart does
+not lose them, and are still counted in the weekly summary.
 
 ### Maintenance mode
 

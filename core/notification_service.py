@@ -1,7 +1,7 @@
 import discord
 
 from config.settings import settings
-from core import activity_log, maintenance
+from core import activity_log, maintenance, quiet_hours
 from utils import theme
 from utils.logger import logger
 
@@ -125,6 +125,9 @@ class NotificationService:
         # alert is not muted by a maintenance that already ran out.
         await self.end_maintenance_if_expired()
 
+        # The same for quiet hours that ended.
+        await self.flush_quiet_hours()
+
         if maintenance.active():
             if level in maintenance.MUTED_LEVELS and not exempt:
                 maintenance.mute(level, title)
@@ -142,6 +145,21 @@ class NotificationService:
                 shown_title = title
         else:
             shown_title = title
+
+            # Quiet hours hold the same levels, except scheduled reports.
+            if (
+                quiet_hours.active()
+                and level in maintenance.MUTED_LEVELS
+                and not exempt
+            ):
+                quiet_hours.hold(level, title)
+                activity_log.record("alert", level=level, title=title)
+
+                logger.info(
+                    "[NotificationService] Held for the quiet hours summary: %s",
+                    title,
+                )
+                return
 
         message = await self._post(
             title=shown_title,
@@ -278,6 +296,47 @@ class NotificationService:
         )
 
         return state
+
+    async def flush_quiet_hours(self) -> None:
+        """Post what the quiet hours held, once they are over."""
+
+        if quiet_hours.active() or not quiet_hours.pending():
+            return
+
+        state = quiet_hours.take()
+
+        if state is None:
+            return
+
+        total, titles = maintenance.muted_summary(state)
+        counts = state.get("counts") or {}
+
+        logger.info(
+            "[NotificationService] Quiet hours over; %s alerts held.",
+            total,
+        )
+
+        await self._post(
+            title="🌙 Quiet Hours Summary",
+            description=(
+                f"{total} alert{'s' if total != 1 else ''} held since "
+                f"<t:{state.get('started', 0)}:t>:\n{titles}"
+            ),
+            color=theme.PRIMARY_COLOR,
+            fields=[
+                (
+                    "Held per level",
+                    " · ".join(
+                        f"{count} {level}"
+                        for level, count in sorted(
+                            counts.items(),
+                            key=lambda item: -item[1],
+                        )
+                    ),
+                    False,
+                )
+            ],
+        )
 
     async def end_maintenance_if_expired(self) -> None:
         """Post the end message once maintenance has run out."""

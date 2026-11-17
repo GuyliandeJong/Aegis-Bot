@@ -1,8 +1,26 @@
 import asyncio
+import time
 
 from config.settings import settings
 from core.notification_service import NotificationService
 from utils.logger import logger
+
+
+# What each monitor did last, for /status: {class name: {"last_ok",
+# "last_error", "error", "interval"}} with epoch seconds.
+HEALTH: dict[str, dict] = {}
+
+
+def record_health(name: str, interval: float, error: str | None = None) -> None:
+    """Remember that a monitor's check ended well, or how it failed."""
+    entry = HEALTH.setdefault(name, {})
+    entry["interval"] = interval
+
+    if error is None:
+        entry["last_ok"] = time.time()
+    else:
+        entry["last_error"] = time.time()
+        entry["error"] = error[:200]
 
 
 class MonitorManager:
@@ -48,12 +66,20 @@ class MonitorManager:
         )
 
         try:
+            interval = float(getattr(monitor, "INTERVAL", settings.MONITOR_INTERVAL))
+        except (TypeError, ValueError):
+            interval = 60.0
+
+        try:
             await asyncio.wait_for(
                 monitor.check(),
                 timeout=timeout,
             )
 
+            record_health(monitor_name, interval)
+
         except asyncio.TimeoutError:
+            record_health(monitor_name, interval, f"timed out after {timeout}s")
             logger.error(
                 "[MonitorManager] Monitor %s timed out after %ss.",
                 monitor_name,
@@ -64,6 +90,7 @@ class MonitorManager:
             raise
 
         except Exception as ex:
+            record_health(monitor_name, interval, f"{type(ex).__name__}: {ex}")
             logger.exception(
                 "[MonitorManager] Monitor %s failed: %s",
                 monitor_name,

@@ -137,9 +137,9 @@ EXPECTED = {
     "check_modules.py": [
         "monitors, setups, checks and commands that do not load: []",
         "always on: ['general']",
-        "nothing set, auto: backup=off containers=off esxi=off fluxer=off general=on host=on idrac=off jellyfin=off minecraft=off torrents=off uptime=off wan=on wol=off",
-        "everything set, auto: backup=on containers=on esxi=on fluxer=on general=on host=on idrac=on jellyfin=on minecraft=on torrents=on uptime=on wan=on wol=on",
-        "MODULES=torrents,jellyfin: backup=off containers=off esxi=off fluxer=off general=on host=off idrac=off jellyfin=on minecraft=off torrents=on uptime=off wan=off wol=off",
+        "nothing set, auto: backup=off containers=off esxi=off fluxer=off general=on host=on idrac=off jellyfin=off minecraft=off torrents=off ups=off uptime=off wan=on wol=off",
+        "everything set, auto: backup=on containers=on esxi=on fluxer=on general=on host=on idrac=on jellyfin=on minecraft=on torrents=on ups=on uptime=on wan=on wol=on",
+        "MODULES=torrents,jellyfin: backup=off containers=off esxi=off fluxer=off general=on host=off idrac=off jellyfin=on minecraft=off torrents=on ups=off uptime=off wan=off wol=off",
         "MODULES=auto,-wan,-host: ['host', 'wan']",
         "unknown name: [('WARNING', \"[Modules] MODULES names 'minecraf', but there is no such module.\")]",
         "INFO    |  minecraft   off: set MINECRAFT_SERVERS",

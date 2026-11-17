@@ -521,6 +521,18 @@ EXPECTED = {
         "critical goes through -> Test Alert (critical) (during maintenance) | The critical test alert was posted in <#10>.",
         "The info test alert was not posted. The alert channel was not found. C",
     ],
+    "check_seed_rules.py": [
+        "targets: (2.0, 14.0) (2.0, 14.0)",
+        "seeded enough: ['Game A', 'Game B', 'Loose', 'Show A']",
+        "wording: ratio 2 or 14 days of seeding",
+        "parsed: {'pc': (3.0, 30.0), 'movies': (1.0, 7.0)}",
+        "targets PC / Movies / Series / none: (3.0, 30.0) (1.0, 7.0) (2.0, 14.0) (2.0, 14.0)",
+        "seeded enough: ['Film A', 'Film B', 'Game B', 'Loose', 'Show A']",
+        "wording: ratio 2 or 14 days of seeding (PC: ratio 3 or 30 days; movies: ratio 1 or 7 days)",
+        "'PC=3'                                   -> {}",
+        "'PC=3:30,,Movies=bad,Series=0.5:2'       -> {'pc': (3.0, 30.0), 'series': (0.5, 2.0)}",
+        "'PC=-5:-1'                               -> {}",
+    ],
     "check_recheck_notifications.py": [
         "completed            -> ['Alpha']",
         "seeding              -> ['Alpha']",

@@ -4,9 +4,10 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Time zone data, so TZ (e.g. Europe/Amsterdam) sets the time used for
-# schedules and alerts. The slim image has none.
+# schedules and alerts. The slim image has none. smartmontools gives
+# smartctl for the optional SMART disk check (SMART_DEVICES).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tzdata \
+    && apt-get install -y --no-install-recommends tzdata smartmontools \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

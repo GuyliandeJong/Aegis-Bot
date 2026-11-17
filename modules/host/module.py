@@ -14,5 +14,6 @@ MODULE = Module(
         "modules.host.filesystem_monitor:FilesystemMonitor",
         "modules.host.cpu_monitor:CPUMonitor",
         "modules.host.memory_monitor:MemoryMonitor",
+        "modules.host.smart_monitor:SmartMonitor",
     ),
 )

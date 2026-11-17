@@ -124,6 +124,27 @@ failed command file and carries on without it, so the container looks
 healthy while a command is missing. Read the startup log after a
 change.
 
+## Releases
+
+A release is made by pushing a version tag (`v1.2.0`): the "Publish
+image" workflow runs the checks and publishes the container image, and
+the "Release" workflow then creates the GitHub release with
+`docker-compose.yml` and `env.example` from that tag.
+
+The release notes are built by `scripts/release_notes.sh`: what changed
+in that version, from `.github/releases/<tag>.md` (for example
+`.github/releases/v1.2.0.md`), followed by the install notes every
+release shares, from `.github/release-notes.md`. Write the version's
+file before tagging; without one, the release only has the install
+notes. `{{VERSION}}`, `{{TAG}}`, `{{OWNER}}` and `{{REPO}}` are replaced
+in both files.
+
+Both files are read from the default branch, so a release's notes can
+be corrected after tagging: change the file on the default branch, then
+run the "Release" workflow by hand (Actions > Release > Run workflow)
+with the tag. Doing so also replaces any edit made on the release page
+itself.
+
 ## Line endings
 
 Some files use Windows line endings (CRLF), among them `bot.py`, most

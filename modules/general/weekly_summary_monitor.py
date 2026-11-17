@@ -10,7 +10,8 @@ from config.paths import DATA_DIR
 from core.base_monitor import BaseMonitor
 from core import activity_log, modules
 from modules.jellyfin import watch_stats
-from modules.containers import watchtower_updates
+from modules.containers import image_updates, watchtower_updates
+from modules.containers.portainer_service import PortainerService
 from modules.host.filesystem_service import FilesystemService
 from modules.jellyfin.jellyfin_service import JellyfinService
 from modules.torrents.qbittorrent_service import QBittorrentService
@@ -180,6 +181,7 @@ class WeeklySummaryMonitor(BaseMonitor):
         ("jellyfin", "🍿 Watched this week", "_watched"),
         ("general", "🔔 Alerts", "_alerts"),
         ("containers", "🔄 Container updates", "_container_updates"),
+        ("containers", "📦 Images with updates", "_image_updates"),
     )
 
     async def build(self, since: float) -> list[tuple[str, str, bool]]:
@@ -338,6 +340,53 @@ class WeeklySummaryMonitor(BaseMonitor):
             f"{format_bytes(size)}",
             lines,
         )
+
+    IMAGE_CHECK_TIMEOUT = 120
+
+    @staticmethod
+    def image_updates_enabled() -> bool:
+        value = os.getenv("WEEKLY_SUMMARY_IMAGE_UPDATES", "true")
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+
+    async def _image_updates(self, since: float) -> str | None:
+        """
+        Running containers whose image has a newer version in its
+        registry. None (no field) when turned off or Portainer is not
+        set up.
+        """
+        service = PortainerService()
+
+        if not self.image_updates_enabled() or not service.configured:
+            return None
+
+        try:
+            found = await asyncio.wait_for(
+                image_updates.outdated(service),
+                timeout=self.IMAGE_CHECK_TIMEOUT,
+            )
+        except Exception as ex:
+            logger.warning("[WeeklySummary] Image update check failed: %s", ex)
+            return "Could not check the registries."
+
+        if not found["checked"]:
+            return "No image could be compared with its registry."
+
+        if not found["outdated"]:
+            return f"All {found['checked']} images are current."
+
+        lines = [
+            f"• `{image}` ({', '.join(names)})"
+            for image, names in found["outdated"]
+        ]
+        text = (
+            f"{len(lines)} of {found['checked']} images have a newer version:\n"
+            + "\n".join(lines)
+        )
+
+        if found["skipped"]:
+            text += f"\n({found['skipped']} could not be compared.)"
+
+        return text
 
     async def _container_updates(self, since: float) -> str:
         try:

@@ -25,6 +25,7 @@ import json
 import os
 import re
 import time
+from urllib.parse import quote
 
 import aiohttp
 
@@ -272,6 +273,7 @@ class PortainerService:
                     "id": item.get("Id") or "",
                     "name": names[0].lstrip("/"),
                     "image": item.get("Image") or "",
+                    "image_id": item.get("ImageID") or "",
                     "state": item.get("State") or "",
                     "status": status_text,
                     "health": health,
@@ -442,6 +444,56 @@ class PortainerService:
             raise PortainerError("That container no longer exists.")
 
         raise PortainerError(self._api_message(status, body))
+
+    async def local_digests(self, image_id: str) -> list[str]:
+        """
+        The registry digests ("sha256:...") of a local image, from its
+        RepoDigests. Empty for an image that was built here and never
+        pulled.
+        """
+        status, body = await self._request(
+            "GET",
+            f"/images/{quote(image_id, safe=':')}/json",
+        )
+
+        if status != 200:
+            raise PortainerError(self._api_message(status, body))
+
+        try:
+            data = json.loads(body)
+        except ValueError:
+            raise PortainerError("Portainer returned unreadable image details.")
+
+        return [
+            digest.split("@", 1)[1]
+            for digest in data.get("RepoDigests") or []
+            if "@" in digest
+        ]
+
+    async def registry_digest(self, image: str) -> str:
+        """
+        The digest the registry has for an image reference (name:tag),
+        asked through the Docker daemon (GET /distribution/{name}/json),
+        which reaches the registry the way a pull would.
+        """
+        status, body = await self._request(
+            "GET",
+            f"/distribution/{quote(image, safe='/:')}/json",
+            timeout=ACTION_TIMEOUT,
+        )
+
+        if status != 200:
+            raise PortainerError(self._api_message(status, body))
+
+        try:
+            digest = (json.loads(body).get("Descriptor") or {}).get("digest")
+        except ValueError:
+            digest = None
+
+        if not digest:
+            raise PortainerError("The registry gave no digest.")
+
+        return digest
 
     async def own_container(self) -> dict:
         """

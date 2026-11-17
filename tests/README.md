@@ -62,6 +62,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_status.py` | `/status`: monitor health recorded by the monitor manager (success, failure, timeout, silence), modules on and off with the reason, maintenance, the last 24 hours of alerts, the title, administrators only | Fake interaction, stubbed monitors |
 | `check_health_endpoint.py` | The health endpoint: off when unset, 200 while healthy, 503 degraded or down, counts only, other paths refused, a busy port retried | Local port 18201 |
 | `check_bot_restart.py` | `/bot restart`: allowed users and Portainer set up, the confirmation only the same person can press, the restart request to the bot's own container (also when protected), cancel, `/container` still refusing it, and the cases where it cannot work | Local fake Portainer |
+| `check_quiet_hours.py` | Quiet hours: the window formats and boundaries, which alerts are held, the summary when the window ends (by the monitor and by the next alert), restarts, maintenance taking precedence, nothing posted when nothing was held | Fake alert channel, stubbed clock |
 | `check_vpn.py` | The VPN check: leak alert with masked addresses, the disconnected warning and recoveries, qBittorrent before 5.1, the `/torrent status` VPN field | Local fake qBittorrent, stubbed WAN IP |
 
 `isolate.py` points the bot's state files at a temporary folder, so a

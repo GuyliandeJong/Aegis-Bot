@@ -18,6 +18,7 @@ MODULE = Module(
         "modules.torrents.seed_cleanup_monitor:SeedCleanupMonitor",
         "modules.torrents.vpn_monitor:VpnMonitor",
         "modules.torrents.peers_monitor:NoPeersMonitor",
+        "modules.torrents.dead_torrent_monitor:DeadTorrentMonitor",
     ),
     setup="modules.torrents.torrent_action_tracker:install_qbittorrent_action_tracking",
     startup_checks="modules.torrents.checks:checks",

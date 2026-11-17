@@ -61,6 +61,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_dead_torrents.py` | Dead torrent removal: off by default, the no-progress timer, progress or another state resetting it, paused and finished torrents never dead, removal with or without files, a failed removal retried, timers across a restart | Local fake qBittorrent |
 | `check_status.py` | `/status`: monitor health recorded by the monitor manager (success, failure, timeout, silence), modules on and off with the reason, maintenance, the last 24 hours of alerts, the title, administrators only | Fake interaction, stubbed monitors |
 | `check_health_endpoint.py` | The health endpoint: off when unset, 200 while healthy, 503 degraded or down, counts only, other paths refused, a busy port retried | Local port 18201 |
+| `check_bot_restart.py` | `/bot restart`: allowed users and Portainer set up, the confirmation only the same person can press, the restart request to the bot's own container (also when protected), cancel, `/container` still refusing it, and the cases where it cannot work | Local fake Portainer |
 | `check_vpn.py` | The VPN check: leak alert with masked addresses, the disconnected warning and recoveries, qBittorrent before 5.1, the `/torrent status` VPN field | Local fake qBittorrent, stubbed WAN IP |
 
 `isolate.py` points the bot's state files at a temporary folder, so a

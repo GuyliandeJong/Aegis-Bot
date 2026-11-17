@@ -21,12 +21,70 @@ def _target(name: str, default: float) -> float:
         return default
 
 
-def seeding_targets() -> tuple[float, float]:
-    """(ratio, days) after which a torrent counts as seeded enough."""
+def _parse_rules() -> list[tuple[str, float, float]]:
+    """(name as typed, ratio, days) for every readable rule."""
+    rules = []
+
+    for part in os.getenv("SEED_CATEGORY_RULES", "").split(","):
+        name, _, targets = part.partition("=")
+        ratio, _, days = targets.partition(":")
+
+        try:
+            ratio, days = float(ratio), float(days)
+        except ValueError:
+            continue
+
+        # A negative target would count everything as seeded enough.
+        if name.strip() and ratio >= 0 and days >= 0:
+            rules.append((name.strip(), ratio, days))
+
+    return rules
+
+
+def category_rules() -> dict[str, tuple[float, float]]:
+    """
+    Seeding targets per category from SEED_CATEGORY_RULES, for example
+    "PC=3:30, Movies=1:7" (category = ratio:days), by lower-case name.
+    An entry that cannot be read, or is negative, is ignored.
+    """
+    return {
+        name.casefold(): (ratio, days)
+        for name, ratio, days in _parse_rules()
+    }
+
+
+def seeding_targets(category: str | None = None) -> tuple[float, float]:
+    """
+    (ratio, days) after which a torrent counts as seeded enough: the
+    rule for its category in SEED_CATEGORY_RULES, otherwise the global
+    SEED_RATIO_TARGET and SEED_DAYS_TARGET.
+    """
+    rule = category_rules().get(str(category or "").strip().casefold())
+
+    if rule is not None:
+        return rule
+
     return (
         _target("SEED_RATIO_TARGET", 2.0),
         _target("SEED_DAYS_TARGET", 14.0),
     )
+
+
+def describe_targets() -> str:
+    """
+    "ratio 2 or 14 days of seeding", followed by the rules of single
+    categories when SEED_CATEGORY_RULES has any.
+    """
+    ratio, days = seeding_targets()
+    text = f"ratio {ratio:g} or {days:g} days of seeding"
+    rules = _parse_rules()
+
+    if rules:
+        text += " (" + "; ".join(
+            f"{name}: ratio {r:g} or {d:g} days" for name, r, d in rules
+        ) + ")"
+
+    return text
 
 
 def finished_torrents(torrents: list[dict]) -> list[dict]:
@@ -36,10 +94,11 @@ def finished_torrents(torrents: list[dict]) -> list[dict]:
     Each gets a "done" flag: its ratio or its seeding time reached the
     target. Within each group the highest ratio comes first.
     """
-    ratio_target, days_target = seeding_targets()
     finished = []
 
     for torrent in torrents:
+        ratio_target, days_target = seeding_targets(torrent.get("category"))
+
         try:
             if float(torrent.get("progress") or 0) < 1.0:
                 continue
@@ -83,7 +142,6 @@ def page_count(finished: list[dict]) -> int:
 
 
 def cleanup_embed(finished: list[dict], page: int = 0, chosen=()) -> discord.Embed:
-    ratio_target, days_target = seeding_targets()
     done = [t for t in finished if t["done"]]
     shown = finished[page * PAGE_SIZE:(page + 1) * PAGE_SIZE]
 
@@ -101,7 +159,7 @@ def cleanup_embed(finished: list[dict], page: int = 0, chosen=()) -> discord.Emb
 
     summary = (
         f"{len(finished)} finished torrent(s); {len(done)} reached "
-        f"ratio {ratio_target:g} or {days_target:g} days of seeding "
+        f"{describe_targets()} "
         f"({format_bytes(sum(int(t.get('size') or 0) for t in done))})."
     )
 

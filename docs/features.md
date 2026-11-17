@@ -27,6 +27,9 @@ off, and its commands and alerts do not exist.
 | `/jellyfin playing` | What is being played on your own Jellyfin server now: who, on which device, progress, and whether it transcodes and why | Administrators (private reply) | jellyfin |
 | `/jellyfin movies` | Looks up a movie on all Jellyfin servers, with watched state; the title has autocomplete | Everyone (private reply) | jellyfin |
 | `/container` | Lists, inspects and controls Docker containers through Portainer: `list`, `info`, `logs`, `start`, `stop`, `restart`, `kill`, `remove` | Only the users in `PORTAINER_ALLOWED_USER_IDS` | containers |
+| `/status` | The bot's health at a glance: modules on and off, maintenance, alerts of the last 24 hours, failing or silent monitors | Administrators (private reply) | general |
+| `/alert test` | Posts a test alert of a chosen level to the alert channel | Administrators (private reply) | general |
+| `/bot restart` | Restarts the bot's own container through Portainer, after a confirmation | Users in `PORTAINER_ALLOWED_USER_IDS` (private reply) | containers |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone | general |
 | `/help` | Lists the commands you can use, by area; `/help <command>` shows one command's options (autocomplete) | Everyone (private reply) | general |
 
@@ -39,8 +42,8 @@ Server Settings > Integrations.
 
 `/help` builds its list from the commands the bot has loaded, so a new
 command shows up without changes. It leaves out what the person cannot
-run: administrator commands for members, `/container` for anyone not in
-`PORTAINER_ALLOWED_USER_IDS`, and `/torrent cleanup` for
+run: administrator commands for members, `/container` and `/bot` for anyone
+not in `PORTAINER_ALLOWED_USER_IDS`, and `/torrent cleanup` for
 non-administrators. It goes by the command defaults and does not see
 changes made under Server Settings > Integrations.
 
@@ -393,7 +396,16 @@ and the reply is visible to them only.
 ```text
 SEED_RATIO_TARGET=2     # a ratio counted as seeded enough
 SEED_DAYS_TARGET=14     # or this many days of seeding
+SEED_CATEGORY_RULES=PC=3:30,Movies=1:7   # other targets per category
 ```
+
+`SEED_CATEGORY_RULES` gives single categories their own targets, as
+`category=ratio:days`, comma separated, so PC games can seed longer than
+movies. Category names are matched without regard to case, a category
+without a rule keeps the two global targets, and an entry that cannot be
+read (or is negative) is ignored. Each torrent is judged by its own
+category's targets, and the overview and the weekly suggestion name the
+rules next to the global ones.
 
 Once a week the bot posts the torrents that reached a target in the
 alert channel: how many, their total size and the list (the first
@@ -414,6 +426,26 @@ CLEANUP_REMINDER_HOUR=11     # container time
 qBittorrent's own share limits (Options > BitTorrent) can stop or
 remove torrents automatically; the bot only shows and removes on
 request.
+
+### Dead torrents
+
+Downloads that are stuck for good can be removed automatically. With
+`DEAD_TORRENT_DAYS` set above 0, an unfinished torrent that is stalled or
+stuck on metadata, and whose progress has not grown for that many days,
+is removed and "Dead Torrent Removed" is posted (the torrent, how long
+it made no progress, at what percentage), mentioning the person who
+added it so a better release can be searched. Any progress, another
+state or leaving qBittorrent resets the timer; paused and stopped
+torrents are never dead. It is **off by default**, since removing cannot
+be undone.
+
+```text
+DEAD_TORRENT_DAYS=0              # 0 turns it off
+DEAD_TORRENT_DELETE_FILES=true   # false keeps the partial download
+```
+
+The check runs every ten minutes and a failed removal is tried again at
+the next run.
 
 ### Speed
 

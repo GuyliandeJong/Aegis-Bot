@@ -58,6 +58,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_release_notes.py` | Release notes per version: a version's own notes before the shared install notes, placeholders replaced, a tag that is not a version refused, every notes file in the repository reads correctly | `scripts/release_notes.sh` in a temporary folder |
 | `check_alert_test.py` | `/alert test`: the posted test alert per level, administrators only by default, muted by maintenance except critical, and the reply when nothing was posted | Fake alert channel and interaction |
 | `check_seed_rules.py` | Seeding targets per category: parsing `SEED_CATEGORY_RULES`, categories without a rule, each torrent judged by its own category, the overview wording, damaged settings | Pure functions |
+| `check_dead_torrents.py` | Dead torrent removal: off by default, the no-progress timer, progress or another state resetting it, paused and finished torrents never dead, removal with or without files, a failed removal retried, timers across a restart | Local fake qBittorrent |
 | `check_vpn.py` | The VPN check: leak alert with masked addresses, the disconnected warning and recoveries, qBittorrent before 5.1, the `/torrent status` VPN field | Local fake qBittorrent, stubbed WAN IP |
 
 `isolate.py` points the bot's state files at a temporary folder, so a

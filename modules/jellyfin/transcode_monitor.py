@@ -7,6 +7,7 @@ import time
 import discord
 
 from config.paths import DATA_DIR
+from core import activity_log
 from core.base_monitor import BaseMonitor
 from modules.jellyfin.jellyfin_service import JellyfinService
 from modules.jellyfin.transcode import describe_reasons
@@ -177,6 +178,14 @@ class TranscodeMonitor(BaseMonitor):
 
         if reasons:
             text += f" because of: {', '.join(reasons)}"
+
+        # For the weekly summary ("Transcoding").
+        activity_log.record(
+            "transcode",
+            device=where,
+            what=what,
+            reasons=reasons,
+        )
 
         await self.notification_service.warning(
             title="Jellyfin Is Transcoding",

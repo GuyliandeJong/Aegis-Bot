@@ -174,6 +174,7 @@ class WeeklySummaryMonitor(BaseMonitor):
         ("wan", "🌐 Internet", "_outages"),
         ("torrents", "🧲 qBittorrent peers", "_no_peers"),
         ("backup", "🗄️ Backup", "_backup"),
+        ("jellyfin", "🎞️ Transcoding", "_transcodes"),
         ("jellyfin", "💬 Subtitles", "_subtitles"),
         ("jellyfin", "🍿 Watched this week", "_watched"),
         ("general", "🔔 Alerts", "_alerts"),
@@ -678,6 +679,42 @@ class WeeklySummaryMonitor(BaseMonitor):
             parts.append(f"{name} " + ", ".join(done))
 
         return "; ".join(parts)
+
+    @staticmethod
+    def _ranked(values, limit: int = 3) -> str:
+        """"Living Room TV ×2, Phone ×1", most frequent first."""
+        counts: dict[str, int] = {}
+
+        for value in values:
+            counts[value] = counts.get(value, 0) + 1
+
+        top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+
+        return ", ".join(f"{name} ×{count}" for name, count in top[:limit])
+
+    @staticmethod
+    def _transcodes(since: float) -> str | None:
+        """Playback that made Jellyfin transcode (TranscodeMonitor alerts)."""
+        entries = activity_log.since(since, "transcode")
+
+        if not entries:
+            return None
+
+        ranked = WeeklySummaryMonitor._ranked
+        video = [e for e in entries if e.get("what") != "audio"]
+        line = (
+            f"{len(entries)} transcode{'s' if len(entries) != 1 else ''}"
+            + (f" ({len(video)} video)" if len(video) != len(entries) else "")
+            + ". Devices: "
+            + ranked(e.get("device") or "unknown" for e in entries)
+            + "."
+        )
+        reasons = [r for e in entries for r in e.get("reasons") or []]
+
+        if reasons:
+            line += " Reasons: " + ranked(reasons) + "."
+
+        return line
 
     @staticmethod
     def _no_peers(since: float) -> str | None:

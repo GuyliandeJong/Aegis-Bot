@@ -651,6 +651,17 @@ EXPECTED = {
         "field listed for the ups module: True",
         "NUT_HOST empty -> requests: [] | alerts: []",
     ],
+    "check_image_updates.py": [
+        "outdated: [('jellyfin/jellyfin:latest', ['jellyfin', 'jellyfin-copy']), ('linuxserver/sonarr:latest', ['sonarr'])]",
+        "checked: 3 | skipped: 3",
+        "registry asked once per image: ['example/broken:latest', 'ghcr.io/example/tool:1.2', 'jellyfin/jellyfin:latest', 'linuxserver/sonarr:latest']",
+        "text: 2 of 3 images have a newer version: / • `jellyfin/jellyfin:latest` (jellyfin, jellyfin-copy) / • `linuxserver/sonarr:latest` (sonarr) / (3 could not be compared.)",
+        "field listed for the containers module: True",
+        "WEEKLY_SUMMARY_IMAGE_UPDATES=false -> None | asked: []",
+        "Portainer not configured -> None",
+        "everything current -> All 3 images are current.",
+        "nothing pulled from a registry -> No image could be compared with its registry.",
+    ],
     "check_recheck_notifications.py": [
         "completed            -> ['Alpha']",
         "seeding              -> ['Alpha']",

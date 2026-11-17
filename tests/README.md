@@ -64,6 +64,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_bot_restart.py` | `/bot restart`: allowed users and Portainer set up, the confirmation only the same person can press, the restart request to the bot's own container (also when protected), cancel, `/container` still refusing it, and the cases where it cannot work | Local fake Portainer |
 | `check_quiet_hours.py` | Quiet hours: the window formats and boundaries, which alerts are held, the summary when the window ends (by the monitor and by the next alert), restarts, maintenance taking precedence, nothing posted when nothing was held | Fake alert channel, stubbed clock |
 | `check_ups.py` | The UPS monitor: outage, low battery, restored with its duration, replace battery, an unreachable NUT server and an outage ending while it is unreachable, an unknown UPS, missing variables, state across a restart, the weekly power line, off without `NUT_HOST` | Local fake NUT server (port 18203) |
+| `check_image_updates.py` | Images with updates: current and outdated images, an image shared by two containers asked once, local and digest-pinned images and a silent registry skipped, stopped containers ignored, the weekly field (text, off, not configured, nothing comparable) | Local fake Portainer (port 18204) |
 | `check_vpn.py` | The VPN check: leak alert with masked addresses, the disconnected warning and recoveries, qBittorrent before 5.1, the `/torrent status` VPN field | Local fake qBittorrent, stubbed WAN IP |
 
 `isolate.py` points the bot's state files at a temporary folder, so a

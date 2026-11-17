@@ -443,6 +443,46 @@ class PortainerService:
 
         raise PortainerError(self._api_message(status, body))
 
+    async def own_container(self) -> dict:
+        """
+        The bot's own container, found by the hostname Docker gives it
+        (the start of its id). PortainerError when it cannot be told.
+        """
+        hostname = _env("HOSTNAME")
+
+        if len(hostname) >= 12:
+            for container in await self.list_containers(fresh=True):
+                if container["id"].startswith(hostname):
+                    return container
+
+        raise PortainerError(
+            "The bot could not find its own container. It must run in "
+            "Docker, on the Portainer environment PORTAINER_ENDPOINT_ID."
+        )
+
+    async def restart_own_container(self) -> None:
+        """
+        Restart the bot's own container (and so the bot).
+
+        This is the one restart that skips protection: it is only used
+        by /bot restart, which asks the person to confirm first. The
+        request is not answered before Docker stops this process, so
+        callers do not wait for a result; a refusal raises.
+        """
+        container = await self.own_container()
+
+        status, body = await self._request(
+            "POST",
+            f"/containers/{container['id']}/restart",
+            params={"t": str(STOP_GRACE_SECONDS)},
+            timeout=ACTION_TIMEOUT,
+        )
+
+        _list_cache["data"] = None
+
+        if status not in (204, 304):
+            raise PortainerError(self._api_message(status, body))
+
     async def remove(self, container: dict) -> None:
         """
         Remove a stopped container.

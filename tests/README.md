@@ -55,6 +55,7 @@ not that Discord or another person's Jellyfin behaves as assumed.
 | `check_no_peers.py` | The no-peers watchdog: counting, the alert, the restart through Portainer, grace period, restart limit, recovery, state across restarts, the cases where it stays quiet, the `/torrent status` Peers field and the weekly summary line | Local fake qBittorrent and Portainer |
 | `check_recheck_notifications.py` | A finished torrent is not announced again after a recheck, missing files or a power cut; it is when it is downloaded again or gets a new completion time | Fake qBittorrent list |
 | `check_transcode_alert.py` | The Jellyfin transcode alert: one warning per transcoded stream after two checks, the text, direct play and blips ignored, audio-only off by default, a silent server, another server ignored, state across a restart | Local fake Jellyfin |
+| `check_release_notes.py` | Release notes per version: a version's own notes before the shared install notes, placeholders replaced, a tag that is not a version refused, every notes file in the repository reads correctly | `scripts/release_notes.sh` in a temporary folder |
 | `check_vpn.py` | The VPN check: leak alert with masked addresses, the disconnected warning and recoveries, qBittorrent before 5.1, the `/torrent status` VPN field | Local fake qBittorrent, stubbed WAN IP |
 
 `isolate.py` points the bot's state files at a temporary folder, so a

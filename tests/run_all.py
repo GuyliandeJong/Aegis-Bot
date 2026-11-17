@@ -495,6 +495,18 @@ EXPECTED = {
         "field listed for the torrents module: True",
         "restarts after outages unchanged: newt restarted 2×; x failed 1×",
     ],
+    "check_release_notes.py": [
+        "exit: 0",
+        "lines: [\"## What's new in 2.0.0\", '- a change, see Some-Owner/Repo@v2.0.0', '', 'INSTALL 2.0.0 v2.0.0 some-owner Some-Owner/Repo']",
+        "own notes first: True",
+        "exit: 0 | lines: ['INSTALL 2.1.0 v2.1.0 some-owner Some-Owner/Repo']",
+        "'../x'           -> exit 1 | stdout empty: True | Not a version tag: ../x",
+        "'main'           -> exit 1 | stdout empty: True | Not a version tag: main",
+        "'v1.0/../../x'   -> exit 1 | stdout empty: True | Not a version tag: v1.0/../../x",
+        "missing arguments -> exit: 1 | usage: release_notes.sh <tag> <owner> <owner/repo>",
+        "v1.2.0 has notes: True",
+        "every notes file reads correctly (heading first, placeholders replaced, install notes after): True []",
+    ],
     "check_recheck_notifications.py": [
         "completed            -> ['Alpha']",
         "seeding              -> ['Alpha']",

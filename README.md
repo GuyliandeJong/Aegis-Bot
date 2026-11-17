@@ -15,17 +15,18 @@ one Discord server and runs in Docker.
 
 | Module | What it does | Commands | On when these are set |
 |---|---|---|---|
-| general | Help, maintenance mode, weekly summary, heartbeat | `/help`, `/maintenance`, `/ping`, `/hello` | Always |
-| host | CPU, memory, disk and network of the machine the bot runs on | `/cpu`, `/memory`, `/filesystems`, `/network` | Always |
+| general | Help, status, test alerts, maintenance mode, quiet hours, weekly summary, health endpoint | `/help`, `/status`, `/alert`, `/maintenance`, `/ping`, `/hello` | Always |
+| host | CPU, memory, disk (with optional SMART health) and network of the machine the bot runs on | `/cpu`, `/memory`, `/filesystems`, `/network` | Always |
 | wan | Internet outages, public IP changes, container restarts after an outage | `/wan` | Always |
 | idrac | Dell server hardware: temperatures, RAID, power, fans, event log | `/server`, `/idrac`, `/storage`, `/temperature` | `IDRAC_HOST`, `IDRAC_USERNAME`, `IDRAC_PASSWORD` |
 | esxi | ESXi datastores, virtual machines and old snapshots | `/esxi` | `ESXI_HOST`, `ESXI_USERNAME`, `ESXI_PASSWORD` |
-| containers | Docker containers through Portainer: control, crash alerts, Watchtower updates | `/container` | `PORTAINER_URL`, `PORTAINER_API_KEY`, `PORTAINER_ENDPOINT_ID` |
+| containers | Docker containers through Portainer: control, restarting the bot, crash alerts, Watchtower updates, images with updates | `/container`, `/bot` | `PORTAINER_URL`, `PORTAINER_API_KEY`, `PORTAINER_ENDPOINT_ID` |
 | torrents | qBittorrent: search (Jackett), add, list, approvals, watchlist, seeding cleanup, VPN check | `/torrent` | `QBITTORRENT_HOST`, `QBITTORRENT_USERNAME`, `QBITTORRENT_PASSWORD` |
 | jellyfin | Jellyfin: movie lookup with watched state, now playing, new content, subtitles, copies between servers | `/jellyfin` | `JELLYFIN_1_URL`, `JELLYFIN_1_API_KEY` |
 | wol | Wake and sleep a computer through GPTWOL | `/wol` | `GPTWOL_HOST`, `GPTWOL_TARGET_IP`, `GPTWOL_TARGET_MAC` |
 | minecraft | Minecraft Java server status, joins, down alerts | `/minecraft` | `MINECRAFT_SERVERS` |
 | uptime | Public URLs answering and their TLS certificates | — | `UPTIME_URLS` |
+| ups | UPS power outages, low battery and a battery to replace, through NUT | — | `NUT_HOST` |
 | backup | Alerts when the backup script has not succeeded recently | — | `BACKUP_PATHS` |
 | fluxer | Mirrors every alert to a Fluxer channel | — | `FLUXER_WEBHOOK_URL` |
 

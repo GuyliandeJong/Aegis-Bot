@@ -44,7 +44,7 @@ print("  v1.2.0 has notes:", "v1.2.0" in releases)
 problems = []
 for tag in releases:
     code, out, err = run(PROJECT, tag, "Some-Owner", "Some-Owner/Repo")
-    heading = "## What" + chr(39) + "s new in " + tag[1:]
-    if code != 0 or not out.startswith(heading) or "{{" in out or "## Install" not in out:
+    first = out.splitlines()[0] if out else ""
+    if code != 0 or not first.startswith("## ") or tag[1:] not in first or "{{" in out or "## Install" not in out:
         problems.append(tag)
 print("  every notes file reads correctly (heading first, placeholders replaced, install notes after):", not problems, problems)

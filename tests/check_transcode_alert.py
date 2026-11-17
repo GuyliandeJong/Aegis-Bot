@@ -3,6 +3,7 @@ import asyncio
 import logging
 import os
 import sys
+import time
 import types
 
 from aiohttp import web
@@ -201,6 +202,27 @@ async def main():
         CALLS.clear(); await run(mon, 4)
         print("  transcoding on the other server -> alerts:", len(notes.sent), "| servers asked:", sorted(set(CALLS)))
         SESSIONS["friend"] = []
+
+        print("\n== the weekly summary ==")
+        import modules.general.weekly_summary_monitor as WS
+        from core import activity_log
+        week = time.time() - 3600
+        activity_log._entries[:] = []
+        print("  quiet week ->", WS.WeeklySummaryMonitor._transcodes(week))
+        notes, mon = fresh()
+        SESSIONS["home"] = [stream(device="Living Room TV"), stream(device="Phone", title="Other Film", user="Sam", reasons=("VideoCodecNotSupported",))]
+        await run(mon, 2)
+        SESSIONS["home"] = [stream(device="Living Room TV", title="Third Film", reasons=("ContainerNotSupported",), user="Alex")]
+        await run(mon, 2)
+        print("  three transcodes ->", WS.WeeklySummaryMonitor._transcodes(week))
+        SESSIONS["home"] = [stream(device="Kitchen", title="Fourth", video_direct=True, reasons=("AudioCodecNotSupported",))]
+        os.environ["JELLYFIN_TRANSCODE_AUDIO_ALERTS"] = "true"
+        await run(mon, 2)
+        del os.environ["JELLYFIN_TRANSCODE_AUDIO_ALERTS"]
+        print("  plus an audio-only one ->", WS.WeeklySummaryMonitor._transcodes(week))
+        print("  older than the week ->", WS.WeeklySummaryMonitor._transcodes(time.time() + 60))
+        print("  field listed for the jellyfin module:", ("jellyfin", "🎞️ Transcoding", "_transcodes") in WS.WeeklySummaryMonitor.FIELDS)
+        SESSIONS["home"] = []
 
         print("\n== off ==")
         notes, mon = fresh()

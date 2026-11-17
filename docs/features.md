@@ -717,6 +717,63 @@ start equals its end, turns quiet hours off and says so once in the
 log. Held alerts are kept in `data/quiet_hours.json`, so a restart does
 not lose them, and are still counted in the weekly summary.
 
+### UPS power
+
+The ups module reads a UPS from a NUT (Network UPS Tools) server and
+alerts on power problems. It is on when `NUT_HOST` is set:
+
+```text
+NUT_HOST=192.0.2.20    # the machine running upsd
+NUT_PORT=3493
+NUT_UPS=ups            # the name shown by: upsc -l
+```
+
+- "Power Outage" (warning) once when the UPS runs on battery, with the
+  charge, the runtime left and the load; "Power Restored" with how long
+  it lasted when it is back on line power.
+- "UPS Battery Low" (critical) once per outage, and "UPS Battery Needs
+  Replacing" (warning) once until the UPS stops reporting it.
+- "UPS Monitor Not Reachable" after three failed reads (90 seconds) in
+  a row, and "Reachable Again". An unreachable NUT server is never read
+  as "power is back"; an outage that ends meanwhile is reported when
+  the server answers.
+- The weekly summary's "Power" field gives the number of outages, the
+  total time on battery and the longest.
+
+The bot only reads the UPS (NUT's `GET VAR`, no login). It can only
+report an outage while its own server is powered, so that server should
+be on the UPS.
+
+### SMART disk health
+
+With `SMART_DEVICES` set, the host module runs `smartctl` once an hour
+on those disks:
+
+```text
+SMART_DEVICES=/dev/sda,/dev/nvme0n1
+SMART_NVME_WEAR=90      # NVMe: warn at this percent of life used
+```
+
+- "Disk Health Failing" (critical) when SMART's own verdict fails, and
+  "Disk Health OK Again" if it passes.
+- SATA and SAS disks: "Disk Has Bad Sectors" once while pending or
+  uncorrectable sectors exist, and "Disk Reallocated Sectors Increasing"
+  each time the reallocated count grows. The first reading is the
+  baseline, so a disk with old reallocated sectors is not reported for
+  them.
+- NVMe disks: "NVMe Critical Warning" for any warning flag, "NVMe Wear
+  High" at the wear limit and "NVMe Media Errors Increasing".
+- A disk that cannot be read three checks in a row gives one "SMART Not
+  Readable" warning. A sleeping disk is skipped, not woken.
+
+The image contains `smartctl`, but the container must be given the disks
+and the capability to read them. In `docker-compose.yml`, uncomment the
+`devices` and `cap_add` lines of `docker-compose.example.yml` for your
+disks. An existing install must rebuild or pull the image first. Disks
+behind a RAID controller (such as a PERC) are not readable this way; the
+iDRAC module reports their health. Without `smartctl`, or without
+access to the disks, the monitor does nothing.
+
 ### Maintenance mode
 
 `/maintenance start` with a duration (30 minutes, 1, 2, 4, 8 or 24
@@ -994,3 +1051,23 @@ the person who asked.
 - Every confirmation step expires after 30 seconds.
 - The container is looked up by name again just before the action, so
   one that was recreated since it was picked is left alone.
+
+`/bot restart` restarts the bot's own container, which `/container`
+refuses on purpose. It asks for one confirmation (only the person who
+ran it can press, and only users in `PORTAINER_ALLOWED_USER_IDS` may
+run it), then restarts the container through Portainer. The bot is back
+in about half a minute; buttons on open messages are marked as expired
+when it starts. The container is restarted, not rebuilt: a changed image
+still needs `scripts/rebuild.sh`. The bot finds its own container by its
+hostname, as for the protection above.
+
+The weekly summary's "📦 Images with updates" lists the running
+containers whose image has a newer version in its registry, for example
+"`jellyfin/jellyfin:latest` (jellyfin)". For each distinct image the bot
+asks the Docker daemon, through Portainer, which digest the registry has
+for its name and tag, and compares it with the digests the image was
+pulled as. This works with Portainer Community Edition and needs no
+registry login from the bot. Images built on the server, pinned by
+digest, or whose registry does not answer are skipped and counted
+("3 could not be compared"). `WEEKLY_SUMMARY_IMAGE_UPDATES=false` turns
+the field off.

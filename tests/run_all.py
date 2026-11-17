@@ -504,7 +504,7 @@ EXPECTED = {
         "'main'           -> exit 1 | stdout empty: True | Not a version tag: main",
         "'v1.0/../../x'   -> exit 1 | stdout empty: True | Not a version tag: v1.0/../../x",
         "missing arguments -> exit: 1 | usage: release_notes.sh <tag> <owner> <owner/repo>",
-        "v1.2.0 has notes: True",
+        "every released version has notes: True",
         "every notes file reads correctly (heading first, placeholders replaced, install notes after): True []",
     ],
     "check_recheck_notifications.py": [

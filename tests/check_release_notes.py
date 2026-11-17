@@ -40,7 +40,7 @@ print("  missing arguments -> exit:", code, "|", err)
 
 print("\n== the repository's own notes ==")
 releases = sorted(p.stem for p in (PROJECT / ".github" / "releases").glob("v*.md"))
-print("  v1.2.0 has notes:", "v1.2.0" in releases)
+print("  every released version has notes:", all(t in releases for t in ("v1.0.0", "v1.1.0", "v1.2.0")))
 problems = []
 for tag in releases:
     code, out, err = run(PROJECT, tag, "Some-Owner", "Some-Owner/Repo")

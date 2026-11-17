@@ -13,7 +13,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from core import activity_log, maintenance, modules
-from core import monitor_manager
+from core.monitor_manager import problems as monitor_problems
 from utils import theme
 from utils.embed_models import EmbedField
 from utils.embeds import create_embed
@@ -22,35 +22,7 @@ from utils.formatting import format_compact_duration
 
 STARTED = time.time()
 
-# A monitor that has not finished a check for this many of its own
-# intervals (and at least a minute) counts as stopped.
-STALE_INTERVALS = 3
-
 DAY = 86400
-
-
-def monitor_problems(now: float | None = None) -> tuple[int, list[str]]:
-    """(monitors seen, one line per failing or silent monitor)."""
-    now = time.time() if now is None else now
-    problems = []
-
-    for name, entry in sorted(monitor_manager.HEALTH.items()):
-        interval = float(entry.get("interval") or 60)
-        last_ok = entry.get("last_ok")
-        last_error = entry.get("last_error")
-
-        if last_error and (not last_ok or last_error > last_ok):
-            problems.append(
-                f"⚠️ **{name}** failed {format_compact_duration(now - last_error)} ago: "
-                f"{entry.get('error') or 'unknown error'}"
-            )
-        elif last_ok and now - last_ok > max(60, STALE_INTERVALS * interval):
-            problems.append(
-                f"⚠️ **{name}** has not finished a check for "
-                f"{format_compact_duration(now - last_ok)}"
-            )
-
-    return len(monitor_manager.HEALTH), problems
 
 
 def module_lines() -> tuple[str, str]:

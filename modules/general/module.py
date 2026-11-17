@@ -10,6 +10,7 @@ MODULE = Module(
         "modules.general.weekly_summary_monitor:WeeklySummaryMonitor",
         "modules.general.heartbeat_monitor:HeartbeatMonitor",
         "modules.general.maintenance_monitor:MaintenanceMonitor",
+        "modules.general.health_endpoint:HealthEndpoint",
     ),
     always_on=True,
 )

@@ -23,6 +23,38 @@ def record_health(name: str, interval: float, error: str | None = None) -> None:
         entry["error"] = error[:200]
 
 
+# A monitor that has not finished a check for this many of its own
+# intervals (and at least a minute) counts as stopped.
+STALE_INTERVALS = 3
+
+
+def problems(now: float | None = None) -> tuple[int, list[str]]:
+    """(monitors seen, one line per failing or silent monitor)."""
+    # Imported here: utils.formatting is not needed to record health.
+    from utils.formatting import format_compact_duration
+
+    now = time.time() if now is None else now
+    found = []
+
+    for name, entry in sorted(HEALTH.items()):
+        interval = float(entry.get("interval") or 60)
+        last_ok = entry.get("last_ok")
+        last_error = entry.get("last_error")
+
+        if last_error and (not last_ok or last_error > last_ok):
+            found.append(
+                f"⚠️ **{name}** failed {format_compact_duration(now - last_error)} ago: "
+                f"{entry.get('error') or 'unknown error'}"
+            )
+        elif last_ok and now - last_ok > max(60, STALE_INTERVALS * interval):
+            found.append(
+                f"⚠️ **{name}** has not finished a check for "
+                f"{format_compact_duration(now - last_ok)}"
+            )
+
+    return len(HEALTH), found
+
+
 class MonitorManager:
     """
     Coordinates all monitoring tasks.

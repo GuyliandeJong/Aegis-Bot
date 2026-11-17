@@ -511,6 +511,16 @@ EXPECTED = {
         "every released version has notes: True",
         "every notes file reads correctly (heading first, placeholders replaced, install notes after): True []",
     ],
+    "check_alert_test.py": [
+        "administrators only by default: True",
+        "levels offered: ['info', 'warning', 'critical', 'recovered', 'success']",
+        "default level -> Test Alert (info) | The info test alert was posted in <#10>. | private: True",
+        "critical  -> Test Alert (critical)",
+        "description: <@42> sent this with `/alert test`. Nothing is wrong.",
+        "warning muted -> posted: 0 | The warning test alert was not posted. Maintenance mode is",
+        "critical goes through -> Test Alert (critical) (during maintenance) | The critical test alert was posted in <#10>.",
+        "The info test alert was not posted. The alert channel was not found. C",
+    ],
     "check_recheck_notifications.py": [
         "completed            -> ['Alpha']",
         "seeding              -> ['Alpha']",

@@ -150,3 +150,17 @@ print("\nTemperature (checks 40 minutes apart, so cooldown never applies)")
 print("  50 -> 75 -> 50            :", t_run([50, 75, 50]))
 print("  legacy state 'ok', 50, 50 :", t_run([50, 50], {"CPU1 Temp": "ok"}))
 print("  75 -> 90 -> 75 -> 50      :", t_run([50, 75, 90, 75, 50])[0])
+
+
+def t_texts(seq):
+    state.temperatures = {}; state.alerts = {}; state.last_success = {}; state.stale = {}
+    notes = Notes(); m = TemperatureMonitor(notes)
+    for v in seq:
+        temp["c"] = v; asyncio.run(m.check()); CLOCK["now"] += timedelta(minutes=40)
+    return notes.sent
+
+
+print("\nTemperature alert text (the same layout as the CPU alerts: a sentence, then values in code format)")
+for level, title, description in t_texts([50, 75, 90, 75, 50]):
+    print(f"  {title}: {description!r}")
+print("  no 'Sensor' block repeating the title:", not any("**Sensor**" in d for _, _, d in t_texts([50, 75, 90, 50])))

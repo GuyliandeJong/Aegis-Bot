@@ -170,14 +170,9 @@ class TemperatureMonitor(BaseMonitor):
                 await self.notification_service.recovered(
                     title=f"Temperature Recovered — {sensor.name}",
                     description=(
-                        f"**Sensor**\n"
-                        f"{sensor.name}\n\n"
+                        f"{sensor.name} has returned to normal levels.\n\n"
                         f"**Current Temperature**\n"
-                        f"{sensor.reading:.1f}°C\n\n"
-                        f"**Warning Threshold**\n"
-                        f"{settings.TEMPERATURE_WARNING:.1f}°C\n\n"
-                        f"**Critical Threshold**\n"
-                        f"{settings.TEMPERATURE_CRITICAL:.1f}°C"
+                        f"`{sensor.reading:.1f}°C`"
                     ),
                 )
 
@@ -189,14 +184,13 @@ class TemperatureMonitor(BaseMonitor):
                 await self.notification_service.warning(
                     title=f"High Temperature — {sensor.name}",
                     description=(
-                        f"**Sensor**\n"
-                        f"{sensor.name}\n\n"
+                        f"{sensor.name} is above its warning threshold.\n\n"
                         f"**Current Temperature**\n"
-                        f"{sensor.reading:.1f}°C\n\n"
+                        f"`{sensor.reading:.1f}°C`\n\n"
                         f"**Warning Threshold**\n"
-                        f"{settings.TEMPERATURE_WARNING:.1f}°C\n\n"
+                        f"`{settings.TEMPERATURE_WARNING:.1f}°C`\n\n"
                         f"**Critical Threshold**\n"
-                        f"{settings.TEMPERATURE_CRITICAL:.1f}°C"
+                        f"`{settings.TEMPERATURE_CRITICAL:.1f}°C`"
                     ),
                 )
 
@@ -208,12 +202,11 @@ class TemperatureMonitor(BaseMonitor):
                 await self.notification_service.critical(
                     title=f"Critical Temperature — {sensor.name}",
                     description=(
-                        f"**Sensor**\n"
-                        f"{sensor.name}\n\n"
+                        f"{sensor.name} is above its critical threshold.\n\n"
                         f"**Current Temperature**\n"
-                        f"{sensor.reading:.1f}°C\n\n"
+                        f"`{sensor.reading:.1f}°C`\n\n"
                         f"**Critical Threshold**\n"
-                        f"{settings.TEMPERATURE_CRITICAL:.1f}°C"
+                        f"`{settings.TEMPERATURE_CRITICAL:.1f}°C`"
                     ),
                 )
 

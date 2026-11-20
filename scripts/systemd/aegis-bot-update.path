@@ -1,0 +1,11 @@
+# Starts the update the moment the bot writes data/update_request.
+# Installed by scripts/install_update_service.sh.
+[Unit]
+Description=Aegis-Bot update request
+
+[Path]
+PathChanged=__PROJECT__/data/update_request
+Unit=aegis-bot-update.service
+
+[Install]
+WantedBy=multi-user.target

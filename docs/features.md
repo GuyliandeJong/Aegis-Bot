@@ -29,7 +29,7 @@ off, and its commands and alerts do not exist.
 | `/container` | Lists, inspects and controls Docker containers through Portainer: `list`, `info`, `logs`, `start`, `stop`, `restart`, `kill`, `remove` | Only the users in `PORTAINER_ALLOWED_USER_IDS` | containers |
 | `/status` | The bot's health at a glance: modules on and off, maintenance, alerts of the last 24 hours, failing or silent monitors | Administrators (private reply) | general |
 | `/alert test` | Posts a test alert of a chosen level to the alert channel | Administrators (private reply) | general |
-| `/bot restart` | Restarts the bot's own container through Portainer, after a confirmation | Users in `PORTAINER_ALLOWED_USER_IDS` (private reply) | containers |
+| `/bot restart`, `/bot update` | Restarts the bot's own container through Portainer; or fetches a branch on the server and restarts the bot with it, like `git try` (needs the host service), each after a confirmation | Users in `PORTAINER_ALLOWED_USER_IDS` (private reply) | containers |
 | `/ping`, `/hello` | Checks that the bot responds | Everyone | general |
 | `/help` | Lists the commands you can use, by area; `/help <command>` shows one command's options (autocomplete) | Everyone (private reply) | general |
 
@@ -1100,6 +1100,53 @@ in about half a minute; buttons on open messages are marked as expired
 when it starts. The container is restarted, not rebuilt: a changed image
 still needs `scripts/rebuild.sh`. The bot finds its own container the
 same three ways as for the protection above.
+
+`/bot update [branch]` updates the bot from Discord, like `git try
+<branch>` (or `git back` for main, the default) on the server. The bot
+runs in a container and cannot run commands on the server, and polling
+was ruled out, so it works from the outside in: the bot writes a small
+request file in `data/`, a systemd path unit on the server watches that
+file with inotify and starts `scripts/update_host.sh` at once, and the
+script fetches the branch, fast-forwards to it and restarts the
+container. It runs as your own user with plain `docker compose`, so it
+needs no `sudo` and no password, and it does not use `ds`.
+
+One-time setup on the server:
+
+```bash
+bash scripts/install_update_service.sh
+```
+
+It asks for your sudo password once, installs
+`aegis-bot-update.path` and `.service` in `/etc/systemd/system` and
+starts watching (`--print` shows the units, `--uninstall` removes
+them). Then in `.env`:
+
+```text
+REMOTE_UPDATE=true
+WATCHDOG_WEBHOOK_URL=https://discord.com/api/webhooks/...   # the result is posted here
+UPDATE_COMPOSE_DIR=/home/you/.docker/compose                # DockSTARTer's compose folder
+```
+
+and restart the bot once. Without the webhook the update still runs and
+is logged in `~/.local/state/aegis-bot/update.log`, but nothing is
+posted in Discord. Without `UPDATE_COMPOSE_DIR`, `docker compose` runs in
+the project folder; with DockSTARTer the folder is the one in your
+rebuild log (`docker compose --project-directory ...`).
+
+The command is for the users in `PORTAINER_ALLOWED_USER_IDS`, asks for a
+confirmation, and is off until `REMOTE_UPDATE=true`. The host script
+checks everything again: a plain branch name that exists on origin, a
+request younger than ten minutes, an id it has not handled, and only one
+update at a time. Nothing in the request is ever run as a command. A
+server with uncommitted changes, or a branch that cannot be
+fast-forwarded, is reported and left alone.
+
+What it does not do: it does not rebuild the image (changes to the
+Dockerfile or `requirements.txt` still need `scripts/rebuild.sh` by
+hand), and it does not regenerate DockSTARTer's merged compose file.
+Anyone who can write to the bot's `data/` folder can ask for an update
+of a branch of your own repository, so keep that folder private.
 
 The weekly summary's "📦 Images with updates" lists the running
 containers whose image has a newer version in its registry, for example

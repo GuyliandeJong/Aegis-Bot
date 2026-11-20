@@ -29,7 +29,12 @@ services:
       - ./data:/app/data
 
       # Read-only view of the host, for the disk usage checks.
-      # Remove it if you do not use them.
+      # Remove it if you do not use them. NOTE: this reaches
+      # /run/docker.sock, and a read-only mount does not stop a program
+      # from connecting to a socket, so a taken-over bot could control
+      # Docker (root on the host). Prefer mounting only the folders you
+      # need (for example /mnt and /boot), and see "remote updates" in
+      # docs/features.md, which refuses to run while this is mounted.
       - /:/host:ro
 
       # Read-write media folder, only for Jellyfin downloads.

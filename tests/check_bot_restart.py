@@ -3,7 +3,9 @@ import asyncio
 import logging
 import os
 import sys
+import tempfile
 import types
+from pathlib import Path
 
 from aiohttp import web
 
@@ -23,18 +25,40 @@ os.environ.update({"PORTAINER_URL": f"http://127.0.0.1:{PORT}", "PORTAINER_API_K
 import discord
 from core import activity_log
 import modules.containers.commands.bot as BC
+import modules.containers.portainer_service as PS
 from modules.containers.portainer_service import PortainerError, PortainerService
 import isolate  # state files go to a temporary folder
 
+# What the bot reads about its own container; inside the real container
+# the real files would otherwise decide.
+MOUNTS = Path(tempfile.mkdtemp(prefix="mountinfo-", dir=str(isolate.DATA))) / "mountinfo"
+PS.MOUNTINFO = MOUNTS / "missing"
+
+
+def mountinfo(*lines):
+    MOUNTS.parent.mkdir(exist_ok=True)
+    MOUNTS.write_text("\n".join(lines) + "\n")
+    PS.MOUNTINFO = MOUNTS
+
+
+def mount_lines(container_id, root="/var/lib/docker"):
+    return [
+        f"1001 990 8:1 {root}/containers/{container_id}/resolv.conf /etc/resolv.conf rw,relatime - ext4 /dev/sda1 rw",
+        f"1002 990 8:1 {root}/containers/{container_id}/hostname /etc/hostname rw,relatime - ext4 /dev/sda1 rw",
+        f"1003 990 8:1 {root}/containers/{container_id}/hosts /etc/hosts rw,relatime - ext4 /dev/sda1 rw",
+        "1004 990 8:1 /home/user/Aegis-Bot /app rw,relatime - ext4 /dev/sda1 rw",
+    ]
+
 POSTS = []
 FAIL = {"restart": False}
+NAMES = {"own": "aegis-bot"}
 
 
 async def docker(request):
     path = request.match_info["path"]
     if path == "containers/json":
         return web.json_response([
-            {"Id": OWN, "Names": ["/aegis-bot"], "Image": "aegis-bot:latest", "State": "running", "Status": "Up 3 days"},
+            {"Id": OWN, "Names": [f"/{NAMES['own']}"], "Image": "aegis-bot:latest", "State": "running", "Status": "Up 3 days"},
             {"Id": OTHER, "Names": ["/jellyfin"], "Image": "jellyfin/jellyfin", "State": "running", "Status": "Up 3 days"},
         ])
     if FAIL["restart"]:
@@ -113,6 +137,40 @@ async def main():
         other = await service.find_container("jellyfin")
         print("  another container ->", await service.perform("restart", other), POSTS)
 
+        print("\n== recognising the bot's own container ==")
+        service = PortainerService()
+        os.environ["HOSTNAME"] = "fs01-linux"
+        NAMES["own"] = "renamed-bot"
+        mountinfo(*mount_lines(OWN))
+        print("  ids read from the mounts:", [i[:12] for i in service.own_ids()])
+        mountinfo(*mount_lines(OWN, root=""))
+        print("  the same when the data root is its own mount:", [i[:12] for i in service.own_ids()])
+        mountinfo(*mount_lines(OWN))
+        own = await service.own_container()
+        print("  custom hostname, renamed, id in the mounts ->", own["name"], "| protected:", service.protection_reason(own))
+        print("  another container is not the bot's:", service.protection_reason(await service.find_container("jellyfin")))
+        mountinfo(*mount_lines("ee" * 32))
+        NAMES["own"] = "aegis-bot"
+        own = await service.own_container()
+        print("  mounts name an unknown id, falls through to the name ->", own["name"])
+        PS.MOUNTINFO = MOUNTS / "missing"
+        os.environ["HOSTNAME"] = OWN[:12]
+        NAMES["own"] = "renamed-bot"
+        print("  no mounts, default hostname ->", (await service.own_container())["name"])
+        os.environ["HOSTNAME"] = "fs01-linux"
+        NAMES["own"] = "aegis-bot"
+        own = await service.own_container()
+        print("  no mounts, custom hostname, named aegis-bot ->", own["name"], "| protected:", service.protection_reason(own))
+        try:
+            await service.perform("restart", own)
+        except PortainerError as ex:
+            print("  /container refuses it:", ex)
+        NAMES["own"] = "renamed-bot"
+        try:
+            await service.own_container()
+        except PortainerError as ex:
+            print("  nothing matches ->", str(ex)[:90])
+
         print("\n== when it cannot work ==")
         os.environ["HOSTNAME"] = "elsewhere"
         POSTS.clear()
@@ -120,6 +178,7 @@ async def main():
         press = Interaction(); await i.log[0][2]["view"].children[0].callback(press); await settle()
         print("  unknown own container ->", press.log[0][1][:62], "| requests:", POSTS)
         os.environ["HOSTNAME"] = OWN[:12]
+        NAMES["own"] = "aegis-bot"
         FAIL["restart"] = True
         i = Interaction(); await cog.restart.callback(cog, i)
         press = Interaction(); await i.log[0][2]["view"].children[0].callback(press); await settle()

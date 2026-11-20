@@ -25,6 +25,7 @@ import json
 import os
 import re
 import time
+from pathlib import Path
 from urllib.parse import quote
 
 import aiohttp
@@ -37,6 +38,16 @@ STOP_GRACE_SECONDS = 10
 
 REQUEST_TIMEOUT = 30
 ACTION_TIMEOUT = 60
+
+# Where the bot reads which container it runs in. Docker mounts
+# /etc/hostname, /etc/hosts and /etc/resolv.conf from a folder named
+# after the container's id, whatever hostname the compose file gives it.
+MOUNTINFO = Path("/proc/self/mountinfo")
+_MOUNT_ID = re.compile(r"containers/([0-9a-f]{64})/(?:hostname|hosts|resolv\.conf)")
+
+# The container name of the bot in docker-compose.example.yml and in
+# DockSTARTer; the last way the bot recognises its own container.
+BOT_CONTAINER_NAME = "aegis-bot"
 
 # The container list is cached briefly so autocomplete, which Discord
 # calls on every keystroke, does not hit Portainer each time.
@@ -116,6 +127,36 @@ class PortainerService:
         """An empty list allows nobody."""
         return user_id in self.allowed_user_ids
 
+    @staticmethod
+    def own_ids() -> list[str]:
+        """The container ids the bot's own mounts point to (usually one)."""
+        try:
+            text = MOUNTINFO.read_text()
+        except OSError:
+            return []
+
+        return list(dict.fromkeys(_MOUNT_ID.findall(text)))
+
+    @classmethod
+    def own_matchers(cls) -> list:
+        """
+        The ways to recognise the bot's own container, most reliable
+        first: the id in its mounts, the hostname Docker gives it by
+        default (the start of its id), and its name.
+        """
+        ids = cls.own_ids()
+        hostname = _env("HOSTNAME")
+
+        return [
+            lambda c: c["id"] in ids,
+            lambda c: len(hostname) >= 12 and c["id"].startswith(hostname),
+            lambda c: c["name"].lower() == BOT_CONTAINER_NAME,
+        ]
+
+    def is_own(self, container: dict) -> bool:
+        """Whether a container is the one the bot itself runs in."""
+        return any(match(container) for match in self.own_matchers())
+
     def protection_reason(self, container: dict) -> str | None:
         """
         Say why a container may not be stopped, restarted, killed or
@@ -130,9 +171,7 @@ class PortainerService:
         if name in self.protected:
             return f"`{container['name']}` is protected."
 
-        hostname = _env("HOSTNAME")
-
-        if len(hostname) >= 12 and container["id"].startswith(hostname):
+        if self.is_own(container):
             return "That is the bot's own container."
 
         if container.get("image", "").lower().startswith("portainer/"):
@@ -497,19 +536,23 @@ class PortainerService:
 
     async def own_container(self) -> dict:
         """
-        The bot's own container, found by the hostname Docker gives it
-        (the start of its id). PortainerError when it cannot be told.
+        The bot's own container: found by the id in its mounts, else by
+        its hostname, else by its name (see own_matchers). Each way is
+        tried in turn, so one that matches nothing does not stop the
+        next. PortainerError when none does.
         """
-        hostname = _env("HOSTNAME")
+        containers = await self.list_containers(fresh=True)
 
-        if len(hostname) >= 12:
-            for container in await self.list_containers(fresh=True):
-                if container["id"].startswith(hostname):
+        for match in self.own_matchers():
+            for container in containers:
+                if match(container):
                     return container
 
         raise PortainerError(
-            "The bot could not find its own container. It must run in "
-            "Docker, on the Portainer environment PORTAINER_ENDPOINT_ID."
+            "The bot could not find its own container: none of the "
+            "containers matches its mount id, its hostname or the name "
+            f"`{BOT_CONTAINER_NAME}`. Is PORTAINER_ENDPOINT_ID the "
+            "environment the bot runs in?"
         )
 
     async def restart_own_container(self) -> None:

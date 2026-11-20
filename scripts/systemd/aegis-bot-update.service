@@ -1,0 +1,11 @@
+# Runs scripts/update_host.sh as the server's own user.
+# Installed by scripts/install_update_service.sh.
+[Unit]
+Description=Update and restart Aegis-Bot
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+ExecStart=/bin/bash __PROJECT__/scripts/update_host.sh
+TimeoutStartSec=900

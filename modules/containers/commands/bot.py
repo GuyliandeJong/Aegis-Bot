@@ -1,11 +1,22 @@
 """
-/bot restart: restart the bot's own container from Discord.
+/bot restart and /bot update: control the bot itself from Discord.
+
+/bot restart restarts the bot's own container from Discord.
 
 Only the users in PORTAINER_ALLOWED_USER_IDS, only when Portainer is
 set up, and only after pressing Restart. /container restart refuses the
 bot's own container; this command is the way to do it on purpose. The
 bot is back in about half a minute; buttons on open messages are marked
 as expired when it starts again.
+
+/bot update [branch] asks the server to fetch a branch (main by default),
+fast-forward to it and restart the bot, like `git try` and `git back`
+do by hand. The bot cannot run commands on the server, so it leaves a
+request file that a systemd path unit on the host picks up at once (see
+modules/containers/update_service.py and scripts/update_host.sh); the
+host script reports the result through the webhook of the watchdog. It
+needs REMOTE_UPDATE=true, so it stays off until that host service is
+installed.
 """
 
 import asyncio
@@ -15,6 +26,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from core import activity_log
+from modules.containers import update_service
 from modules.containers.portainer_service import PortainerError, PortainerService
 from utils import theme
 from utils.embeds import create_embed
@@ -28,20 +40,13 @@ STEP_TIMEOUT = 120
 _tasks: set[asyncio.Task] = set()
 
 
-class RestartView(ExpiringView):
-    """Restart and Cancel, for the person who ran the command."""
+class OwnerView(ExpiringView):
+    """A confirmation only the person who ran the command can answer."""
 
     def __init__(self, user_id: int):
         super().__init__(timeout=STEP_TIMEOUT)
         self.user_id = user_id
         self.interaction: discord.Interaction | None = None
-
-        restart = discord.ui.Button(label="Restart now", style=discord.ButtonStyle.danger)
-        restart.callback = self._restart
-        cancel = discord.ui.Button(label="Cancel", style=discord.ButtonStyle.secondary)
-        cancel.callback = self._cancel
-        self.add_item(restart)
-        self.add_item(cancel)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if (
@@ -65,6 +70,20 @@ class RestartView(ExpiringView):
                 await self.interaction.edit_original_response(view=self)
             except discord.HTTPException:
                 pass
+
+
+
+class RestartView(OwnerView):
+    """Restart and Cancel, for the person who ran the command."""
+
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        restart = discord.ui.Button(label="Restart now", style=discord.ButtonStyle.danger)
+        restart.callback = self._restart
+        cancel = discord.ui.Button(label="Cancel", style=discord.ButtonStyle.secondary)
+        cancel.callback = self._cancel
+        self.add_item(restart)
+        self.add_item(cancel)
 
     async def _cancel(self, interaction: discord.Interaction) -> None:
         self.stop()
@@ -113,6 +132,59 @@ class RestartView(ExpiringView):
         except Exception as ex:
             # The connection is cut when Docker stops this process.
             logger.info("[Bot] Restart request ended: %s", ex)
+
+
+class UpdateView(OwnerView):
+    """Update now and Cancel, for the person who ran the command."""
+
+    def __init__(self, user_id: int, branch: str):
+        super().__init__(user_id)
+        self.branch = branch
+        update = discord.ui.Button(label="Update now", style=discord.ButtonStyle.danger)
+        update.callback = self._update
+        cancel = discord.ui.Button(label="Cancel", style=discord.ButtonStyle.secondary)
+        cancel.callback = self._cancel
+        self.add_item(update)
+        self.add_item(cancel)
+
+    async def _cancel(self, interaction: discord.Interaction) -> None:
+        self.stop()
+        await interaction.response.edit_message(
+            content="Update cancelled.", embed=None, view=None
+        )
+
+    async def _update(self, interaction: discord.Interaction) -> None:
+        self.stop()
+
+        try:
+            request_id = update_service.write_request(self.branch, interaction.user.id)
+        except (OSError, ValueError) as ex:
+            logger.error("[Bot] Could not leave the update request: %s", ex)
+            await interaction.response.edit_message(
+                content=f"The update request could not be written: {ex}",
+                embed=None,
+                view=None,
+            )
+            return
+
+        activity_log.record("bot_update", user=interaction.user.id, branch=self.branch)
+        logger.warning(
+            "[Bot] Update to %s requested by %s (%s) as %s.",
+            self.branch,
+            interaction.user,
+            interaction.user.id,
+            request_id,
+        )
+
+        await interaction.response.edit_message(
+            content=(
+                f"Update to `{self.branch}` requested (`{request_id}`). The "
+                "server starts it within a moment; the result is posted by "
+                "the webhook once the bot is back."
+            ),
+            embed=None,
+            view=None,
+        )
 
 
 class BotCog(commands.Cog):
@@ -166,6 +238,66 @@ class BotCog(commands.Cog):
                     "Monitoring stops for about half a minute, and buttons "
                     "on open messages stop working until you run their "
                     "command again."
+                ),
+                color=theme.WARNING_COLOR,
+            ),
+            view=view,
+            ephemeral=True,
+        )
+
+    @control_group.command(
+        name="update",
+        description="Fetch a branch on the server and restart the bot with it.",
+    )
+    @app_commands.describe(branch="Branch to update to (default: main).")
+    async def update(
+        self,
+        interaction: discord.Interaction,
+        branch: str = "main",
+    ):
+        service = PortainerService()
+        branch = branch.strip()
+
+        if not service.is_user_allowed(interaction.user.id):
+            logger.warning(
+                "[Bot] %s (%s) tried /bot update.",
+                interaction.user,
+                interaction.user.id,
+            )
+            await interaction.response.send_message(
+                "You are not allowed to control containers.",
+                ephemeral=True,
+            )
+            return
+
+        if not update_service.enabled():
+            await interaction.response.send_message(
+                "Remote update is off. Install the host service "
+                "(`scripts/install_update_service.sh`, see the docs) and "
+                "set `REMOTE_UPDATE=true` in .env.",
+                ephemeral=True,
+            )
+            return
+
+        if not update_service.valid_branch(branch):
+            await interaction.response.send_message(
+                f"`{branch[:60]}` is not a valid branch name.",
+                ephemeral=True,
+            )
+            return
+
+        view = UpdateView(interaction.user.id, branch)
+        view.interaction = interaction
+
+        await interaction.response.send_message(
+            embed=create_embed(
+                interaction=interaction,
+                title=f"{theme.WARNING_EMOJI} Update the bot to `{branch}`?",
+                description=(
+                    "The server fetches the branch, fast-forwards to it and "
+                    "restarts the bot, about a minute in total. A branch "
+                    "that cannot be fast-forwarded, or a server with "
+                    "uncommitted changes, is reported and left alone."
                 ),
                 color=theme.WARNING_COLOR,
             ),

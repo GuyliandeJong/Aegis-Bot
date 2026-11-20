@@ -14,9 +14,10 @@ fast-forward to it and restart the bot, like `git try` and `git back`
 do by hand. The bot cannot run commands on the server, so it leaves a
 request file that a systemd path unit on the host picks up at once (see
 modules/containers/update_service.py and scripts/update_host.sh); the
-host script reports the result through the webhook of the watchdog. It
-needs REMOTE_UPDATE=true, so it stays off until that host service is
-installed.
+host script reports the result through the webhook it was installed
+with. It needs REMOTE_UPDATE=true, so it stays off until that host
+service is installed; the script refuses to run unless the container's
+mounts are safe (see docs/features.md).
 """
 
 import asyncio

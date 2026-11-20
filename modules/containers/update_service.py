@@ -14,7 +14,9 @@ own user. The file holds plain "key=value" lines:
     by=<Discord user id>
 
 The host script checks every value again, so a damaged or old file
-does nothing.
+does nothing. Treat this file as written by an attacker: the script that
+reads it is a root-owned copy with root-owned settings, and refuses to
+run while the container could write to the project folder.
 """
 
 import os

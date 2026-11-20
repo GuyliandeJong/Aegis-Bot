@@ -1049,9 +1049,12 @@ the person who asked.
 - Containers named in `PORTAINER_PROTECTED` cannot be stopped,
   restarted, killed or removed. The bot's own container and any
   `portainer/*` image are always protected too, because stopping them
-  would cut off this control. The bot's own container is recognised by
-  its hostname, which only works while the container keeps Docker's
-  default hostname.
+  would cut off this control. The bot recognises its own container by
+  the id in its mounts (`/proc/self/mountinfo`), which works whatever
+  hostname the compose file or DockSTARTer sets; then by the hostname
+  Docker gives it by default; then by the container name `aegis-bot`.
+  A container renamed to something else, running with a custom hostname
+  and no readable mounts, is not recognised.
 - Every confirmation step expires after 30 seconds.
 - The container is looked up by name again just before the action, so
   one that was recreated since it was picked is left alone.
@@ -1062,8 +1065,8 @@ ran it can press, and only users in `PORTAINER_ALLOWED_USER_IDS` may
 run it), then restarts the container through Portainer. The bot is back
 in about half a minute; buttons on open messages are marked as expired
 when it starts. The container is restarted, not rebuilt: a changed image
-still needs `scripts/rebuild.sh`. The bot finds its own container by its
-hostname, as for the protection above.
+still needs `scripts/rebuild.sh`. The bot finds its own container the
+same three ways as for the protection above.
 
 The weekly summary's "📦 Images with updates" lists the running
 containers whose image has a newer version in its registry, for example

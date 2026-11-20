@@ -719,6 +719,10 @@ not lose them, and are still counted in the weekly summary.
 
 ### UPS power
 
+> **Untested.** The UPS module has only been run against a fake NUT
+> server, never against a real UPS. Treat its alerts as unverified until
+> it has seen a real outage, and tell the maintainer what you find.
+
 The ups module reads a UPS from a NUT (Network UPS Tools) server and
 alerts on power problems. It is on when `NUT_HOST` is set:
 

@@ -26,7 +26,7 @@ one Discord server and runs in Docker.
 | wol | Wake and sleep a computer through GPTWOL | `/wol` | `GPTWOL_HOST`, `GPTWOL_TARGET_IP`, `GPTWOL_TARGET_MAC` |
 | minecraft | Minecraft Java server status, joins, down alerts | `/minecraft` | `MINECRAFT_SERVERS` |
 | uptime | Public URLs answering and their TLS certificates | — | `UPTIME_URLS` |
-| ups | UPS power outages, low battery and a battery to replace, through NUT | — | `NUT_HOST` |
+| ups | UPS power outages, low battery and a battery to replace, through NUT (untested on a real UPS) | — | `NUT_HOST` |
 | backup | Alerts when the backup script has not succeeded recently | — | `BACKUP_PATHS` |
 | fluxer | Mirrors every alert to a Fluxer channel | — | `FLUXER_WEBHOOK_URL` |
 

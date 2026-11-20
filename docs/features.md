@@ -1102,51 +1102,106 @@ still needs `scripts/rebuild.sh`. The bot finds its own container the
 same three ways as for the protection above.
 
 `/bot update [branch]` updates the bot from Discord, like `git try
-<branch>` (or `git back` for main, the default) on the server. The bot
-runs in a container and cannot run commands on the server, and polling
-was ruled out, so it works from the outside in: the bot writes a small
-request file in `data/`, a systemd path unit on the server watches that
-file with inotify and starts `scripts/update_host.sh` at once, and the
-script fetches the branch, fast-forwards to it and restarts the
-container. It runs as your own user with plain `docker compose`, so it
-needs no `sudo` and no password, and it does not use `ds`.
+<branch>` (or `git back` for main, the default) on the server. It is off
+until you install a host service and set `REMOTE_UPDATE=true`, because
+it is the one place where the bot's container can start something on
+the server. Read the threat model first.
 
-One-time setup on the server:
+**How it works.** The bot runs in a container and cannot run commands on
+the server, and polling was ruled out, so it works from the outside in:
+the bot writes a small request file in `data/`, a systemd path unit
+watches that file with inotify and starts the update script at once, and
+the script fetches the branch, fast-forwards to it and restarts the
+container with plain `docker compose` as your own user (no `sudo`, no
+password, no `ds`). It posts the start and the result through a Discord
+webhook.
+
+**Threat model.** Assume the bot can be taken over. Then whatever the
+container can write must not be able to run code on the host. Three
+things make sure of it:
+
+- The script that runs is a root-owned copy in `/usr/local/lib/aegis-bot/`,
+  and its settings (project path, compose folder, webhook, allowed
+  branches, cooldown) are in the root-owned `/etc/aegis-bot/update.conf`,
+  read as plain lines and never executed. Nothing is read from the
+  project folder except `data/update_request`, not even `.env`. Updating
+  the project does not update the script: run the installer again.
+- The request must be a regular file of at most 1 KiB (a symlink or a
+  FIFO is ignored without being opened) with a branch from the
+  allowlist (`main` by default), a recent time and an id not handled
+  before. At most one update runs per cooldown (5 minutes by default) and
+  one at a time. Nothing in the request is run as a command.
+- **Before every update the script asks Docker which mounts the bot's
+  container has, and refuses** if the container can write to the project
+  folder, to a folder above it or to a folder inside it other than
+  `data/`; can reach the Docker socket through a mount of `/` or `/run`
+  (a read-only mount does not stop a program from connecting to a
+  socket); or is privileged or shares the host's process namespace. The
+  hooks and settings git would otherwise run on the host live in the
+  project folder, and the read-only mount is what keeps the container
+  from planting them. The installer runs the same check and does not
+  switch the unit on while it fails.
+
+**What this means for your compose file.** Mount the project read-only
+and only `data/` writable (the bot writes nothing else in the project;
+Jellyfin media folders are separate mounts):
+
+```yaml
+volumes:
+  - /path/to/Aegis-Bot:/app:ro
+  - /path/to/Aegis-Bot/data:/app/data
+```
+
+and do not mount `/` (the compose example's `/:/host:ro` for the disk
+monitor reaches `/run/docker.sock`, which is root on the host for
+anything that can talk to it; mount only the folders you need, for
+example `/mnt` and `/boot`). To check what your container has:
 
 ```bash
-bash scripts/install_update_service.sh
+docker inspect aegis-bot --format '{{range .Mounts}}{{.Source}} -> {{.Destination}} rw={{.RW}}{{"\n"}}{{end}}'
 ```
 
-It asks for your sudo password once, installs
-`aegis-bot-update.path` and `.service` in `/etc/systemd/system` and
-starts watching (`--print` shows the units, `--uninstall` removes
-them). Then in `.env`:
-
-```text
-REMOTE_UPDATE=true
-WATCHDOG_WEBHOOK_URL=https://discord.com/api/webhooks/...   # the result is posted here
-UPDATE_COMPOSE_DIR=/home/you/.docker/compose                # DockSTARTer's compose folder
+```bash
+bash /usr/local/lib/aegis-bot/update_host.sh --check-mounts
 ```
 
-and restart the bot once. Without the webhook the update still runs and
-is logged in `~/.local/state/aegis-bot/update.log`, but nothing is
-posted in Discord. Without `UPDATE_COMPOSE_DIR`, `docker compose` runs in
-the project folder; with DockSTARTer the folder is the one in your
-rebuild log (`docker compose --project-directory ...`).
+(the second after the installer has run; it prints every problem).
 
-The command is for the users in `PORTAINER_ALLOWED_USER_IDS`, asks for a
-confirmation, and is off until `REMOTE_UPDATE=true`. The host script
-checks everything again: a plain branch name that exists on origin, a
-request younger than ten minutes, an id it has not handled, and only one
-update at a time. Nothing in the request is ever run as a command. A
-server with uncommitted changes, or a branch that cannot be
-fast-forwarded, is reported and left alone.
+**Setup, once, on the server.** First look at the project folder, since
+the installer copies code from it as root: `git status` is clean,
+`git diff origin/main --stat` shows nothing, `ls .git/hooks` has only
+`.sample` files and `git config --local --list` has nothing unexpected.
+Then:
 
-What it does not do: it does not rebuild the image (changes to the
-Dockerfile or `requirements.txt` still need `scripts/rebuild.sh` by
-hand), and it does not regenerate DockSTARTer's merged compose file.
-Anyone who can write to the bot's `data/` folder can ask for an update
-of a branch of your own repository, so keep that folder private.
+```bash
+bash scripts/install_update_service.sh --compose-dir /home/you/.docker/compose --webhook https://discord.com/api/webhooks/... --branches main
+```
+
+It asks for your sudo password once. `--compose-dir` is DockSTARTer's
+compose folder (the one in your rebuild log, `docker compose
+--project-directory ...`); leave it out to run `docker compose` in the
+project folder. `--branches` lists what `/bot update` may switch to,
+comma separated; every branch you want to test from Discord must be
+listed. `--print` shows the units, `--uninstall` removes everything.
+Then set `REMOTE_UPDATE=true` in `.env` and restart the bot.
+
+The command is for the users in `PORTAINER_ALLOWED_USER_IDS` and asks for
+a confirmation. A server with uncommitted changes, or a branch that
+cannot be fast-forwarded, is reported and left alone. The log is
+`~/.local/state/aegis-bot/update.log`.
+
+**What it does not do or cover.** It does not rebuild the image (changes
+to the Dockerfile or `requirements.txt` still need `scripts/rebuild.sh`
+by hand) and it does not regenerate DockSTARTer's merged compose file.
+It does not make the container safe by itself: the Portainer API key
+the bot holds can still control containers (an administrator's key can
+create privileged ones, so use a key with limited rights and check
+Portainer's settings for bind mounts and privileged mode), the
+`SYS_ADMIN` capability the SMART setup asks for weakens isolation, and
+a writable media folder that contains the project would defeat the
+read-only mount (the script refuses that too). The same read-only mount
+also protects `scripts/watchdog.sh`, `backup.sh` and `rebuild.sh`, which
+run on the host from the same folder.
 
 The weekly summary's "📦 Images with updates" lists the running
 containers whose image has a newer version in its registry, for example

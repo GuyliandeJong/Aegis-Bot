@@ -89,6 +89,10 @@ for new, cls, attr, label in ((new_cpu, "CPUMonitor", "cpu", "CPU"), (new_mem, "
     assert titles == [f"{label} Usage {word}" for word in EXPECTED], titles
     assert final.get("status") == "healthy", final
     print(f"{cls}: sent {len(sent)} notifications: {[t.split()[-1] for t in titles]}")
+    if label == "CPU":
+        for _, title, description in (sent[0], sent[1], sent[3], sent[5]):
+            print(f"  {title}: {description!r}")
+        print("  no code box (backtick) around any value:", not any("`" in d for _, _, d in sent))
 
 # ---- cooldown: filesystem
 fs = {"pct": 0}

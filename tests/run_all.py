@@ -155,9 +155,9 @@ EXPECTED = {
         "says: ['ERROR Missing or invalid in .env: DISCORD_TOKEN, GUILD_ID, ALERT_CHANNEL_ID.",
     ],
     "check_monitors.py": [
-        "High Temperature — CPU1 Temp: 'CPU1 Temp is above its warning threshold.\\n\\n**Current Temperature**\\n`75.0°C`\\n\\n**Warning Threshold**\\n`70.0°C`\\n\\n**Critical Threshold**\\n`85.0°C`'",
-        "Critical Temperature — CPU1 Temp: 'CPU1 Temp is above its critical threshold.\\n\\n**Current Temperature**\\n`90.0°C`\\n\\n**Critical Threshold**\\n`85.0°C`'",
-        "Temperature Recovered — CPU1 Temp: 'CPU1 Temp has returned to normal levels.\\n\\n**Current Temperature**\\n`50.0°C`'",
+        "High Temperature — CPU1 Temp: 'CPU1 Temp is above its warning threshold.\\n\\n**Current Temperature**\\n75.0°C\\n\\n**Warning Threshold**\\n70.0°C\\n\\n**Critical Threshold**\\n85.0°C'",
+        "Critical Temperature — CPU1 Temp: 'CPU1 Temp is above its critical threshold.\\n\\n**Current Temperature**\\n90.0°C\\n\\n**Critical Threshold**\\n85.0°C'",
+        "Temperature Recovered — CPU1 Temp: 'CPU1 Temp has returned to normal levels.\\n\\n**Current Temperature**\\n50.0°C'",
         "no 'Sensor' block repeating the title: True",
         "CPUMonitor: sent 7 notifications",
         "MemoryMonitor: sent 7 notifications",

@@ -88,7 +88,7 @@ class TemperatureMonitor(BaseMonitor):
                     "Aegis-Bot has successfully retrieved temperature "
                     "information from iDRAC again.\n\n"
                     f"**Stale Duration**\n"
-                    f"`{settings.MONITOR_STALE_DURATION // 60} minutes`"
+                    f"{settings.MONITOR_STALE_DURATION // 60} minutes"
                 ),
             )
 
@@ -172,7 +172,7 @@ class TemperatureMonitor(BaseMonitor):
                     description=(
                         f"{sensor.name} has returned to normal levels.\n\n"
                         f"**Current Temperature**\n"
-                        f"`{sensor.reading:.1f}°C`"
+                        f"{sensor.reading:.1f}°C"
                     ),
                 )
 
@@ -186,11 +186,11 @@ class TemperatureMonitor(BaseMonitor):
                     description=(
                         f"{sensor.name} is above its warning threshold.\n\n"
                         f"**Current Temperature**\n"
-                        f"`{sensor.reading:.1f}°C`\n\n"
+                        f"{sensor.reading:.1f}°C\n\n"
                         f"**Warning Threshold**\n"
-                        f"`{settings.TEMPERATURE_WARNING:.1f}°C`\n\n"
+                        f"{settings.TEMPERATURE_WARNING:.1f}°C\n\n"
                         f"**Critical Threshold**\n"
-                        f"`{settings.TEMPERATURE_CRITICAL:.1f}°C`"
+                        f"{settings.TEMPERATURE_CRITICAL:.1f}°C"
                     ),
                 )
 
@@ -204,9 +204,9 @@ class TemperatureMonitor(BaseMonitor):
                     description=(
                         f"{sensor.name} is above its critical threshold.\n\n"
                         f"**Current Temperature**\n"
-                        f"`{sensor.reading:.1f}°C`\n\n"
+                        f"{sensor.reading:.1f}°C\n\n"
                         f"**Critical Threshold**\n"
-                        f"`{settings.TEMPERATURE_CRITICAL:.1f}°C`"
+                        f"{settings.TEMPERATURE_CRITICAL:.1f}°C"
                     ),
                 )
 
@@ -256,9 +256,9 @@ class TemperatureMonitor(BaseMonitor):
                 "Aegis-Bot has been unable to retrieve current "
                 "temperature information from iDRAC.\n\n"
                 f"**Last Successful Check**\n"
-                f"`{last_success}`\n\n"
+                f"{last_success}\n\n"
                 f"**Stale After**\n"
-                f"`{settings.MONITOR_STALE_DURATION // 60} minutes`\n\n"
+                f"{settings.MONITOR_STALE_DURATION // 60} minutes\n\n"
                 "Previously recorded temperature states have been "
                 "left unchanged until current data can be retrieved."
             ),

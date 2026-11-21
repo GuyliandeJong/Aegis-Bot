@@ -153,9 +153,9 @@ class ThresholdMonitor(BaseMonitor):
                     f"{label} usage has remained critically high "
                     f"for {critical_duration // 60} minutes.\n\n"
                     f"**Current Usage**\n"
-                    f"`{usage:.1f}%`\n\n"
+                    f"{usage:.1f}%\n\n"
                     f"**Threshold**\n"
-                    f"`{critical_threshold:.0f}%`"
+                    f"{critical_threshold:.0f}%"
                     f"{details}"
                 ),
             )
@@ -224,9 +224,9 @@ class ThresholdMonitor(BaseMonitor):
                     f"{label} usage has remained high "
                     f"for {warning_duration // 60} minutes.\n\n"
                     f"**Current Usage**\n"
-                    f"`{usage:.1f}%`\n\n"
+                    f"{usage:.1f}%\n\n"
                     f"**Threshold**\n"
-                    f"`{warning_threshold:.0f}%`"
+                    f"{warning_threshold:.0f}%"
                     f"{details}"
                 ),
             )
@@ -309,7 +309,7 @@ class ThresholdMonitor(BaseMonitor):
                 description=(
                     f"{label} usage has recovered from critical levels.\n\n"
                     f"**Current Usage**\n"
-                    f"`{usage:.1f}%`\n\n"
+                    f"{usage:.1f}%\n\n"
                     f"{label} remains above the healthy range."
                 ),
             )
@@ -323,7 +323,7 @@ class ThresholdMonitor(BaseMonitor):
                 description=(
                     f"{label} usage has returned to normal levels.\n\n"
                     f"**Current Usage**\n"
-                    f"`{usage:.1f}%`"
+                    f"{usage:.1f}%"
                 ),
             )
 

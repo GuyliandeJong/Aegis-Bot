@@ -18,6 +18,7 @@ class WatchlistAddView(ExpiringView):
         query: str,
         category: str,
         hidden: int = 0,
+        reveal=None,
     ):
         super().__init__(timeout=180)
 
@@ -34,6 +35,17 @@ class WatchlistAddView(ExpiringView):
         )
         button.callback = self._add
         self.add_item(button)
+
+        # (label, callback): shows the releases the search left out.
+        self.reveal = reveal
+
+        if reveal:
+            show = discord.ui.Button(
+                label=reveal[0],
+                style=discord.ButtonStyle.secondary,
+            )
+            show.callback = self._reveal
+            self.add_item(show)
 
     async def interaction_check(self, interaction: discord.Interaction):
         if interaction.user.id == self.owner_id:
@@ -55,6 +67,10 @@ class WatchlistAddView(ExpiringView):
                 await self.message.edit(view=self)
             except discord.HTTPException:
                 pass
+
+    async def _reveal(self, interaction: discord.Interaction):
+        self.stop()
+        await self.reveal[1](interaction)
 
     async def _add(self, interaction: discord.Interaction):
         self.stop()

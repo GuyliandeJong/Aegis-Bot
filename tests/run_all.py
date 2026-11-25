@@ -217,7 +217,7 @@ EXPECTED = {
         "pressed: No lossless release of **Aurora Falls Night Driv",
         "entry: [('Aurora Falls Night Drive', 'Music', [])]",
         "/torrent watchlist: • **Aurora Falls Night Drive** (Music)",
-        "buttons: ['dropdown', 'Watch for a better release', 'Cancel'] | footer: 2 hidden (not lossless)",
+        "buttons: ['dropdown', 'Watch for a better release', 'Show 2 not lossless', 'Cancel'] | footer: 2 hidden (not lossless)",
         "entry: Aurora Falls Night Drive Music | seen: 6",
         "only MP3 and untagged: None",
         "a FLAC release turns up: 1 torrent result found.",

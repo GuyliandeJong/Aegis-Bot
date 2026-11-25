@@ -47,6 +47,10 @@ class Ranked(list):
     # Releases left out of a Music search because they are not lossless.
     not_lossless = 0
 
+    # The same releases, scored and ranked, for the button that shows
+    # them when the lossless ones are few or none.
+    not_lossless_results = ()
+
 
 class TorrentSearchSelect(discord.ui.Select):
     """Dropdown used to choose a Jackett search result."""
@@ -145,6 +149,26 @@ class TorrentSearchWatchButton(discord.ui.Button):
             text = reason
 
         await interaction.response.send_message(text, ephemeral=True)
+
+
+class TorrentSearchRevealButton(discord.ui.Button):
+    """Show the releases a Music search left out for not being lossless."""
+
+    def __init__(self, search_view, label, callback):
+        self.search_view = search_view
+        self.reveal = callback
+
+        super().__init__(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction,
+    ):
+        self.search_view.stop()
+        await self.reveal(interaction)
 
 
 class TorrentSearchCancelButton(discord.ui.Button):
@@ -256,6 +280,7 @@ class TorrentSearchView(ExpiringView):
         results,
         torrent_cog,
         query=None,
+        reveal=None,
     ):
         super().__init__(timeout=180)
 
@@ -274,6 +299,12 @@ class TorrentSearchView(ExpiringView):
         if query:
             self.add_item(
                 TorrentSearchWatchButton(self)
+            )
+
+        # (label, callback): shows what the lossless filter left out.
+        if reveal:
+            self.add_item(
+                TorrentSearchRevealButton(self, *reveal)
             )
 
         self.add_item(
@@ -1794,6 +1825,7 @@ class TorrentSearchMixin:
         # Music is lossless-only: everything not shown to be lossless
         # goes, including releases that say nothing about their format.
         not_lossless = 0
+        not_lossless_list = []
 
         if category == "Music" and category_preferences.get(
             "lossless_only",
@@ -1803,6 +1835,11 @@ class TorrentSearchMixin:
                 result
                 for result in results
                 if self._is_lossless(result)
+            ]
+            not_lossless_list = [
+                result
+                for result in results
+                if not self._is_lossless(result)
             ]
             not_lossless = len(results) - len(kept)
             results = kept
@@ -1858,6 +1895,26 @@ class TorrentSearchMixin:
             reverse=True,
         )
 
+        # What the lossless filter left out, ranked the same way, for
+        # the button that shows it.
+        hidden_ranked = [
+            self._score_result(
+                result,
+                query,
+                category_preferences,
+                has_preferred_resolution,
+            )
+            for result in not_lossless_list
+        ]
+        hidden_ranked.sort(
+            key=lambda result: (
+                result["score"],
+                result["seeders"],
+                result["grabs"],
+            ),
+            reverse=True,
+        )
+
         ranked_results = Ranked(
             ranked_results[
                 :self.MAX_RESULTS
@@ -1866,6 +1923,9 @@ class TorrentSearchMixin:
         ranked_results.hidden = hidden
         ranked_results.other = other
         ranked_results.not_lossless = not_lossless
+        ranked_results.not_lossless_results = tuple(
+            hidden_ranked[:self.MAX_RESULTS]
+        )
 
         return (
             ranked_results,
@@ -1873,6 +1933,96 @@ class TorrentSearchMixin:
             searched_query,
             fallback_used,
         )
+
+    async def _reveal_not_lossless(
+        self,
+        interaction,
+        query,
+        category,
+        results,
+        errors,
+    ):
+        """
+        Replace the message with the results of a Music search including
+        the releases that are not lossless, ranked together: the
+        lossless ones keep their lead through their format score.
+        """
+        merged = Ranked(
+            sorted(
+                list(results) + list(results.not_lossless_results),
+                key=lambda result: (
+                    result["score"],
+                    result["seeders"],
+                    result["grabs"],
+                ),
+                reverse=True,
+            )[:self.MAX_RESULTS]
+        )
+        merged.hidden = getattr(results, "hidden", 0)
+        merged.other = getattr(results, "other", 0)
+
+        embed = self._build_search_embed(
+            query,
+            category,
+            merged,
+            errors,
+        )
+        embed.description = (
+            "**Releases that are not lossless are shown too.**\n\n"
+            + (embed.description or "")
+        )
+
+        view = TorrentSearchView(
+            owner_id=interaction.user.id,
+            category=category,
+            results=merged,
+            torrent_cog=self,
+            query=query,
+        )
+
+        logger.info(
+            "[TorrentSearch] %s asked for the %d release(s) that are "
+            "not lossless for '%s'.",
+            interaction.user,
+            len(results.not_lossless_results),
+            query,
+        )
+
+        await interaction.response.edit_message(
+            content=None,
+            embed=embed,
+            view=view,
+        )
+
+        view.message = interaction.message
+
+    @staticmethod
+    def _reveal_label(results, the=True):
+        """"Show the 3 not lossless", or the best part when it is capped."""
+        shown = len(getattr(results, "not_lossless_results", ()))
+        total = max(getattr(results, "not_lossless", 0), shown)
+        prefix = "Show the" if the else "Show"
+
+        if shown < total:
+            return f"{prefix} best {shown} of {total} not lossless"
+
+        return f"{prefix} {shown} not lossless"
+
+    def _reveal_button(self, query, category, results, errors, label):
+        """(label, callback) for a view, or None when nothing is hidden."""
+        if category != "Music" or not getattr(results, "not_lossless_results", ()):
+            return None
+
+        async def reveal(interaction):
+            await self._reveal_not_lossless(
+                interaction,
+                query,
+                category,
+                results,
+                errors,
+            )
+
+        return (label, reveal)
 
     async def _search(
         self,
@@ -2116,6 +2266,13 @@ class TorrentSearchMixin:
                 query,
                 category,
                 hidden=hidden + other + not_lossless,
+                reveal=self._reveal_button(
+                    query,
+                    category,
+                    ranked_results,
+                    errors,
+                    self._reveal_label(ranked_results),
+                ),
             )
 
             if hidden or other or not_lossless:
@@ -2141,6 +2298,14 @@ class TorrentSearchMixin:
                     "Press **Watch for it** to be told when a "
                     f"{'lossless ' if music else 'proper '}"
                     "release turns up."
+                    + (
+                        f"\nPress **{self._reveal_label(ranked_results)}** "
+                        "to see them anyway."
+                        if self._reveal_button(
+                            query, category, ranked_results, errors, ""
+                        )
+                        else ""
+                    )
                 )
             else:
                 found = (
@@ -2179,6 +2344,13 @@ class TorrentSearchMixin:
             results=ranked_results,
             torrent_cog=self,
             query=query,
+            reveal=self._reveal_button(
+                query,
+                category,
+                ranked_results,
+                errors,
+                self._reveal_label(ranked_results, the=False),
+            ),
         )
 
         try:

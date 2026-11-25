@@ -544,6 +544,8 @@ EXPECTED = {
         "description: <@42> sent this with `/alert test`. Nothing is wrong.",
         "warning muted -> posted: 0 | The warning test alert was not posted. Maintenance mode is",
         "critical goes through -> Test Alert (critical) (during maintenance) | The critical test alert was posted in <#10>.",
+        "warning held -> posted: 0 | The warning test alert was not posted. Quiet hours are on and hold this level; it is posted in the summary when they end. Critical alerts still come through.",
+        "critical goes through -> Test Alert (critical) | The critical test alert was posted in <#10>.",
         "The info test alert was not posted. The alert channel was not found. C",
     ],
     "check_seed_rules.py": [

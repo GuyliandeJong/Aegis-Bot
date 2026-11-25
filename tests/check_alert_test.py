@@ -1,8 +1,10 @@
 """/alert test: posts a test alert of the chosen level to the alert channel, administrators only by default, muted by maintenance except critical, and says why when nothing was posted."""
 import asyncio
 import logging
+import os
 import sys
 import types
+from datetime import datetime
 
 from discord import app_commands
 
@@ -12,6 +14,7 @@ m = types.ModuleType("utils.logger"); m.logger = logging.getLogger("aegis"); sys
 c = types.ModuleType("config.settings"); c.settings = types.SimpleNamespace(ALERT_CHANNEL_ID=10, ALERT_COOLDOWN=0); sys.modules["config.settings"] = c
 
 import core.maintenance as M
+import core.quiet_hours as Q
 from modules.general.commands.alert import AlertCog, LEVELS
 import isolate  # state files go to a temporary folder
 
@@ -72,6 +75,18 @@ async def main():
     text, _ = await run(cog, "critical")
     print("  critical goes through ->", channel.posts[-1].title, "|", text)
     M.end()
+
+    print("\n== during quiet hours ==")
+    os.environ["QUIET_HOURS"] = "23-7"
+    Q.now = lambda: datetime(2026, 11, 10, 2, 0)
+    before = len(channel.posts)
+    text, _ = await run(cog, "warning")
+    print("  warning held -> posted:", len(channel.posts) - before, "|", text)
+    text, _ = await run(cog, "critical")
+    print("  critical goes through ->", channel.posts[-1].title, "|", text)
+    Q.now = lambda: datetime(2026, 11, 10, 12, 0)
+    os.environ.pop("QUIET_HOURS")
+    Q.take()
 
     print("\n== no alert channel ==")
     lonely = AlertCog(Bot(None))

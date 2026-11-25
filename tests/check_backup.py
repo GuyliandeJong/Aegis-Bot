@@ -91,6 +91,14 @@ elif cmd == "sync":
     for rel in sorted(have - want):
         keep(rel); print(f"INFO  : {{rel}}: Deleted", file=sys.stderr)
 ''')
+# The archive name has the time to the minute, and the retention check
+# below depends on both backups getting the same name, as they do when a
+# run is quick. A run that crossed a minute boundary used to fail it, so
+# the name's time is fixed (everything else `date` is asked for is real).
+FAKES["date"] = (
+    'if [ "$*" = "+%Y-%m-%d_%H%M" ]; then echo 2026-06-01_0400; else exec /bin/date "$@"; fi'
+)
+
 for name, body in FAKES.items():
     path = BIN / name
     path.write_text("#!/bin/bash\n" + body + "\n")

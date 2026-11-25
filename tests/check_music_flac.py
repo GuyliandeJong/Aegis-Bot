@@ -207,6 +207,83 @@ async def flows():
     print("  entry:", entry["query"], entry["category"], "| seen:", len(entry["seen"]))
 
 
+def labels(view): return [getattr(b, "label", None) or "dropdown" for b in view.children]
+
+
+def options(view):
+    select = next(b for b in view.children if isinstance(b, discord.ui.Select))
+    return [o.label.split(". ", 1)[-1][:36] if False else o.label for o in select.options]
+
+
+async def reveal():
+    print("\n== showing the releases that are not lossless ==")
+    known = {e["id"] for e in W.all_entries()}
+    lossy = [release(f"{A} 2024 MP3 320kbps", 1, [3010], 90), release(f"{A} 2024 OGG", 2, None, 30), release(f"{A} 2024", 3, None, 60)]
+    Cog.raw = [dict(r) for r in lossy]
+    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive (live)", category="Music")
+    k = last(i)
+    print("  nothing lossless: buttons:", labels(k["view"]))
+    print("  message ends:", k["content"].splitlines()[-1])
+    other = Inter(uid=2)
+    print("  someone else may press:", await k["view"].interaction_check(other))
+    press = Inter(); await k["view"].children[1].callback(press)
+    shown = press.log[-1]
+    embed = shown[1]["embed"]
+    print("  pressed ->", shown[0], "| message text cleared:", shown[1]["content"] is None)
+    print("  first line:", embed.description.splitlines()[0])
+    print("  releases, best first:", [f.name.split(". ", 1)[1].replace(A + " ", "") for f in embed.fields])
+    print("  footer:", embed.footer.text.split(" · ")[0], "| mentions hidden:", "hidden" in embed.footer.text)
+    view = shown[1]["view"]
+    print("  buttons now:", labels(view), "| dropdown options:", len(next(b for b in view.children if isinstance(b, discord.ui.Select)).options))
+    print("  the message is recorded for the new view:", view.message is press.message)
+    entry_before = len(W.all_entries())
+    press2 = Inter(); await next(b for b in view.children if getattr(b, "label", "") == "Watch for a better release").callback(press2)
+    print("  watch for a better release works on it:", len(W.all_entries()) - entry_before, "entry |", W.all_entries()[-1].get("seen") is not None)
+    for e in W.all_entries():
+        if e["id"] not in known: W.remove(e["id"])
+
+    print("\n== some lossless found ==")
+    Cog.raw = MIXED()
+    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
+    k = last(i)
+    print("  buttons:", labels(k["view"]))
+    shown_before = [f.name.split(". ", 1)[1].replace(A + " ", "") for f in k["embed"].fields]
+    press = Inter(); await next(b for b in k["view"].children if "not lossless" in (getattr(b, "label", "") or "")).callback(press)
+    embed = press.log[-1][1]["embed"]
+    names = [f.name.split(". ", 1)[1].replace(A + " ", "") for f in embed.fields]
+    print("  before:", len(shown_before), "| after:", len(names), "| first line:", embed.description.splitlines()[0])
+    print("  lossless first, the others last:", names[:6] == shown_before and all("MP3" in n or n == "2024" for n in names[6:]), "|", names[6:])
+    print("  buttons now:", labels(press.log[-1][1]["view"]))
+
+    print("\n== when there is nothing to show ==")
+    Cog.raw = [release("Resident Evil 2026 camrip.1080p", 1, [2040]), release("Resident Evil 2026 HDCAM", 2, [2040])]
+    i = Inter(); await Cog()._search(i, query="Resident Evil 2026", category="Movies")
+    print("  Movies with only cam releases:", labels(last(i)["view"]))
+    Cog.raw = [release(f"{A} (2024) [FLAC]", 5, [3040], 40)]
+    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
+    print("  Music with nothing hidden:", labels(last(i)["view"]))
+    real = with_preferences(lambda p: {**p, "categories": {**p["categories"], "Music": {**p["categories"]["Music"], "lossless_only": False}}})
+    Cog.raw = MIXED()
+    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
+    print("  lossless_only turned off:", labels(last(i)["view"]))
+    SM.TorrentSearchMixin._load_preferences = real
+    i = Inter(); Cog.raw = []
+    saved = Cog._search_fallback_queries
+    Cog._search_fallback_queries = lambda self, q: []
+    await Cog()._search(i, query="Obscure Album", category="Music")
+    Cog._search_fallback_queries = saved
+    print("  nothing found at all:", labels(last(i)["view"]))
+
+    print("\n== a long list ==")
+    Cog.raw = [release(f"{A} 2024 MP3 {n}", n, [3010], 100 - n) for n in range(1, 41)]
+    i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
+    k = last(i)
+    print("  40 hidden: button:", [l for l in labels(k["view"]) if "lossless" in l])
+    press = Inter(); await k["view"].children[1].callback(press)
+    view = press.log[-1][1]["view"]
+    print("  options in the dropdown:", len(next(b for b in view.children if isinstance(b, discord.ui.Select)).options), "| listed in the embed:", len(press.log[-1][1]["embed"].fields))
+
+
 async def watchlist():
     print("\n== the watchlist waits for a lossless release ==")
     mon = WM.WatchlistMonitor(types.SimpleNamespace(bot=None))
@@ -285,6 +362,7 @@ async def main():
     await searches()
     await quality()
     await flows()
+    await reveal()
     await watchlist()
     await command()
 

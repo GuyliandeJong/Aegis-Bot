@@ -343,14 +343,14 @@ mixed releases under Audio/Lossless.
   watchlist then checks twice a day with the same rule, so a Music title
   waits for a lossless release.
 - **Showing the hidden releases:** when releases were hidden for not
-  being lossless, a second button shows them anyway: **Show the 3 not
-  lossless** under the "nothing found" message, and **Show 2 not
-  lossless** under a result list with only a few lossless releases. It
+  being lossless, a second button shows them anyway: **Show hidden**
+  under the "nothing found" message, and under a result list with only
+  a few lossless releases. It
   replaces the message with the normal result list, ranked by score, so
   the lossless releases keep their lead (the lossy format score is
   negative) and an unknown format ranks above a lossy one. A heading says
   that releases that are not lossless are shown too. At most 25 are
-  kept, and the button then says "Show the best 25 of 40 not lossless".
+  kept, and the message then says "(the best 25)".
   Only the person who searched can press it, and there is no such
   button for other categories or with `lossless_only` turned off.
 - **Turning it off:** `lossless_only` under Music in

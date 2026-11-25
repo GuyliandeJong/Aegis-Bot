@@ -1997,16 +1997,9 @@ class TorrentSearchMixin:
         view.message = interaction.message
 
     @staticmethod
-    def _reveal_label(results, the=True):
-        """"Show the 3 not lossless", or the best part when it is capped."""
-        shown = len(getattr(results, "not_lossless_results", ()))
-        total = max(getattr(results, "not_lossless", 0), shown)
-        prefix = "Show the" if the else "Show"
-
-        if shown < total:
-            return f"{prefix} best {shown} of {total} not lossless"
-
-        return f"{prefix} {shown} not lossless"
+    def _reveal_label(results=None, the=True):
+        """The button text: short, the numbers are in the message."""
+        return "Show hidden"
 
     def _reveal_button(self, query, category, results, errors, label):
         """(label, callback) for a view, or None when nothing is hidden."""
@@ -2300,7 +2293,13 @@ class TorrentSearchMixin:
                     "release turns up."
                     + (
                         f"\nPress **{self._reveal_label(ranked_results)}** "
-                        "to see them anyway."
+                        "to see them anyway"
+                        + (
+                            f" (the best {len(ranked_results.not_lossless_results)})"
+                            if len(ranked_results.not_lossless_results) < not_lossless
+                            else ""
+                        )
+                        + "."
                         if self._reveal_button(
                             query, category, ranked_results, errors, ""
                         )

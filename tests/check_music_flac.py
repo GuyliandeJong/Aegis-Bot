@@ -248,7 +248,7 @@ async def reveal():
     k = last(i)
     print("  buttons:", labels(k["view"]))
     shown_before = [f.name.split(". ", 1)[1].replace(A + " ", "") for f in k["embed"].fields]
-    press = Inter(); await next(b for b in k["view"].children if "not lossless" in (getattr(b, "label", "") or "")).callback(press)
+    press = Inter(); await next(b for b in k["view"].children if getattr(b, "label", "") == "Show hidden").callback(press)
     embed = press.log[-1][1]["embed"]
     names = [f.name.split(". ", 1)[1].replace(A + " ", "") for f in embed.fields]
     print("  before:", len(shown_before), "| after:", len(names), "| first line:", embed.description.splitlines()[0])
@@ -278,7 +278,7 @@ async def reveal():
     Cog.raw = [release(f"{A} 2024 MP3 {n}", n, [3010], 100 - n) for n in range(1, 41)]
     i = Inter(); await Cog()._search(i, query="Aurora Falls Night Drive", category="Music")
     k = last(i)
-    print("  40 hidden: button:", [l for l in labels(k["view"]) if "lossless" in l])
+    print("  40 hidden: button:", [l for l in labels(k["view"]) if l == "Show hidden"], "| message ends:", k["content"].splitlines()[-1])
     press = Inter(); await k["view"].children[1].callback(press)
     view = press.log[-1][1]["view"]
     print("  options in the dropdown:", len(next(b for b in view.children if isinstance(b, discord.ui.Select)).options), "| listed in the embed:", len(press.log[-1][1]["embed"].fields))

@@ -3,15 +3,16 @@
 
 Shows that the alert channel, the bot's permissions and the Fluxer
 mirror work, and what maintenance mode does to a level. The alert goes
-through NotificationService like every real one, so maintenance mutes
-it (except critical). The reply to the command is private.
+through NotificationService like every real one, so maintenance mode
+and quiet hours hold it (except critical). The reply to the command is
+private.
 """
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core import maintenance
+from core import maintenance, quiet_hours
 from core.notification_service import NotificationService
 
 
@@ -78,6 +79,11 @@ class AlertCog(commands.Cog):
             reason = (
                 "Maintenance mode is on and mutes this level. Critical "
                 "alerts still come through; see `/maintenance status`."
+            )
+        elif quiet_hours.active() and name in maintenance.MUTED_LEVELS:
+            reason = (
+                "Quiet hours are on and hold this level; it is posted in the "
+                "summary when they end. Critical alerts still come through."
             )
         else:
             reason = (

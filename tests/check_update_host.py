@@ -359,6 +359,18 @@ def main():
         print(f"  {label:30} -> exit {result.returncode} | {result.stderr.strip().splitlines()[0][:48]}")
     result = install(SUDO_USER="root")
     print("  run as root -> exit", result.returncode, "|", result.stderr.strip().splitlines()[0][:40])
+    # Started as a normal user, the installer runs itself again through
+    # sudo and must hand over every option it was given.
+    stubs = WORK / "sudo-bin"
+    stubs.mkdir()
+    (stubs / "id").write_text("#!/bin/bash\n[ \"$1\" = -u ] && echo 1000 || echo alex\n")
+    (stubs / "sudo").write_text("#!/bin/bash\nshift\necho \"sudo got: $*\"\n")
+    (stubs / "id").chmod(0o755)
+    (stubs / "sudo").chmod(0o755)
+    e = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(WORK / "home")}
+    e.pop("AEGIS_UPDATE_TESTING", None)
+    result = subprocess.run(["bash", str(p.path / "scripts" / "install_update_service.sh"), "--compose-dir", "/home/alex/.docker/compose", "--branches", "main"], capture_output=True, text=True, env=e)
+    print("  as a normal user it re-runs through sudo with its options:", result.stdout.strip())
     spaced = WORK / "my project"
     (spaced / "scripts").mkdir(parents=True)
     shutil.copytree(ROOT / "scripts" / "systemd", spaced / "scripts" / "systemd")

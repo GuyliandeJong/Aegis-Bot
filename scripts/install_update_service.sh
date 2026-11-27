@@ -49,6 +49,7 @@ WEBHOOK=""
 BRANCHES="main"
 COOLDOWN="300"
 ACTION="install"
+ARGS=("$@")
 
 die() { echo "$*" >&2; exit 1; }
 
@@ -92,7 +93,7 @@ if [ "$ACTION" = print ]; then
 fi
 
 if [ -z "$TESTING" ] && [ "$(id -u)" -ne 0 ]; then
-    exec sudo "$0" "$@"
+    exec sudo "$0" "${ARGS[@]}"
 fi
 
 [ "$OWNER" != root ] || die "Run this as your own user (it uses sudo itself), not as root."

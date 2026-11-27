@@ -885,6 +885,7 @@ EXPECTED = {
         'a cooldown that is text        -> exit 1 | --cooldown must be a number of seconds',
         'an unknown option              -> exit 1 | Unknown option: --bogus',
         'run as root -> exit 1 | Run this as your own user (it uses sudo',
+        'as a normal user it re-runs through sudo with its options: sudo got: --compose-dir /home/alex/.docker/compose --branches main',
         'a path with a space is refused: 1 | The project path must not contain spaces, | or &',
     ],
     "check_recheck_notifications.py": [

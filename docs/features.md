@@ -152,6 +152,28 @@ folder whatever it is called. A season in which your library has an
 episode without a number is never offered partly, because that file
 might be one of the "missing" ones.
 
+### PC searches and edition names
+
+A game is often released under a title that leaves out the edition you
+typed. For the PC category, `/torrent search` therefore also searches
+without the edition words ("Phantom Blade Zero - Digital Deluxe
+Edition" is also searched as "Phantom Blade Zero"), at the same time as
+the exact search, and merges the two lists, a release found by both
+appearing once. The words left out are "Edition" with any words before it
+("Digital Deluxe Edition", "Game of the Year Edition", "Collectors
+Edition" and similar) and "GOTY". The footer of the result list says
+"also searched ..." when the extra search was run.
+
+Relevance is judged on the game's name, so a release that leaves the
+edition out is not scored as a partial match, and a release that names
+the edition you searched for gets 10 points ("edition match") and
+usually ranks first. Other editions of the game are listed too; the
+sizes and versions in the titles tell them apart. The extra search is
+only made when something is left to search for, and not for the other
+categories. If it fails, the results of the exact search are kept. The
+games folder check (`PC_GAMES_DIR`) ignores the same words, several in a
+row.
+
 ### Quality
 
 For movies, the availability message shows each server's copy as

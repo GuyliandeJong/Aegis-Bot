@@ -1,5 +1,6 @@
 """Jackett-backed torrent search command implementation."""
 
+import asyncio
 import json
 import math
 import re
@@ -50,6 +51,9 @@ class Ranked(list):
     # The same releases, scored and ranked, for the button that shows
     # them when the lossless ones are few or none.
     not_lossless_results = ()
+
+    # The search without its edition words that was run as well (PC).
+    also_searched = None
 
 
 class TorrentSearchSelect(discord.ui.Select):
@@ -440,6 +444,9 @@ class TorrentSearchMixin:
 
     MAX_RESULTS = 25
     DISPLAY_RESULTS = 10
+
+    # Points for a release that names the edition that was searched.
+    EDITION_BONUS = 10
 
     REJECTED_TERMS = {
         "cam",
@@ -1433,6 +1440,9 @@ class TorrentSearchMixin:
             f"Sources: {', '.join(source_names)}"
         )
 
+        if getattr(results, "also_searched", None):
+            footer += f" · also searched “{results.also_searched}”"
+
         hidden = [
             (getattr(results, "hidden", 0), "cam"),
             (getattr(results, "other", 0), "other categories"),
@@ -1459,6 +1469,50 @@ class TorrentSearchMixin:
             )
 
         return embed
+
+    # "Digital Deluxe Edition", "Game of the Year Edition", "GOTY": words
+    # a release title often leaves out, though it is the same game.
+    EDITION_WORDS = re.compile(pc_library.EDITION.pattern, re.IGNORECASE)
+
+    @classmethod
+    def _core_query(cls, query, category):
+        """
+        The PC search without its edition words ("Phantom Blade Zero -
+        Digital Deluxe Edition" -> "Phantom Blade Zero"), or None when
+        there is nothing to leave out or the category is not PC.
+
+        Releases of the same game often do not repeat the edition in
+        their title, so a search with it would miss them.
+        """
+        if category != "PC":
+            return None
+
+        core = cls.EDITION_WORDS.sub(" ", str(query or ""))
+        core = re.sub(r"\s+", " ", core).strip(" \t-\u2013\u2014:")
+
+        if not core or core.lower() == str(query).strip().lower():
+            return None
+
+        # "The Complete Edition" would leave "The": nothing to search for.
+        if not cls._search_tokens(core) - cls.SEARCH_STOP_WORDS:
+            return None
+
+        return core
+
+    @staticmethod
+    def _merge_results(first, second):
+        """Both lists, the first one's copy kept when a release is in both."""
+        merged = list(first)
+        seen = {watchlist.result_key(result) for result in merged}
+
+        for result in second:
+            key = watchlist.result_key(result)
+
+            if key not in seen:
+                seen.add(key)
+                merged.append(result)
+
+        return merged
 
     async def _run_search(
         self,
@@ -1671,14 +1725,43 @@ class TorrentSearchMixin:
         """
         service = JackettService()
 
+        # PC: the same search without the edition words, run next to the
+        # exact one, so a release that leaves the edition out is found.
+        core = self._core_query(query, category)
+        also_searched = None
+
         try:
             # Always try the exact user query first.
-            results, errors = (
-                await self._run_search(
-                    service,
-                    query,
+            if core:
+                exact, extra = await asyncio.gather(
+                    self._run_search(service, query),
+                    self._run_search(service, core),
+                    return_exceptions=True,
                 )
-            )
+
+                if isinstance(exact, Exception):
+                    raise exact
+
+                results, errors = exact
+
+                if isinstance(extra, Exception):
+                    logger.warning(
+                        "[TorrentSearch] The search for '%s' failed: %s",
+                        core,
+                        extra,
+                    )
+                else:
+                    extra_results, extra_errors = extra
+                    results = self._merge_results(results, extra_results)
+                    errors = {**extra_errors, **errors}
+                    also_searched = core
+            else:
+                results, errors = (
+                    await self._run_search(
+                        service,
+                        query,
+                    )
+                )
 
             searched_query = query
             fallback_used = False
@@ -1876,15 +1959,32 @@ class TorrentSearchMixin:
             "blocked_uploader_score": preferences.get("blocked_uploader_score", -100),
         }
 
+        # Relevance is judged on the game's name; the edition words only
+        # give a release that has them a small lead.
+        score_query = core or query
+        edition = (
+            self._search_tokens(query) - self._search_tokens(core)
+            if core
+            else set()
+        )
+
         ranked_results = [
             self._score_result(
                 result,
-                query,
+                score_query,
                 category_preferences,
                 has_preferred_resolution,
             )
             for result in results
         ]
+
+        if edition:
+            for result in ranked_results:
+                if edition <= self._search_tokens(result.get("title") or ""):
+                    result["score"] += self.EDITION_BONUS
+                    result["score_reason"] = ", ".join(
+                        ["edition match", *result["score_reason"].split(", ")][:3]
+                    )
 
         ranked_results.sort(
             key=lambda result: (
@@ -1922,6 +2022,7 @@ class TorrentSearchMixin:
         )
         ranked_results.hidden = hidden
         ranked_results.other = other
+        ranked_results.also_searched = also_searched
         ranked_results.not_lossless = not_lossless
         ranked_results.not_lossless_results = tuple(
             hidden_ranked[:self.MAX_RESULTS]

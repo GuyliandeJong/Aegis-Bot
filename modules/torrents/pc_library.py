@@ -51,12 +51,12 @@ def games_dir() -> Path | None:
     return Path(value) if value else None
 
 
-# "Game of the Year Edition", "Deluxe Edition", "GOTY": the same game,
-# so they do not count as words of its name.
+# "Game of the Year Edition", "Deluxe Edition", "Digital Deluxe Edition",
+# "GOTY": the same game, so they do not count as words of its name.
 EDITION = re.compile(
     r"\b(?:(?:game of the year|complete|deluxe|definitive|ultimate|enhanced|"
     r"gold|premium|collectors|special|anniversary|legendary|standard|"
-    r"digital|royal)\s+)?edition\b|\bgoty\b"
+    r"digital|royal)\s+)*edition\b|\bgoty\b"
 )
 
 

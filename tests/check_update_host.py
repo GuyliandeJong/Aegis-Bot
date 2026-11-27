@@ -115,7 +115,9 @@ class P:
         return result, calls, hooks
 
 
-def messages(hooks): return [h[len('BODY {"content": "'):].rstrip('"}') for h in hooks if h.startswith("BODY")]
+def messages(hooks):
+    # The elapsed seconds depend on the clock, so they are always shown as 0.
+    return [re.sub(r"ready after \d+s", "ready after 0s", h[len('BODY {"content": "'):].rstrip('"}')) for h in hooks if h.startswith("BODY")]
 def urls(hooks): return sorted({h[4:] for h in hooks if h.startswith("URL")})
 def git_calls(calls): return [c for c in calls if c.startswith("git ") and "fetch" in c or c.startswith("git -c core.hooksPath=/dev/null -c core.fsmonitor=false")]
 def started(calls): return any(c.startswith("git") for c in calls) or any(c.startswith("docker compose") for c in calls)

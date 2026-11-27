@@ -26,6 +26,7 @@ NAMES = [
     "Baldur's Gate 3", "The Witcher 3 Wild Hunt", "Portal 2.iso", "Stardew Valley (2016)", "Hades",
     "Fallout 4 - Game of the Year Edition", "Doom Eternal Deluxe Edition", "Chop Chop Inc (2026)",
     "Diablo IV", "Final Fantasy VII", "Mega Man X", "I Am Alive", "Mix Master",
+    "Phantom Blade Zero Digital Deluxe Edition",
 ]
 for name in NAMES:
     (GAMES / name).mkdir()
@@ -86,6 +87,11 @@ for query in ("Hades 2", "Diablo 4", "Diablo IV", "Final Fantasy 7", "Final Fant
               "Alive", "Mix", "Mix Master", "Portal II", "Football Manager MMXXIV"):
     print(f"  {query:24} -> {listed(query)}")
 print("  normalise:", [PL.normalise(t) for t in ("Hades II", "Mega Man X", "Mix Master", "Rocky XX")])
+print("\n== several edition words ==")
+for query in ("Phantom Blade Zero", "Phantom Blade Zero - Digital Deluxe Edition", "Phantom Blade Zero Deluxe Edition"):
+    print(f"  {query:46} -> {listed(query)}")
+print("  normalise:", PL.normalise("Phantom Blade Zero - Digital Deluxe Edition"))
+
 print("\n== notes, pictures, archives ==")
 print("  notes and pictures are not games:", listed("readme"), listed("cover"))
 print("  an archive is:", listed("Sekiro"))
